@@ -1,0 +1,2681 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.155 0.005 160);
+  --foreground: oklch(0.94 0.01 160);
+  --card: oklch(0.19 0.006 160);
+  --card-foreground: oklch(0.92 0.01 160);
+  --popover: oklch(0.19 0.006 160);
+  --popover-foreground: oklch(0.92 0.01 160);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.26 0.008 160);
+  --secondary-foreground: oklch(0.92 0.01 160);
+  --muted: oklch(0.26 0.008 160);
+  --muted-foreground: oklch(0.65 0.02 160);
+  --accent: oklch(0.26 0.008 160);
+  --accent-foreground: oklch(0.92 0.01 160);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.55 0.12 160);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.19 0.006 160);
+  --sidebar-foreground: oklch(0.92 0.01 160);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.26 0.008 160);
+  --sidebar-accent-foreground: oklch(0.92 0.01 160);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.55 0.12 160);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  /* Better focus-visible styles with emerald ring color */
+  *:focus-visible {
+    outline: 2px solid oklch(0.55 0.15 160);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Selection color (emerald) */
+  ::selection {
+    background-color: oklch(0.7 0.15 160 / 30%);
+    color: oklch(0.2 0.05 160);
+  }
+  .dark ::selection {
+    background-color: oklch(0.55 0.15 160 / 40%);
+    color: oklch(0.95 0.02 160);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0.1 160 / 30%);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0.12 160 / 50%);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.45 0.12 160 / 35%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.55 0.15 160 / 55%);
+}
+
+/* Dark mode scrollbar track */
+.dark ::-webkit-scrollbar-track {
+  background: oklch(0.18 0 0);
+}
+
+/* Thin scrollbar utility */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0.1 160 / 20%);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.5 0.12 160 / 40%);
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Animation keyframes */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Animation utility classes */
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 10%), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Staggered animation delay utilities */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+
+/* Section entrance animation */
+.section-enter {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.section-enter.section-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Smooth page transition utility class */
+.page-transition {
+  animation: page-fade-in 0.3s ease-out;
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card hover lift effect utility */
+.card-hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px oklch(0.55 0.15 160 / 15%);
+}
+
+.dark .card-hover-lift:hover {
+  box-shadow: 0 12px 24px -8px oklch(0.55 0.15 160 / 10%);
+}
+
+/* Gradient border utility */
+.gradient-border {
+  position: relative;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(135deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180), oklch(0.6 0.1 200));
+}
+
+/* Glass morphism utility */
+.glass {
+  background: oklch(1 0 0 / 80%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.dark .glass {
+  background: oklch(0.15 0 0 / 80%);
+}
+
+/* Badge glow effect */
+.badge-glow {
+  box-shadow: 0 0 8px oklch(0.55 0.15 160 / 40%), 0 0 16px oklch(0.55 0.15 160 / 20%);
+}
+
+.badge-glow-amber {
+  box-shadow: 0 0 8px oklch(0.75 0.15 85 / 40%), 0 0 16px oklch(0.75 0.15 85 / 20%);
+}
+
+.badge-glow-red {
+  box-shadow: 0 0 8px oklch(0.6 0.2 25 / 40%), 0 0 16px oklch(0.6 0.2 25 / 20%);
+}
+
+/* Animated gradient background utility */
+.animated-gradient-bg {
+  background: linear-gradient(-45deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180), oklch(0.6 0.1 200), oklch(0.55 0.15 160));
+  background-size: 400% 400%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Float animation for decorative elements */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(2deg); }
+  66% { transform: translateY(4px) rotate(-1deg); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out 2s infinite;
+}
+
+.animate-float-slow {
+  animation: float 8s ease-in-out 1s infinite;
+}
+
+/* Dark mode card border glow */
+.dark .card-hover-lift:hover {
+  box-shadow: 0 12px 24px -8px oklch(0.55 0.15 160 / 12%), 0 0 0 1px oklch(0.45 0.12 160 / 20%);
+}
+
+/* Dark mode card subtle border glow on hover */
+.dark [class*="bg-card"]:hover {
+  border-color: oklch(0.45 0.1 160 / 25%);
+}
+
+/* Dark mode text hierarchy - secondary text uses gray-300/400 instead of pure white */
+.dark .text-secondary-muted {
+  color: oklch(0.75 0.02 160);
+}
+
+/* Flip clock animation for countdown digits */
+@keyframes flip-down {
+  0% {
+    transform: perspective(200px) rotateX(0deg);
+  }
+  50% {
+    transform: perspective(200px) rotateX(-90deg);
+  }
+  100% {
+    transform: perspective(200px) rotateX(0deg);
+  }
+}
+
+.animate-flip {
+  animation: flip-down 0.4s ease-in-out;
+}
+
+/* Counter animation for stats */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count-up {
+  animation: count-up 0.6s ease-out forwards;
+}
+
+/* Ripple effect for buttons */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  animation: none;
+  pointer-events: none;
+}
+
+.ripple-effect:active::after {
+  animation: ripple 0.6s ease-out;
+}
+
+/* Checkout shimmer effect */
+@keyframes shimmer-button {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.btn-shimmer {
+  background-size: 200% auto;
+  background-image: linear-gradient(
+    90deg,
+    oklch(0.55 0.15 160) 0%,
+    oklch(0.65 0.15 160) 25%,
+    oklch(0.75 0.1 160) 50%,
+    oklch(0.65 0.15 160) 75%,
+    oklch(0.55 0.15 160) 100%
+  );
+  animation: shimmer-button 3s ease-in-out infinite;
+}
+
+/* Animated gradient border for sections */
+@keyframes border-rotate {
+  0% { --angle: 0deg; }
+  100% { --angle: 360deg; }
+}
+
+.animated-border-gradient {
+  position: relative;
+  border-radius: 1rem;
+  background: var(--background);
+}
+
+.animated-border-gradient::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    oklch(0.55 0.15 160),
+    oklch(0.5 0.12 180),
+    oklch(0.6 0.1 200),
+    oklch(0.55 0.15 160)
+  );
+  z-index: -1;
+  animation: spin 4s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Smooth tab content height transition */
+.tab-content-transition {
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+  overflow: hidden;
+}
+
+/* Zoom lens effect for product images */
+.zoom-lens-container {
+  position: relative;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.zoom-lens-container .zoom-lens {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border: 2px solid oklch(0.55 0.15 160 / 60%);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 2px oklch(1 0 0 / 20%), 0 4px 12px oklch(0 0 0 / 20%);
+}
+
+.zoom-lens-container:hover .zoom-lens {
+  opacity: 1;
+}
+
+/* Wishlist heart bounce animation */
+@keyframes heart-bounce {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.3); }
+  50% { transform: scale(0.95); }
+  75% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.animate-heart-bounce {
+  animation: heart-bounce 0.4s ease-in-out;
+}
+
+/* Search bar glow effect when focused */
+.search-glow:focus-within {
+  box-shadow: 0 0 0 3px oklch(0.55 0.15 160 / 25%), 0 0 12px oklch(0.55 0.15 160 / 15%);
+}
+
+/* Cart badge pulse when items change */
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.animate-badge-pulse {
+  animation: badge-pulse 0.4s ease-in-out;
+}
+
+/* Parallax effect utility */
+.parallax-slow {
+  will-change: transform;
+  transition: transform 0.1s linear;
+}
+
+/* Sticky mobile bottom bar */
+.sticky-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Quantity slide animation */
+@keyframes slide-up-number {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-down-number {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Promo code success/error animation */
+@keyframes promo-success {
+  0% { transform: scale(1); background-color: oklch(0.75 0.15 160 / 10%); }
+  50% { transform: scale(1.02); background-color: oklch(0.75 0.15 160 / 20%); }
+  100% { transform: scale(1); background-color: oklch(0.75 0.15 160 / 10%); }
+}
+
+@keyframes promo-error {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.animate-promo-success {
+  animation: promo-success 0.5s ease;
+}
+
+.animate-promo-error {
+  animation: promo-error 0.4s ease;
+}
+
+/* Empty cart sad face illustration */
+@keyframes float-sad {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float-sad {
+  animation: float-sad 3s ease-in-out infinite;
+}
+
+/* ============================================================
+   NEW STYLING POLISH UTILITIES - Enhanced visual effects
+   ============================================================ */
+
+/* Glass morphism - dark variant */
+.glass-dark {
+  background: oklch(0.15 0.005 160 / 85%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid oklch(1 0 0 / 8%);
+}
+
+.dark .glass-dark {
+  background: oklch(0.12 0.005 160 / 90%);
+}
+
+/* Gradient text - emerald variant */
+.gradient-text-emerald {
+  background: linear-gradient(135deg, oklch(0.55 0.2 160), oklch(0.5 0.15 170), oklch(0.6 0.18 155));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover glow - emerald glow on hover */
+.card-hover-glow {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.card-hover-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px oklch(0.55 0.15 160 / 15%), 0 8px 24px -4px oklch(0 0 0 / 10%);
+  border-color: oklch(0.55 0.15 160 / 30%);
+}
+
+.dark .card-hover-glow:hover {
+  box-shadow: 0 0 24px oklch(0.55 0.15 160 / 12%), 0 8px 24px -4px oklch(0 0 0 / 20%);
+  border-color: oklch(0.55 0.15 160 / 25%);
+}
+
+/* Enhanced shimmer loading effect - for product images */
+@keyframes shimmer-load {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.shimmer-loading {
+  background: linear-gradient(
+    90deg,
+    oklch(0.93 0.005 160) 0%,
+    oklch(0.97 0.01 160) 40%,
+    oklch(0.88 0.02 160 / 50%) 50%,
+    oklch(0.97 0.01 160) 60%,
+    oklch(0.93 0.005 160) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-load 1.5s ease-in-out infinite;
+}
+
+.dark .shimmer-loading {
+  background: linear-gradient(
+    90deg,
+    oklch(0.22 0.005 160) 0%,
+    oklch(0.28 0.01 160) 40%,
+    oklch(0.18 0.02 160 / 50%) 50%,
+    oklch(0.28 0.01 160) 60%,
+    oklch(0.22 0.005 160) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-load 1.5s ease-in-out infinite;
+}
+
+/* Focus ring animation - emerald pulse */
+@keyframes focus-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px oklch(0.55 0.15 160 / 40%); }
+  50% { box-shadow: 0 0 0 4px oklch(0.55 0.15 160 / 20%); }
+}
+
+.focus-ring-emerald:focus-visible {
+  outline: none;
+  animation: focus-ring-pulse 2s ease-in-out infinite;
+  border-color: oklch(0.55 0.15 160 / 60%);
+}
+
+/* Float animations with different speeds */
+.animate-float-fast {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-extra-slow {
+  animation: float 12s ease-in-out 3s infinite;
+}
+
+/* Ripple effect utility class */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, oklch(1 0 0 / 30%) 10%, transparent 10%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10);
+  opacity: 0;
+  transition: transform 0.5s, opacity 0.5s;
+}
+
+.ripple:active::after {
+  transform: scale(0);
+  opacity: 1;
+  transition: 0s;
+}
+
+/* Badge glow effects for different colors */
+.badge-glow-purple {
+  box-shadow: 0 0 8px oklch(0.55 0.2 300 / 40%), 0 0 16px oklch(0.55 0.2 300 / 20%);
+}
+
+.badge-glow-cyan {
+  box-shadow: 0 0 8px oklch(0.65 0.12 200 / 40%), 0 0 16px oklch(0.65 0.12 200 / 20%);
+}
+
+.badge-glow-green {
+  box-shadow: 0 0 8px oklch(0.65 0.15 140 / 40%), 0 0 16px oklch(0.65 0.15 140 / 20%);
+}
+
+/* Input focus styles with emerald accent */
+.input-emerald:focus {
+  border-color: oklch(0.55 0.15 160);
+  box-shadow: 0 0 0 3px oklch(0.55 0.15 160 / 15%), 0 0 8px oklch(0.55 0.15 160 / 10%);
+}
+
+/* Button gradient hover effects */
+.btn-gradient-emerald {
+  background: linear-gradient(135deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180));
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient-emerald:hover {
+  background: linear-gradient(135deg, oklch(0.5 0.18 160), oklch(0.45 0.15 180));
+  box-shadow: 0 4px 16px oklch(0.55 0.15 160 / 30%);
+  transform: translateY(-1px);
+}
+
+.btn-gradient-emerald:active {
+  transform: translateY(0);
+}
+
+/* "Just Sold" flash animation */
+@keyframes just-sold-flash {
+  0% { opacity: 0; transform: translateY(4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+.animate-just-sold {
+  animation: just-sold-flash 3s ease-in-out forwards;
+}
+
+/* 3D tilt effect for category cards */
+.tilt-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transform-style: preserve-3d;
+  perspective: 800px;
+}
+
+.tilt-card:hover {
+  box-shadow: 0 16px 32px -8px oklch(0.55 0.15 160 / 15%);
+}
+
+.dark .tilt-card:hover {
+  box-shadow: 0 16px 32px -8px oklch(0 0 0 / 30%), 0 0 0 1px oklch(0.45 0.12 160 / 20%);
+}
+
+/* Pulsing glow effect for Deal of the Day */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px oklch(0.55 0.15 160 / 20%), 0 0 40px oklch(0.55 0.15 160 / 10%); }
+  50% { box-shadow: 0 0 30px oklch(0.55 0.15 160 / 30%), 0 0 60px oklch(0.55 0.15 160 / 15%); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Confetti micro-animation for "New" badge */
+@keyframes confetti-burst {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-confetti {
+  animation: confetti-burst 0.4s ease-out;
+}
+
+/* Filter chip animation */
+@keyframes chip-in {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes chip-out {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.8); opacity: 0; }
+}
+
+.animate-chip-in {
+  animation: chip-in 0.2s ease-out forwards;
+}
+
+/* Staggered grid loading animation */
+@keyframes card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-card-appear {
+  animation: card-appear 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+/* Stock progress bar gradient */
+.stock-bar-gradient {
+  background: linear-gradient(90deg, oklch(0.65 0.2 25), oklch(0.75 0.18 85), oklch(0.65 0.15 140));
+}
+
+/* Animated number counter */
+@keyframes number-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-number-pop {
+  animation: number-pop 0.3s ease-out;
+}
+
+/* Cart button bounce animation */
+@keyframes cart-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.9); }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate-cart-bounce {
+  animation: cart-bounce 0.4s ease-out;
+}
+
+/* Price drop arrow animation */
+@keyframes price-drop {
+  0% { transform: translateY(-4px); opacity: 0; }
+  50% { transform: translateY(1px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.animate-price-drop {
+  animation: price-drop 0.4s ease-out;
+}
+
+/* Coupon applied success animation */
+@keyframes coupon-success {
+  0% { transform: scale(0.95); opacity: 0; }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-coupon-success {
+  animation: coupon-success 0.5s ease-out;
+}
+
+/* Save for later heart animation */
+@keyframes save-heart {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.3) rotate(-5deg); }
+  50% { transform: scale(0.9) rotate(3deg); }
+  75% { transform: scale(1.15) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.animate-save-heart {
+  animation: save-heart 0.5s ease-in-out;
+}
+
+/* Search suggestions dropdown animation */
+@keyframes dropdown-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown {
+  animation: dropdown-appear 0.15s ease-out;
+}
+
+/* Mega menu grid preview animation */
+@keyframes mega-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-mega-menu {
+  animation: mega-menu-in 0.2s ease-out;
+}
+
+/* ============================================================
+   MEGA MENU ENHANCED STYLING - Task 5-a
+   ============================================================ */
+
+/* Staggered item fade-in with upward slide */
+@keyframes mega-menu-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shimmer sweep effect when mega menu opens */
+@keyframes mega-menu-shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.mega-menu-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 30%) 25%,
+    oklch(1 0 0 / 50%) 50%,
+    oklch(1 0 0 / 30%) 75%,
+    transparent 100%
+  );
+  animation: mega-menu-shimmer-sweep 0.8s ease-out forwards;
+}
+
+.dark .mega-menu-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.55 0.15 160 / 8%) 25%,
+    oklch(0.55 0.15 160 / 15%) 50%,
+    oklch(0.55 0.15 160 / 8%) 75%,
+    transparent 100%
+  );
+}
+
+/* Mega menu panel - dark mode border glow */
+.mega-menu-panel {
+  border: 1px solid oklch(0.922 0 0 / 60%);
+  border-top: none;
+}
+
+.dark .mega-menu-panel {
+  border-color: oklch(0.45 0.12 160 / 25%);
+  box-shadow: 0 4px 24px oklch(0 0 0 / 30%), 0 0 0 1px oklch(0.45 0.12 160 / 15%);
+}
+
+/* Category item hover - colored left border accent */
+.mega-menu-item {
+  opacity: 0;
+}
+
+.mega-menu-item button:hover {
+  border-left-color: oklch(0.55 0.15 160 / 60%) !important;
+  padding-left: calc(0.5rem + 2px) !important;
+}
+
+[dir="rtl"] .mega-menu-item button:hover {
+  border-left-color: transparent !important;
+  border-right-color: oklch(0.55 0.15 160 / 60%) !important;
+  padding-left: 0.5rem !important;
+  padding-right: calc(0.5rem + 2px) !important;
+}
+
+/* Dark mode hover glow on category items */
+.dark .mega-menu-item button:hover {
+  border-left-color: oklch(0.55 0.15 160 / 80%) !important;
+  box-shadow: inset 2px 0 8px -4px oklch(0.55 0.15 160 / 20%);
+}
+
+[dir="rtl"] .dark .mega-menu-item button:hover {
+  border-left-color: transparent !important;
+  border-right-color: oklch(0.55 0.15 160 / 80%) !important;
+  box-shadow: inset -2px 0 8px -4px oklch(0.55 0.15 160 / 20%);
+}
+
+/* Featured item hover card glow */
+.dark .mega-menu-panel .group:hover {
+  border-color: oklch(0.45 0.12 160 / 30%);
+}
+
+/* Mobile mega menu slide-down animation */
+@keyframes mega-menu-mobile-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth category group header underline - color-specific overrides */
+/* These use CSS custom properties for dynamic group colors */
+
+/* Section decorative line/dot headers */
+.section-line {
+  position: relative;
+}
+
+.section-line::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180));
+}
+
+[dir="rtl"] .section-line::after {
+  left: auto;
+  right: 0;
+}
+
+/* Smooth page transition utilities */
+.page-enter {
+  animation: page-slide-in 0.35s ease-out;
+}
+
+@keyframes page-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Price range slider gradient track */
+.price-range-track {
+  background: linear-gradient(90deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180), oklch(0.6 0.1 200));
+}
+
+/* Better empty state */
+.empty-state-illustration {
+  position: relative;
+}
+
+.empty-state-illustration::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.55 0.15 160 / 5%), transparent 70%);
+}
+
+/* Back to top button - animated */
+@keyframes back-to-top-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-back-to-top {
+  animation: back-to-top-appear 0.3s ease-out;
+}
+
+/* Gradient shift for sell button */
+@keyframes gradient-shift-btn {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.btn-gradient-shift {
+  background: linear-gradient(135deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180), oklch(0.6 0.1 200));
+  background-size: 200% 200%;
+  animation: gradient-shift-btn 3s ease infinite;
+}
+
+/* Product specification table alternating rows */
+.spec-row-alt:nth-child(even) {
+  background-color: oklch(0.97 0.005 160 / 50%);
+}
+
+.dark .spec-row-alt:nth-child(even) {
+  background-color: oklch(0.22 0.005 160 / 30%);
+}
+
+/* Social sharing button hover */
+.social-btn-hover {
+  transition: all 0.2s ease;
+}
+
+.social-btn-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 15%);
+}
+
+/* Animated filter panel slide */
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Estimated delivery date badge */
+.delivery-badge {
+  border: 1px solid oklch(0.55 0.15 160 / 20%);
+  background: oklch(0.97 0.01 160 / 50%);
+}
+
+.dark .delivery-badge {
+  border-color: oklch(0.55 0.15 160 / 15%);
+  background: oklch(0.22 0.005 160 / 30%);
+}
+
+/* Mini cart preview animation */
+@keyframes mini-cart-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-mini-cart {
+  animation: mini-cart-in 0.2s ease-out;
+}
+
+/* Verified seller shimmer */
+@keyframes verified-shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.verified-badge-shimmer {
+  background: linear-gradient(90deg, oklch(0.55 0.15 160), oklch(0.75 0.1 160), oklch(0.55 0.15 160));
+  background-size: 200% 100%;
+  animation: verified-shimmer 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   CRON-DEV-2 STYLING POLISH - Micro-interaction enhancements
+   ============================================================ */
+
+/* Smooth page transition keyframes (fade + slight scale) */
+@keyframes page-transition-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-page-transition {
+  animation: page-transition-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Animated gradient background - warm emerald shift */
+@keyframes gradient-warm-shift {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 50% 0%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 50% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-gradient-warm {
+  background: linear-gradient(-45deg, oklch(0.55 0.15 160), oklch(0.5 0.12 170), oklch(0.58 0.14 155), oklch(0.52 0.13 165));
+  background-size: 400% 400%;
+  animation: gradient-warm-shift 10s ease infinite;
+}
+
+/* Improved focus ring styles for accessibility */
+*:focus-visible {
+  outline: 2px solid oklch(0.55 0.15 160);
+  outline-offset: 2px;
+  border-radius: 4px;
+  transition: outline-offset 0.15s ease;
+}
+
+*:focus-visible:active {
+  outline-offset: 1px;
+}
+
+/* Custom selection color (emerald) - enhanced */
+::selection {
+  background-color: oklch(0.7 0.15 160 / 35%);
+  color: oklch(0.15 0.05 160);
+}
+
+.dark ::selection {
+  background-color: oklch(0.55 0.15 160 / 45%);
+  color: oklch(0.95 0.02 160);
+}
+
+/* Improved skeleton loading animation (shimmer with emerald tint) */
+@keyframes shimmer-emerald {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-emerald {
+  background: linear-gradient(
+    90deg,
+    oklch(0.93 0.005 160) 0%,
+    oklch(0.96 0.01 160) 30%,
+    oklch(0.88 0.03 160 / 60%) 50%,
+    oklch(0.96 0.01 160) 70%,
+    oklch(0.93 0.005 160) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-emerald 1.8s ease-in-out infinite;
+}
+
+.dark .skeleton-emerald {
+  background: linear-gradient(
+    90deg,
+    oklch(0.22 0.005 160) 0%,
+    oklch(0.28 0.01 160) 30%,
+    oklch(0.18 0.03 160 / 60%) 50%,
+    oklch(0.28 0.01 160) 70%,
+    oklch(0.22 0.005 160) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-emerald 1.8s ease-in-out infinite;
+}
+
+/* Card hover lift effect with shadow progression */
+.card-hover-shadow {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover-shadow:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 4px 8px oklch(0 0 0 / 4%),
+    0 8px 16px oklch(0 0 0 / 4%),
+    0 16px 32px -4px oklch(0.55 0.15 160 / 10%);
+}
+
+.dark .card-hover-shadow:hover {
+  box-shadow:
+    0 4px 8px oklch(0 0 0 / 8%),
+    0 8px 16px oklch(0 0 0 / 8%),
+    0 16px 32px -4px oklch(0.55 0.15 160 / 8%);
+}
+
+.card-hover-shadow:active {
+  transform: translateY(-2px);
+}
+
+/* Button press effect (scale-95 on active) */
+.btn-press {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.95);
+}
+
+/* Toast notification slide-in animation */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%) scale(0.95);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-toast-out {
+  animation: toast-slide-out 0.25s ease-in forwards;
+}
+
+/* Input focus glow effect */
+.input-focus-glow {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-focus-glow:focus {
+  border-color: oklch(0.55 0.15 160);
+  box-shadow:
+    0 0 0 3px oklch(0.55 0.15 160 / 15%),
+    0 0 12px oklch(0.55 0.15 160 / 8%);
+}
+
+.dark .input-focus-glow:focus {
+  border-color: oklch(0.55 0.15 160);
+  box-shadow:
+    0 0 0 3px oklch(0.55 0.15 160 / 20%),
+    0 0 12px oklch(0.55 0.15 160 / 12%);
+}
+
+/* Image crossfade transition */
+@keyframes crossfade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-crossfade {
+  animation: crossfade-in 0.4s ease-out;
+}
+
+/* Sticky bottom bar animation */
+@keyframes slide-up-bar {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up-bar {
+  animation: slide-up-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Floating action button animation */
+@keyframes fab-bounce-in {
+  0% { transform: scale(0) translateY(20px); opacity: 0; }
+  50% { transform: scale(1.15) translateY(-4px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.animate-fab-in {
+  animation: fab-bounce-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Stock progress bar animation */
+@keyframes stock-bar-fill {
+  from { width: 0; }
+}
+
+.animate-stock-fill {
+  animation: stock-bar-fill 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Verified purchase badge shimmer */
+@keyframes verified-purchase-shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.verified-purchase-badge {
+  background: linear-gradient(90deg, oklch(0.55 0.15 160), oklch(0.7 0.1 160), oklch(0.55 0.15 160));
+  background-size: 200% 100%;
+  animation: verified-purchase-shimmer 3s ease-in-out infinite;
+}
+
+/* Follow button heart animation */
+@keyframes follow-heart {
+  0% { transform: scale(1); }
+  15% { transform: scale(1.35); }
+  30% { transform: scale(0.9); }
+  45% { transform: scale(1.15); }
+  60% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.animate-follow-heart {
+  animation: follow-heart 0.6s ease-in-out;
+}
+
+/* Gradient overlay for cover banners */
+.gradient-overlay {
+  position: relative;
+}
+
+.gradient-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    oklch(0 0 0 / 0%) 0%,
+    oklch(0 0 0 / 10%) 40%,
+    oklch(0 0 0 / 40%) 100%
+  );
+  pointer-events: none;
+}
+
+/* Star distribution bar */
+@keyframes bar-fill-right {
+  from { width: 0; }
+  to { width: var(--bar-width); }
+}
+
+.animate-bar-fill {
+  animation: bar-fill-right 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Timeline step colored indicator */
+.timeline-step-line {
+  position: relative;
+}
+
+.timeline-step-line::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 24px;
+  transform: translateX(-50%);
+}
+
+.timeline-step-completed::after {
+  background: oklch(0.55 0.15 160);
+}
+
+.timeline-step-pending::after {
+  background: oklch(0.85 0.02 160);
+}
+
+/* Expandable section animation */
+@keyframes expand-section {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.animate-expand {
+  animation: expand-section 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+/* Social share icon hover effect */
+.social-icon-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.social-icon-hover:hover {
+  transform: translateY(-3px) scale(1.05);
+}
+
+/* Lightning deal flash animation */
+@keyframes lightning-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-lightning-flash {
+  animation: lightning-flash 0.8s ease-in-out infinite;
+}
+
+/* Deal badge pulse animation */
+@keyframes deal-badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 oklch(0.6 0.2 25 / 40%);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 8px oklch(0.6 0.2 25 / 0%);
+  }
+}
+
+.animate-deal-pulse {
+  animation: deal-badge-pulse 1.5s ease-in-out infinite;
+}
+
+/* Progress step connector */
+.step-connector {
+  position: relative;
+}
+
+.step-connector-active::after {
+  background: oklch(0.55 0.15 160) !important;
+}
+
+/* Coupon success celebration */
+@keyframes coupon-celebrate {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.05) rotate(-1deg); }
+  50% { transform: scale(1.08) rotate(1deg); }
+  75% { transform: scale(1.03) rotate(-0.5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.animate-coupon-celebrate {
+  animation: coupon-celebrate 0.6s ease-out;
+}
+
+/* Reorder button cart icon animation */
+@keyframes cart-icon-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(-8deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(4deg); }
+}
+
+.animate-cart-bounce-icon {
+  animation: cart-icon-bounce 0.5s ease-in-out;
+}
+
+/* Quick action card gradient backgrounds */
+.gradient-card-emerald {
+  background: linear-gradient(135deg, oklch(0.95 0.05 160), oklch(0.92 0.06 165));
+}
+
+.dark .gradient-card-emerald {
+  background: linear-gradient(135deg, oklch(0.22 0.03 160), oklch(0.18 0.04 165));
+}
+
+.gradient-card-rose {
+  background: linear-gradient(135deg, oklch(0.95 0.05 0), oklch(0.92 0.06 10));
+}
+
+.dark .gradient-card-rose {
+  background: linear-gradient(135deg, oklch(0.22 0.03 0), oklch(0.18 0.04 10));
+}
+
+.gradient-card-purple {
+  background: linear-gradient(135deg, oklch(0.95 0.05 300), oklch(0.92 0.06 290));
+}
+
+.dark .gradient-card-purple {
+  background: linear-gradient(135deg, oklch(0.22 0.03 300), oklch(0.18 0.04 290));
+}
+
+.gradient-card-amber {
+  background: linear-gradient(135deg, oklch(0.95 0.05 85), oklch(0.92 0.06 75));
+}
+
+.dark .gradient-card-amber {
+  background: linear-gradient(135deg, oklch(0.22 0.03 85), oklch(0.18 0.04 75));
+}
+
+/* Wallet balance card gradient */
+.wallet-gradient {
+  background: linear-gradient(135deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180), oklch(0.45 0.1 200));
+}
+
+.dark .wallet-gradient {
+  background: linear-gradient(135deg, oklch(0.45 0.12 160), oklch(0.4 0.1 180), oklch(0.35 0.08 200));
+}
+
+/* Horizontal scroll hide scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Profile completion progress bar gradient */
+.profile-progress-gradient {
+  background: linear-gradient(90deg, oklch(0.55 0.15 160), oklch(0.5 0.12 175), oklch(0.6 0.1 155));
+}
+
+/* Payment method card hover */
+.payment-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.payment-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px -4px oklch(0.55 0.15 160 / 15%);
+}
+
+.dark .payment-card-hover:hover {
+  box-shadow: 0 6px 16px -4px oklch(0 0 0 / 25%), 0 0 0 1px oklch(0.55 0.15 160 / 15%);
+}
+
+/* Filter pill active state */
+.filter-pill-active {
+  background: oklch(0.55 0.15 160);
+  color: white;
+  box-shadow: 0 2px 8px oklch(0.55 0.15 160 / 30%);
+}
+
+/* Expandable accordion icon rotation */
+.expand-icon-rotate {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.expand-icon-rotate.open {
+  transform: rotate(180deg);
+}
+
+/* Store stats card subtle animation */
+@keyframes stat-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stat-card-in {
+  animation: stat-card-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* Empty state floating illustration */
+@keyframes empty-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-8px) rotate(1deg); }
+  50% { transform: translateY(-4px) rotate(-1deg); }
+  75% { transform: translateY(-10px) rotate(0.5deg); }
+}
+
+.animate-empty-float {
+  animation: empty-float 4s ease-in-out infinite;
+}
+
+/* ============================================================
+   TASK 5: Product Detail Page Styling Enhancements
+   ============================================================ */
+
+/* Sale badge shimmer/sparkle effect */
+@keyframes sale-badge-sparkle {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.sale-badge-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 30%) 25%,
+    oklch(1 0 0 / 60%) 50%,
+    oklch(1 0 0 / 30%) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: sale-badge-sparkle 2s ease-in-out infinite;
+}
+
+/* Action buttons animated gradient border */
+@keyframes gradient-border-rotate {
+  0% { --angle: 0deg; }
+  100% { --angle: 360deg; }
+}
+
+.action-buttons-gradient-border {
+  background: conic-gradient(
+    from 0deg,
+    oklch(0.55 0.15 160),
+    oklch(0.5 0.12 180),
+    oklch(0.6 0.1 200),
+    oklch(0.55 0.15 160),
+    oklch(0.5 0.12 180),
+    oklch(0.6 0.1 200),
+    oklch(0.55 0.15 160)
+  );
+  animation: spin 6s linear infinite;
+}
+
+/* Seller card gradient background */
+.seller-card-gradient {
+  background: oklch(1 0 0);
+}
+
+.dark .seller-card-gradient {
+  background: oklch(0.19 0.006 160);
+}
+
+/* Verified seller checkmark animation */
+@keyframes check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.verified-check-anim {
+  animation: check-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Tab list emerald accent */
+.tab-list-emerald {
+  border-bottom: 2px solid oklch(0.9 0.02 160 / 30%);
+  position: relative;
+}
+
+.dark .tab-list-emerald {
+  border-bottom-color: oklch(0.3 0.02 160 / 30%);
+}
+
+/* Tab trigger emerald accent transition */
+.tab-trigger-emerald {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.tab-trigger-emerald[data-state="active"] {
+  border-bottom-color: oklch(0.55 0.15 160);
+}
+
+/* Tab count badge */
+.tab-count-badge {
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.tab-trigger-emerald[data-state="active"] .tab-count-badge {
+  background-color: oklch(0.55 0.15 160 / 15%);
+  color: oklch(0.45 0.15 160);
+}
+
+.dark .tab-trigger-emerald[data-state="active"] .tab-count-badge {
+  background-color: oklch(0.55 0.15 160 / 25%);
+  color: oklch(0.7 0.1 160);
+}
+
+/* Main image container border/shadow */
+.main-image-container {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 5%),
+    0 4px 12px oklch(0.55 0.15 160 / 5%);
+  transition: box-shadow 0.3s ease;
+}
+
+.main-image-container:hover {
+  box-shadow:
+    0 2px 6px oklch(0 0 0 / 8%),
+    0 8px 24px oklch(0.55 0.15 160 / 8%);
+}
+
+.dark .main-image-container {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 15%),
+    0 4px 12px oklch(0.55 0.15 160 / 3%);
+}
+
+.dark .main-image-container:hover {
+  box-shadow:
+    0 2px 6px oklch(0 0 0 / 20%),
+    0 8px 24px oklch(0.55 0.15 160 / 5%);
+}
+
+/* Thumbnail strip custom scrollbar */
+.thumbnail-strip::-webkit-scrollbar {
+  height: 3px;
+}
+
+.thumbnail-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thumbnail-strip::-webkit-scrollbar-thumb {
+  background: oklch(0.55 0.15 160 / 20%);
+  border-radius: 9999px;
+}
+
+.thumbnail-strip::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.55 0.15 160 / 40%);
+}
+
+/* Notification toggle switch enhancement */
+.switch-emerald[data-state="checked"] {
+  background-color: oklch(0.55 0.15 160);
+}
+
+/* ============================================================
+   TASK 5 - Styling Improvements for Deals, Cars, Properties, Shop, Product Detail
+   ============================================================ */
+
+/* Animated gradient border for Deal of the Day hero card */
+@keyframes gradient-border-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.deal-hero-gradient-border {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.deal-hero-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #ef4444, #f59e0b);
+  background-size: 300% 100%;
+  animation: gradient-border-shift 3s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Sparkle/shimmer effect on discount badges */
+@keyframes sparkle-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.discount-sparkle {
+  background: linear-gradient(90deg, #ef4444 0%, #fb923c 25%, #fde68a 50%, #fb923c 75%, #ef4444 100%);
+  background-size: 200% auto;
+  animation: sparkle-shimmer 2s ease-in-out infinite;
+}
+
+/* Pulsing amber border for Lightning Deals */
+@keyframes amber-border-pulse {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 1);
+    box-shadow: 0 0 12px 2px rgba(245, 158, 11, 0.2);
+  }
+}
+
+.lightning-deal-pulse-border {
+  animation: amber-border-pulse 2s ease-in-out infinite;
+}
+
+/* HOT fire badge flicker animation */
+@keyframes hot-fire-flicker {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  25% { transform: scale(1.05); opacity: 0.9; }
+  50% { transform: scale(1.02); opacity: 1; }
+  75% { transform: scale(1.07); opacity: 0.95; }
+}
+
+.animate-hot-fire {
+  animation: hot-fire-flicker 1.5s ease-in-out infinite;
+}
+
+/* Map pin bounce animation */
+@keyframes map-pin-bounce {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-3px); }
+  60% { transform: translateY(-1px); }
+}
+
+.animate-map-pin {
+  animation: map-pin-bounce 1.5s ease-in-out infinite;
+}
+
+/* Featured gold badge shimmer */
+@keyframes gold-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.featured-gold-badge {
+  background: linear-gradient(90deg, #b8860b, #ffd700, #b8860b, #ffd700);
+  background-size: 200% auto;
+  animation: gold-shimmer 2.5s ease-in-out infinite;
+}
+
+/* Animated product count bump */
+@keyframes count-bump {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.animate-count-bump {
+  animation: count-bump 0.3s ease-out;
+}
+
+/* Car silhouette drive-in animation */
+@keyframes car-drive-in {
+  0% { transform: translateX(100%); opacity: 0; }
+  60% { transform: translateX(-5%); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.animate-car-drive {
+  animation: car-drive-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Verified seller badge animated glow */
+@keyframes seller-verified-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+}
+
+.seller-verified-anim {
+  animation: seller-verified-glow 2s ease-in-out infinite;
+}
+
+/* Sticky bottom cart bar for mobile */
+.mobile-sticky-cart {
+  position: fixed;
+  bottom: 0;
+  inset-inline: 0;
+  z-index: 50;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid rgba(16, 185, 129, 0.15);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  animation: slide-up-bar 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .mobile-sticky-cart {
+  background: rgba(15, 23, 20, 0.95);
+  border-top-color: rgba(16, 185, 129, 0.25);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Bundle discount badge pulse */
+@keyframes bundle-save-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.animate-bundle-save {
+  animation: bundle-save-pulse 2s ease-in-out infinite;
+}
+
+/* Deal card hover scale */
+.deal-card-hover {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+
+.deal-card-hover:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.12);
+}
+
+/* Car card hover detail overlay */
+.car-detail-overlay {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.car-card-hover:hover .car-detail-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Furnished/unfurnished badge styling */
+.furnished-badge {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: white;
+}
+
+.unfurnished-badge {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.dark .furnished-badge {
+  background: linear-gradient(135deg, #065f46, #047857);
+}
+
+.dark .unfurnished-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+/* Active filter pill animation */
+.filter-pill-anim {
+  animation: chip-in 0.2s ease-out forwards;
+}
+
+/* Car condition gradient cards */
+.car-condition-new {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(20, 184, 166, 0.05));
+}
+
+.car-condition-used {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.05));
+}
+
+.dark .car-condition-new {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(20, 184, 166, 0.1));
+}
+
+.dark .car-condition-used {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(234, 88, 12, 0.1));
+}
+
+/* Stock progress bar color coding */
+.stock-bar-red { background: #ef4444; }
+.stock-bar-amber { background: #f59e0b; }
+.stock-bar-green { background: #10b981; }
+
+/* Discount badge pulse animation */
+@keyframes discount-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.animate-discount-pulse {
+  animation: discount-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   TASK 5 - Styling Polish: Animated gradients, hover effects,
+   mobile sticky bar, count animations
+   ============================================================ */
+
+/* Animated gradient border rotation keyframe (for deal hero card) */
+@keyframes gradient-border-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Enhanced deal hero gradient border - animated shimmer */
+.deal-hero-gradient-border::before {
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #ec4899, #ef4444, #f59e0b);
+  background-size: 300% 100%;
+  animation: gradient-border-rotate 4s ease infinite;
+}
+
+/* Product count badge animation - scale + color flash */
+@keyframes product-count-pop {
+  0% { transform: scale(1); color: inherit; }
+  30% { transform: scale(1.25); color: #10b981; }
+  100% { transform: scale(1); color: inherit; }
+}
+
+.animate-product-count {
+  animation: product-count-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Cars hero gradient overlay pattern */
+.cars-hero-pattern {
+  position: relative;
+}
+
+.cars-hero-pattern::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.06) 0%, transparent 40%),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 40px,
+      rgba(255, 255, 255, 0.02) 40px,
+      rgba(255, 255, 255, 0.02) 80px
+    );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Ensure hero content sits above the pattern overlay */
+.cars-hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Enhanced car condition gradient cards - stronger visual distinction */
+.car-condition-new {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(52, 211, 153, 0.06), rgba(16, 185, 129, 0.03));
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.car-condition-used {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.06), rgba(245, 158, 11, 0.03));
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.dark .car-condition-new {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.1), rgba(16, 185, 129, 0.05));
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.dark .car-condition-used {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Reusable hover scale effect */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -6px oklch(0 0 0 / 10%), 0 0 0 1px oklch(0.55 0.15 160 / 10%);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 0 12px 24px -6px oklch(0 0 0 / 20%), 0 0 0 1px oklch(0.55 0.15 160 / 15%);
+}
+
+.hover-lift:active {
+  transform: translateY(-2px);
+}
+
+/* Discount badge subtle pulse - for product detail */
+@keyframes discount-badge-soft-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+  }
+}
+
+.animate-discount-soft-pulse {
+  animation: discount-badge-soft-pulse 2.5s ease-in-out infinite;
+}
+
+/* Mobile sticky Add to Cart bar */
+.mobile-sticky-cart {
+  position: fixed;
+  bottom: 0;
+  inset-inline: 0;
+  z-index: 50;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  padding: 0.75rem 1rem;
+  animation: slide-up-bar 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .mobile-sticky-cart {
+  background: rgba(15, 23, 20, 0.97);
+  border-top-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Active filter pill entrance animation (enhanced) */
+.filter-pill-anim {
+  animation: chip-in 0.2s ease-out forwards;
+}
+
+/* Filter pill exit animation */
+.filter-pill-exit {
+  animation: chip-out 0.15s ease-in forwards;
+}
+
+/* ============================================================
+   TASK 5-b: Premium Styling Enhancements
+   ============================================================ */
+
+/* Hero particle/sparkle animation */
+@keyframes sparkle-float {
+  0% { transform: translateY(0) translateX(0) scale(0); opacity: 0; }
+  20% { opacity: 1; transform: translateY(-10px) translateX(3px) scale(1); }
+  80% { opacity: 0.6; transform: translateY(-40px) translateX(-5px) scale(0.8); }
+  100% { opacity: 0; transform: translateY(-60px) translateX(2px) scale(0); }
+}
+
+.hero-sparkle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: oklch(1 0 0 / 80%);
+  animation: sparkle-float var(--sparkle-duration, 3s) ease-in-out var(--sparkle-delay, 0s) infinite;
+  pointer-events: none;
+}
+
+/* Hero vignette effect */
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, oklch(0 0 0 / 40%) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Hero progress bar for auto-advance timing */
+@keyframes hero-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.hero-progress-bar {
+  height: 3px;
+  background: oklch(1 0 0 / 60%);
+  border-radius: 9999px;
+  animation: hero-progress var(--carousel-duration, 5s) linear;
+}
+
+/* Scroll down indicator bounce */
+@keyframes scroll-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(8px); opacity: 1; }
+}
+
+.animate-scroll-bounce {
+  animation: scroll-bounce 2s ease-in-out infinite;
+}
+
+/* Cinematic slide transitions */
+@keyframes cinematic-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(60px) scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes cinematic-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-60px) scale(0.98);
+  }
+}
+
+.hero-slide-enter {
+  animation: cinematic-slide-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hero-slide-exit {
+  animation: cinematic-slide-out 0.6s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+/* Glassmorphism CTA button effect */
+.glassmorphism-btn {
+  background: oklch(1 0 0 / 15%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid oklch(1 0 0 / 25%);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glassmorphism-btn:hover {
+  background: oklch(1 0 0 / 25%);
+  border-color: oklch(1 0 0 / 40%);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 20%), 0 0 0 1px oklch(1 0 0 / 10%) inset;
+  transform: translateY(-2px);
+}
+
+/* Product card - grid line pattern on hover */
+@keyframes grid-pattern-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.product-grid-pattern {
+  background-image:
+    linear-gradient(oklch(0.55 0.15 160 / 3%) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.55 0.15 160 / 3%) 1px, transparent 1px);
+  background-size: 20px 20px;
+  animation: grid-pattern-in 0.3s ease-out;
+}
+
+/* Animated gradient badge for "New" and "Sale" */
+@keyframes badge-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.badge-animated-gradient {
+  background-size: 200% 200%;
+  animation: badge-gradient-shift 3s ease infinite;
+}
+
+.badge-new-animated {
+  background: linear-gradient(135deg, oklch(0.55 0.2 160), oklch(0.5 0.18 170), oklch(0.6 0.15 155), oklch(0.55 0.2 160));
+  background-size: 200% 200%;
+  animation: badge-gradient-shift 2.5s ease infinite;
+}
+
+.badge-sale-animated {
+  background: linear-gradient(135deg, oklch(0.6 0.22 25), oklch(0.55 0.2 15), oklch(0.65 0.18 35), oklch(0.6 0.22 25));
+  background-size: 200% 200%;
+  animation: badge-gradient-shift 2s ease infinite;
+}
+
+/* Price highlight background */
+.price-highlight {
+  background: linear-gradient(90deg, oklch(0.55 0.15 160 / 8%), oklch(0.55 0.15 160 / 3%));
+  border-radius: 6px;
+  padding: 2px 6px;
+  display: inline-block;
+}
+
+.dark .price-highlight {
+  background: linear-gradient(90deg, oklch(0.55 0.15 160 / 12%), oklch(0.55 0.15 160 / 5%));
+}
+
+/* Cart icon slide animation */
+@keyframes cart-slide-in {
+  0% { transform: translateX(-8px) rotate(-10deg); opacity: 0.5; }
+  60% { transform: translateX(2px) rotate(3deg); opacity: 1; }
+  100% { transform: translateX(0) rotate(0deg); opacity: 1; }
+}
+
+.animate-cart-slide {
+  animation: cart-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Category card animated border pulse */
+@keyframes border-pulse {
+  0%, 100% { border-color: oklch(0.55 0.15 160 / 15%); }
+  50% { border-color: oklch(0.55 0.15 160 / 40%); }
+}
+
+.category-border-pulse {
+  animation: border-pulse 3s ease-in-out infinite;
+}
+
+/* Category card 3D tilt on hover */
+.category-tilt {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  transform-style: preserve-3d;
+}
+
+.category-tilt:hover {
+  transform: perspective(600px) rotateX(2deg) rotateY(-2deg) translateY(-4px);
+  box-shadow: 0 16px 32px -8px oklch(0.55 0.15 160 / 15%);
+}
+
+.dark .category-tilt:hover {
+  box-shadow: 0 16px 32px -8px oklch(0 0 0 / 30%), 0 0 0 1px oklch(0.45 0.12 160 / 20%);
+}
+
+/* Category count badge gradient */
+.count-badge-gradient {
+  background: linear-gradient(135deg, oklch(0.55 0.15 160), oklch(0.5 0.12 180));
+  color: white;
+}
+
+/* Trending searches animated gradient bg */
+@keyframes trending-gradient-bg {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 50% 0%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 50% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+.trending-section-bg {
+  background: linear-gradient(-45deg, oklch(0.55 0.12 160 / 5%), oklch(0.5 0.1 180 / 8%), oklch(0.58 0.11 155 / 6%), oklch(0.52 0.1 165 / 5%));
+  background-size: 400% 400%;
+  animation: trending-gradient-bg 12s ease infinite;
+}
+
+.dark .trending-section-bg {
+  background: linear-gradient(-45deg, oklch(0.55 0.12 160 / 8%), oklch(0.5 0.1 180 / 12%), oklch(0.58 0.11 155 / 10%), oklch(0.52 0.1 165 / 8%));
+  background-size: 400% 400%;
+  animation: trending-gradient-bg 12s ease infinite;
+}
+
+/* Trending tag glassmorphism */
+.trending-tag-glass {
+  background: oklch(1 0 0 / 12%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid oklch(1 0 0 / 15%);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.trending-tag-glass:hover {
+  background: oklch(1 0 0 / 20%);
+  border-color: oklch(1 0 0 / 25%);
+  box-shadow: 0 4px 16px oklch(0 0 0 / 15%);
+}
+
+/* Trending flame wiggle animation */
+@keyframes flame-wiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  15% { transform: rotate(-5deg) scale(1.05); }
+  30% { transform: rotate(3deg) scale(1.1); }
+  45% { transform: rotate(-3deg) scale(1.05); }
+  60% { transform: rotate(2deg) scale(1); }
+  75% { transform: rotate(-1deg) scale(1); }
+}
+
+.animate-flame-wiggle {
+  animation: flame-wiggle 2s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Trending tag hover tilt */
+.trending-tag-tilt {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.trending-tag-tilt:hover {
+  transform: rotate(-2deg) translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 12px oklch(0 0 0 / 15%);
+}
+
+/* ============================================================
+   MISSING CSS CLASS DEFINITIONS - Task 3
+   ============================================================ */
+
+/* a. Hero sparkle effect */
+.hero-sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: white;
+  animation: sparkle-float 3s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+@keyframes sparkle-float {
+  0%, 100% { opacity: 0.2; transform: translateY(0) scale(1); }
+  50% { opacity: 0.8; transform: translateY(-20px) scale(1.5); }
+}
+
+/* b. Hero vignette effect */
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none;
+}
+
+/* c. Hero slide transitions */
+.hero-slide-enter {
+  animation: slideIn 0.7s ease-out forwards;
+}
+
+.hero-slide-exit {
+  animation: slideOut 0.7s ease-in forwards;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-100%); opacity: 0; }
+}
+
+/* d. Glassmorphism button effect */
+.glassmorphism-btn {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* e. Seller card gradient */
+.seller-card-gradient {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(20, 184, 166, 0.1));
+}
+
+/* f. Sale badge shimmer effect */
+.sale-badge-shimmer {
+  background: linear-gradient(110deg, rgba(239, 68, 68, 0.9) 0%, rgba(249, 115, 22, 0.9) 45%, rgba(255, 255, 255, 0.6) 50%, rgba(249, 115, 22, 0.9) 55%, rgba(239, 68, 68, 0.9) 100%);
+  background-size: 200% 100%;
+  animation: shimmer-slide 2s linear infinite;
+}
+
+@keyframes shimmer-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* g. Action buttons gradient border */
+.action-buttons-gradient-border {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.action-buttons-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #10b981, #14b8a6);
+  z-index: -1;
+}
+
+/* h. Verified checkmark animation */
+.verified-check-anim {
+  animation: verified-pop 0.4s ease-out;
+}
+
+@keyframes verified-pop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* i. Discount soft pulse animation */
+.animate-discount-soft-pulse {
+  animation: discount-soft-pulse 2s ease-in-out infinite;
+}
+
+@keyframes discount-soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* j. Tab styling - emerald theme */
+.tab-list-emerald [role="tablist"] {
+  border-bottom-color: rgba(16, 185, 129, 0.2);
+}
+
+.tab-trigger-emerald[data-state="active"] {
+  color: #10b981;
+  border-bottom-color: #10b981;
+}
+
+.tab-count-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  margin-left: 4px;
+}
