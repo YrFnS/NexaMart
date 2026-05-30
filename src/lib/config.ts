@@ -14,7 +14,6 @@ export const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'nexamart.com';
 export const APP_URL = `https://${APP_DOMAIN}`;
 export const APP_SUPPORT_EMAIL = `support@${APP_DOMAIN}`;
 export const APP_NOREPLY_EMAIL = `noreply@${APP_DOMAIN}`;
-// TODO: Move these to PlatformSettings DB table for admin-configurable values
 export const APP_SUPPORT_PHONE = process.env.NEXT_PUBLIC_SUPPORT_PHONE || '+966 50 123 4567';
 export const APP_ADDRESS = process.env.NEXT_PUBLIC_APP_ADDRESS || 'Dubai, UAE & Riyadh, KSA';
 
@@ -59,7 +58,7 @@ export const SHIPPING_CONFIG = {
     express: { id: 'express', price: 9.99, days: '2-3' },
     nextDay: { id: 'next_day', price: 19.99, days: '1' },
   },
-  chatServicePort: parseInt(process.env.CHAT_SERVICE_PORT || '3003', 10),
+  chatServicePort: parseInt(process.env.NEXT_PUBLIC_CHAT_SERVICE_PORT || '3003', 10),
 };
 
 // ─── Commission & Fees ───────────────────────────────────────────────────────
@@ -181,7 +180,6 @@ export const SOCIAL_SHARE = {
 };
 
 // ─── Default Seller Phone ────────────────────────────────────────────────────
-// TODO: Move to PlatformSettings DB table
 export const DEFAULT_SELLER_PHONE = process.env.NEXT_PUBLIC_DEFAULT_SELLER_PHONE || '+971501234567';
 
 // ─── localStorage Keys ───────────────────────────────────────────────────────
