@@ -44,7 +44,7 @@ export function AdminLoginGate({ children }: { children: React.ReactNode }) {
 
   // Check localStorage on mount — eslint-disable for setMounted in effect
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setMounted(true);
     if (hasAdminKey()) {
       // Verify the stored key is still valid by making a test request
