@@ -31,15 +31,18 @@ export interface Product {
   name: string;
   nameAr?: string;
   description?: string;
+  descriptionAr?: string;
   price: number;
   originalPrice?: number;
   images: string;
   categoryId: string;
   storeId: string;
+  sku?: string;
   stock: number;
   rating: number;
   reviewCount: number;
   soldCount: number;
+  views?: number;
   isFeatured: boolean;
   isNew: boolean;
   isSale: boolean;
@@ -49,8 +52,10 @@ export interface Product {
   tieredPricing: string;
   tags: string;
   category?: { id: string; name: string; nameAr?: string };
-  store?: { id: string; name: string; rating: number; isVerified: boolean };
+  store?: { id: string; name: string; nameAr?: string; rating: number; isVerified: boolean; location?: string; productCount?: number };
   createdAt: string;
+  updatedAt?: string;
+  expiresAt?: string;
   promotionType?: 'bump-up' | 'featured-ad' | 'premium-ad' | 'urgent-badge' | 'spotlight' | null;
 }
 

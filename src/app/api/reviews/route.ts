@@ -9,7 +9,10 @@ export async function GET(request: Request) {
     const where = productId ? { productId } : {};
     const reviews = await db.review.findMany({
       where,
-      include: { user: { select: { name: true, avatar: true } } },
+      include: {
+        user: { select: { name: true, avatar: true } },
+        product: { select: { name: true, nameAr: true, price: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 

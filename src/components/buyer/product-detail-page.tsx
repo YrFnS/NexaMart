@@ -492,7 +492,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
             <span className="text-sm text-muted-foreground">
               {product.soldCount.toLocaleString()} {t('sold')}
             </span>
-            <ListingExpirationBadge createdAt={product.createdAt || new Date().toISOString()} expiresAt={(product as Record<string, unknown>).expiresAt as string | undefined} />
+            <ListingExpirationBadge createdAt={product.createdAt || new Date().toISOString()} expiresAt={(product as unknown as Record<string, unknown>).expiresAt as string | undefined} />
           </div>
 
           {/* Price */}
@@ -884,7 +884,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
               {Object.entries({
-                SKU: (product as Record<string, unknown>).sku ? String((product as Record<string, unknown>).sku) : 'N/A',
+                SKU: product.sku || 'N/A',
                 Category: product.category?.name || 'N/A',
                 Stock: String(product.stock),
                 Rating: `${product.rating}/5`,

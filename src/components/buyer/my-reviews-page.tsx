@@ -53,20 +53,23 @@ export function MyReviewsPage() {
         const res = await fetch('/api/reviews');
         if (res.ok) {
           const data = await res.json();
-          const mapped = (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => ({
-            id: (r.id as string) || '',
-            productName: (r.productName as string) || (r.product?.name as string) || 'Product',
-            productNameAr: (r.productNameAr as string) || (r.product?.nameAr as string) || '',
-            productImage: (r.productImage as string) || '',
-            productPrice: (r.productPrice as number) || (r.product?.price as number) || 0,
+          const mapped = (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => {
+            const prod = r.product as Record<string, unknown> | undefined;
+            return {
+              id: (r.id as string) || '',
+              productName: (r.productName as string) || (prod?.name as string) || 'Product',
+              productNameAr: (r.productNameAr as string) || (prod?.nameAr as string) || '',
+              productImage: (r.productImage as string) || '',
+              productPrice: (r.productPrice as number) || (prod?.price as number) || 0,
             rating: (r.rating as number) || 0,
             reviewText: (r.comment as string) || '',
             reviewTextAr: (r.commentAr as string) || '',
             date: r.createdAt ? new Date(r.createdAt as string).toISOString().split('T')[0] : (r.date as string) || '',
-            helpfulCount: (r.helpfulCount as number) || 0,
-            isVerified: (r.isVerified as boolean) || false,
-            hasImages: (r.hasImages as boolean) || false,
-          }));
+              helpfulCount: (r.helpfulCount as number) || 0,
+              isVerified: (r.isVerified as boolean) || false,
+              hasImages: (r.hasImages as boolean) || false,
+            };
+          });
           setReviews(mapped);
         }
       } catch {

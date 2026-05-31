@@ -68,7 +68,14 @@ const COUNTRIES = [
 
 const defaultAddresses: Address[] = [];
 
-const defaultRecentOrders = [];
+const defaultRecentOrders: {
+  id: string;
+  orderNumber: string;
+  date: string;
+  status: string;
+  total: number;
+  itemCount: number;
+}[] = [];
 
 const defaultWishlistItems = [];
 

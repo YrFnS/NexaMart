@@ -153,7 +153,17 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
-    let userData = null;
+    let userData: {
+      userId: string;
+      userName: string | null;
+      currentTier: string;
+      points: number;
+      pointsToNextTier: number;
+      nextTier: string | null;
+      pointMultiplier: number;
+      recentPointsHistory: never[];
+      availableRewards: { id: string; name: string; nameAr: string; pointsCost: number }[];
+    } | null = null;
     if (userId) {
       try {
         const user = await db.user.findUnique({

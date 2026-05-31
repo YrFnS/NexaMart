@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
@@ -67,6 +67,7 @@ model Store {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  location  String?
   owner     User      @relation(fields: [ownerId], references: [id])
   products  Product[]
   orders    Order[]
@@ -110,6 +111,7 @@ model Product {
   rating        Float    @default(0)
   reviewCount   Int      @default(0)
   soldCount     Int      @default(0)
+  views         Int      @default(0)
   isFeatured    Boolean  @default(false)
   isNew         Boolean  @default(false)
   isSale        Boolean  @default(false)
@@ -129,6 +131,7 @@ model Product {
   wishlistItems Wishlist[]
   priceAlerts   PriceAlert[]
   returns       Return[]
+  auctions      Auction[]
 }
 
 model Order {
@@ -279,6 +282,8 @@ model Auction {
   bidCount      Int      @default(0)
   winnerId      String?
   createdAt     DateTime @default(now())
+
+  product       Product      @relation(fields: [productId], references: [id])
 }
 
 model App {

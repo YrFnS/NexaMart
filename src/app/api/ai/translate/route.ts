@@ -15,6 +15,6 @@ export async function POST(request: Request) {
     return Response.json({ translation: translation || text });
   } catch (error) {
     console.error('Translate API error:', error);
-    return Response.json({ translation: text || '' });
+    return Response.json({ translation: '' });
   }
 }
