@@ -438,4 +438,4 @@ export function LocationGuideSection() {
   );
 }
 
-export type { FeaturedStore };
+

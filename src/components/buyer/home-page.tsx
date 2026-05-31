@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Sparkles, Zap, TrendingUp, Flame, ShoppingBag } from 'lucide-react';
+
 import { useI18n } from '@/lib/i18n';
-import { useAppNavigation } from '@/lib/use-app-navigation';
 import { type Product } from '@/components/buyer/product-card';
 import { type Category } from '@/components/buyer/category-grid';
 import { ProductQuickView } from '@/components/buyer/product-quick-view';
@@ -28,7 +27,6 @@ import {
 
 export function HomePage() {
   const { t, locale } = useI18n();
-  const { setView } = useAppNavigation();
   const isRTL = locale === 'ar';
 
   // Quick view state
@@ -132,11 +130,7 @@ export function HomePage() {
     fetchData();
   }, []);
 
-  // Icon name to component mapping
-  const iconMap: Record<string, React.ElementType> = {
-    Sparkles, Zap, TrendingUp, Flame, ShoppingBag, Star: Sparkles,
-    Gift: ShoppingBag, Globe: TrendingUp,
-  };
+
 
   // Default fallback slides (used when no banners from admin)
   const defaultSlides = [
