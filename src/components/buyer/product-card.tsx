@@ -290,7 +290,7 @@ export function ProductCard({ product, onQuickView, onView }: ProductCardProps) 
                   className={`size-8 rounded-full shadow-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-white/20 ${
                     isComparing ? 'text-white ring-2 hover:brightness-110' : 'hover:bg-muted text-gray-600 dark:text-gray-400'
                   }`}
-                  style={isComparing ? { backgroundColor: GOLD, ringColor: `${GOLD}50` } : undefined}
+                  style={isComparing ? { backgroundColor: GOLD, boxShadow: `0 0 0 2px ${GOLD}50` } : undefined}
                   onClick={handleCompare}
                   aria-label={t('addToCompare')}
                 >
