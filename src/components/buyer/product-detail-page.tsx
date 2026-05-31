@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 import { APP_NAME } from '@/lib/config';
+import { ReportListingDialog } from '@/components/common/report-listing-dialog';
 
 import { useAppStore } from '@/stores/app-store';
 import { useAppNavigation } from '@/lib/use-app-navigation';
@@ -19,7 +20,6 @@ import { useCartStore } from '@/stores/cart-store';
 import { useRecentlyViewedStore } from '@/stores/recently-viewed-store';
 import { type Product } from '@/components/buyer/product-card';
 
-import { RippleButton } from './product-detail/ripple-button';
 import { ProductGallerySection } from './product-detail/product-gallery-section';
 import { ProductInfoSection } from './product-detail/product-info-section';
 import { ProductActions } from './product-detail/product-actions';
@@ -32,7 +32,8 @@ interface TierPrice {
 }
 
 export function ProductDetailPage({ productId }: { productId?: string }) {
-  const { t, locale } = useI18n();
+  const { t: _t, locale } = useI18n();
+  const t = _t as (key: string, params?: Record<string, unknown>) => string;
   const { toggleCompare, compareIds } = useAppStore();
   const nav = useAppNavigation();
   const selectedProductId = productId;
@@ -58,8 +59,6 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const [returnsExpanded, setReturnsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('description');
   const similarScrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
 
   // Fetch product data using the individual product API
   useEffect(() => {
@@ -255,8 +254,6 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
     : 0;
 
   const displayName = isRTL && product.nameAr ? product.nameAr : product.name;
-  const displayDescription =
-    isRTL && product.descriptionAr ? product.descriptionAr : product.description;
 
   const isComparing = compareIds.includes(product.id);
 
@@ -334,7 +331,10 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
             t={t}
           />
 
+          <ReportListingDialog listingTitle={displayName} />
+
           <ProductActions
+            t={t}
             productId={product.id}
             productName={product.name}
             displayName={displayName}

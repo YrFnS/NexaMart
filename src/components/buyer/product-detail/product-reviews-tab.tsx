@@ -24,7 +24,7 @@ export function ProductReviewsTab(props: ProductReviewsTabProps) {
     t,
   } = props;
 
-  const displayDescription = product.description;
+  const displayDescription = isRTL && product.descriptionAr ? product.descriptionAr : product.description;
 
   return (
     <>

@@ -32,6 +32,8 @@ interface ProductActionsProps {
   handleAddToCart: () => void;
   handleBuyNow: () => void;
   isRTL: boolean;
+  listingTitle?: string;
+  t: (key: string, params?: Record<string, unknown>) => string;
 }
 
 export function ProductActions(props: ProductActionsProps) {
