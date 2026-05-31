@@ -10,14 +10,14 @@
 // Replaces duplicated gradient arrays in home-page.tsx and other components.
 
 export const AVATAR_GRADIENTS = [
-  'from-blue-500 to-cyan-500',
-  'from-pink-500 to-rose-500',
-  'from-amber-500 to-orange-500',
-  'from-green-500 to-emerald-500',
-  'from-violet-500 to-purple-500',
-  'from-teal-500 to-cyan-500',
-  'from-yellow-500 to-amber-500',
-  'from-red-500 to-rose-500',
+  'from-amber-500 to-yellow-600',
+  'from-rose-400 to-red-500',
+  'from-indigo-500 to-blue-700',
+  'from-orange-400 to-amber-600',
+  'from-purple-400 to-violet-600',
+  'from-stone-400 to-stone-600',
+  'from-yellow-500 to-orange-500',
+  'from-red-400 to-rose-500',
 ];
 
 // ─── Color Map ──────────────────────────────────────────────────────────────

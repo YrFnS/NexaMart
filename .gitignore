@@ -53,3 +53,8 @@ server.log
 ~/.pi/
 public/images/products/
 public/products/
+
+!.crew/artifacts/
+!.crew/graphs/
+!.crew/artifacts/.gitkeep
+!.crew/graphs/.gitkeep
