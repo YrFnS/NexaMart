@@ -1,11 +1,7 @@
 'use client';
-
-import React from 'react';
 import Link from 'next/link';
 import {
   Star,
-  Heart,
-  GitCompare,
   Truck,
   Shield,
   Clock,
@@ -19,19 +15,16 @@ import {
   Check,
   MapPin,
   Package,
-  Zap,
-  ShoppingCart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { COLOR_MAP } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
-import { APP_NAME, DEFAULT_SELLER_PHONE, SOCIAL_SHARE } from '@/lib/config';
+import { APP_NAME, DEFAULT_SELLER_PHONE } from '@/lib/config';
 
 import { type Product } from '@/components/buyer/product-card';
 import { VariationSelector } from '@/components/buyer/variation-selector';
 import { TieredPricing } from '@/components/buyer/tiered-pricing';
-import { ReportListingDialog } from '@/components/common/report-listing-dialog';
 import { ContactSellerButtons } from '@/components/common/contact-seller-buttons';
 import { ListingExpirationBadge } from '@/components/common/listing-expiration-badge';
 
@@ -45,30 +38,17 @@ interface ProductInfoSectionProps {
   quantity: number;
   setQuantity: (q: number) => void;
   selectedVariations: Record<string, string>;
-  setSelectedVariations: (v: Record<string, string>) => void;
-  images: string[];
+  setSelectedVariations: (v: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
   variations: Record<string, string[]>;
   tieredPricing: TierPrice[];
   discount: number;
   displayName: string;
-  displayDescription: string;
-  isComparing: boolean;
-  toggleCompare: (id: string) => void;
   effectivePrice: number;
   stockStatus: 'outOfStock' | 'lowStock' | 'inStock';
-  isWishlisted: boolean;
-  setIsWishlisted: (v: boolean) => void;
-  shareOpen: boolean;
-  setShareOpen: (v: boolean) => void;
   copied: boolean;
   setCopied: (v: boolean) => void;
-  shareWebSuccess: boolean;
-  setShareWebSuccess: (v: boolean) => void;
-  handleAddToCart: () => void;
-  handleBuyNow: () => void;
-  locale: string;
   isRTL: boolean;
-  t: (key: string, params?: Record<string, unknown>) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 function getColorHex(colorName: string): string | undefined {
@@ -78,38 +58,11 @@ function getColorHex(colorName: string): string | undefined {
 export function ProductInfoSection(props: ProductInfoSectionProps) {
   const {
     product, quantity, setQuantity, selectedVariations, setSelectedVariations,
-    images, variations, tieredPricing, discount, displayName,
-    isComparing, toggleCompare, effectivePrice, stockStatus,
-    isWishlisted, setIsWishlisted,
-    shareOpen, setShareOpen, copied, setCopied, shareWebSuccess, setShareWebSuccess,
-    handleAddToCart, handleBuyNow,
-    locale, isRTL, t,
+    variations, tieredPricing, discount, displayName,
+    effectivePrice, stockStatus,
+    copied, setCopied,
+    isRTL, t,
   } = props;
-
-  const BackIcon = isRTL ? ChevronRight : ChevronLeft;
-
-  const handleShare = async (platform: string) => {
-    const url = window.location.href;
-    const text = product ? `${product.name} - ${APP_NAME}` : `${APP_NAME} Product`;
-
-    switch (platform) {
-      case 'whatsapp':
-        window.open(SOCIAL_SHARE.whatsapp(text + ' ' + url));
-        break;
-      case 'telegram':
-        window.open(SOCIAL_SHARE.telegram(url, text));
-        break;
-      case 'facebook':
-        window.open(SOCIAL_SHARE.facebook(url));
-        break;
-      case 'copy':
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-        break;
-    }
-    setShareOpen(false);
-  };
 
   return (
     <div className="space-y-5">
@@ -334,78 +287,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="relative p-[2px] rounded-xl action-buttons-gradient-border">
-        <div className="flex flex-col sm:flex-row gap-3 rounded-xl bg-background p-1">
-          <RippleButton
-            size="lg"
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-base h-12 rounded-lg"
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-          >
-            <ShoppingCart className="size-5 me-2" />
-            {t('addToCart')}
-          </RippleButton>
-          <RippleButton
-            size="lg"
-            variant="outline"
-            className="flex-1 border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-base h-12 rounded-lg"
-            onClick={handleBuyNow}
-            disabled={product.stock === 0}
-          >
-            <Zap className="size-5 me-2" />
-            {t('buyNow')}
-          </RippleButton>
-        </div>
-      </div>
 
-      {/* Secondary Actions */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button
-          variant="outline"
-          size="sm"
-          className={`gap-1.5 ${isWishlisted ? 'text-red-500 border-red-300' : ''}`}
-          onClick={() => setIsWishlisted(!isWishlisted)}
-        >
-          <Heart className={`size-4 ${isWishlisted ? 'fill-red-500' : ''}`} />
-          {isWishlisted ? t('wishlisted') : t('wishlist')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className={`gap-1.5 ${isComparing ? 'text-emerald-600 border-emerald-300' : ''}`}
-          onClick={() => toggleCompare(product.id)}
-        >
-          <GitCompare className="size-4" />
-          {t('compare')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={async () => {
-            if (navigator.share) {
-              try {
-                await navigator.share({
-                  title: displayName,
-                  text: `${product.name} - ${APP_NAME}`,
-                  url: window.location.href,
-                });
-                setShareWebSuccess(true);
-                setTimeout(() => setShareWebSuccess(false), 2000);
-              } catch {
-                setShareOpen(true);
-              }
-            } else {
-              setShareOpen(true);
-            }
-          }}
-        >
-          {shareWebSuccess ? <Check className="size-4 text-emerald-500" /> : <Share2 className="size-4" />}
-          {shareWebSuccess ? t('copied') : t('shareProduct')}
-        </Button>
-        <ReportListingDialog listingTitle={displayName} />
-      </div>
 
       {/* Estimated Delivery Date */}
       {product.stock > 0 && (
