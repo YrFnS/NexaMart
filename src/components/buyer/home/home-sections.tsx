@@ -367,51 +367,42 @@ export function DealsSection({ saleProducts, onQuickView }: { saleProducts: Prod
 }
 
 export function NewsletterSection() {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   const isRTL = locale === 'ar';
 
   return (
     <AnimatedSection>
-      <section className="container mx-auto px-4">
-        <div className="relative rounded-2xl md:rounded-3xl overflow-hidden">
-          {/* Gradient background */}
-          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-8 md:p-12 text-white relative overflow-hidden">
-            {/* Decorative elements */}
-            <div className="absolute top-0 end-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/3" />
-            <div className="absolute bottom-0 start-0 w-48 h-48 rounded-full bg-white/5 translate-y-1/3 -translate-x-1/4" />
-            <div className="absolute top-1/2 end-1/4 w-32 h-32 rounded-full bg-white/5" />
+      <section className="bg-[oklch(0.98_0.01_80)] py-12 md:py-16">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
+            {/* Left: Editorial text */}
+            <div className="flex-1 text-center md:text-start">
+              <h2 className="text-2xl md:text-3xl font-bold text-[oklch(0.18_0.02_270)] dark:text-gray-100 mb-2">
+                {isRTL ? 'ابق على اطلاع' : 'Stay in the Loop'}
+              </h2>
+              <p className="text-muted-foreground text-sm md:text-base max-w-md leading-relaxed">
+                {isRTL ? 'احصل على أحدث المنتجات والعروض الحصرية وتنبيهات البائعين الجدد.' : 'Get curated drops, exclusive offers, and new seller alerts.'}
+              </p>
+            </div>
 
-            <div className="relative flex flex-col md:flex-row items-center gap-6 md:gap-10">
-              <div className="flex-1 text-center md:text-start">
-                <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-full text-sm mb-3">
-                  <Sparkles className="size-4" />
-                  {isRTL ? 'اشترك الآن' : 'Subscribe Now'}
-                </div>
-                <h2 className="text-2xl md:text-3xl font-bold mb-2">
-                  {t('newsletterTitle') !== 'newsletterTitle' ? t('newsletterTitle') : (isRTL ? 'ابق على اطلاع بأحدث العروض' : 'Stay Updated with Latest Deals')}
-                </h2>
-                <p className="text-white/80 text-sm md:text-base max-w-md">
-                  {t('newsletterDesc') !== 'newsletterDesc' ? t('newsletterDesc') : (isRTL ? 'اشترك في النشرة الإخبارية واحصل على عروض حصرية مباشرة في بريدك الإلكتروني' : 'Subscribe to our newsletter and get exclusive deals delivered straight to your inbox.')}
-                </p>
+            {/* Right: Email input */}
+            <div className="w-full md:w-auto md:min-w-[360px] max-w-full">
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder={isRTL ? 'أدخل بريدك الإلكتروني' : 'Enter your email'}
+                  className="bg-white border-gray-200 dark:border-gray-700 text-[oklch(0.18_0.02_270)] placeholder:text-muted-foreground focus:border-[oklch(0.75_0.12_85)] transition-all duration-200"
+                />
+                <Button
+                  className="bg-[oklch(0.75_0.12_85)] text-white hover:bg-[oklch(0.70_0.12_85)] font-semibold shadow-md shrink-0 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  {isRTL ? 'اشترك' : 'Subscribe'}
+                  {isRTL ? <ArrowLeft className="size-4 ms-1" /> : <ArrowRight className="size-4 ms-1" />}
+                </Button>
               </div>
-              <div className="w-full md:w-auto md:min-w-[320px] max-w-full">
-                <div className="flex gap-2">
-                  <Input
-                    type="email"
-                    placeholder={isRTL ? 'أدخل بريدك الإلكتروني' : 'Enter your email'}
-                    className="bg-white/15 border-white/25 text-white placeholder:text-white/50 backdrop-blur-sm focus:bg-white/20 focus:border-white/40 transition-all duration-200"
-                  />
-                  <Button
-                    className="bg-white text-emerald-700 hover:bg-white/90 font-semibold shadow-lg shrink-0 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
-                  >
-                    {isRTL ? 'اشترك' : 'Subscribe'}
-                    {isRTL ? <ArrowLeft className="size-4 ms-1" /> : <ArrowRight className="size-4 ms-1" />}
-                  </Button>
-                </div>
-                <p className="text-white/50 text-[11px] mt-2 text-center md:text-start">
-                  {isRTL ? 'لا إزعاج. إلغاء الاشتراك في أي وقت.' : 'No spam. Unsubscribe at any time.'}
-                </p>
-              </div>
+              <p className="text-muted-foreground/60 text-[11px] mt-2 text-center md:text-start">
+                {isRTL ? 'لا إزعاج. إلغاء الاشتراك في أي وقت.' : 'No spam. Unsubscribe at any time.'}
+              </p>
             </div>
           </div>
         </div>

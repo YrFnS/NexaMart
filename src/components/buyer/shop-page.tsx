@@ -253,7 +253,7 @@ export function ShopPage() {
     <div className="space-y-5">
       {/* Search */}
       <div>
-        <Label className="text-xs font-semibold mb-2 block text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{t('search')}</Label>
+        <Label className="text-xs font-semibold mb-2 block text-amber-700 dark:text-amber-400 uppercase tracking-wider">{t('search')}</Label>
         <form onSubmit={handleSearch} className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -261,20 +261,20 @@ export function ShopPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('searchProducts')}
-              className="text-sm ps-8 h-9 border-emerald-200 dark:border-emerald-800 focus-visible:ring-emerald-500/30"
+              className="text-sm ps-8 h-9 border-amber-200 dark:border-amber-800 focus-visible:ring-amber-500/30"
             />
           </div>
-          <Button type="submit" size="icon" className="shrink-0 h-9 w-9 bg-emerald-600 hover:bg-emerald-700">
+          <Button type="submit" size="icon" className="shrink-0 h-9 w-9 bg-amber-600 hover:bg-amber-700">
             <Search className="size-4" />
           </Button>
         </form>
       </div>
 
-      <Separator className="bg-emerald-100 dark:bg-emerald-900/50" />
+      <Separator className="bg-amber-100 dark:bg-amber-900/50" />
 
       {/* Categories - Enhanced Pills */}
       <div>
-        <Label className="text-xs font-semibold mb-3 block text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{t('categories')}</Label>
+        <Label className="text-xs font-semibold mb-3 block text-amber-700 dark:text-amber-400 uppercase tracking-wider">{t('categories')}</Label>
         <div className="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto scrollbar-thin pr-1">
           <button
             onClick={() => {
@@ -284,8 +284,8 @@ export function ShopPage() {
             }}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
               !categoryId
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25 scale-105'
-                : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 hover:shadow-sm border border-emerald-200/60 dark:border-emerald-800/60'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-500/25 scale-105'
+                : 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/70 hover:shadow-sm border border-amber-200/60 dark:border-amber-800/60'
             }`}
           >
             {t('allCategories')}
@@ -303,13 +303,13 @@ export function ShopPage() {
                 }}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
                   isActive
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25 scale-105'
-                    : 'bg-muted/60 text-foreground hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:text-emerald-700 dark:hover:text-emerald-300 hover:shadow-sm border border-border hover:border-emerald-200/60 dark:hover:border-emerald-800/60'
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-500/25 scale-105'
+                    : 'bg-muted/60 text-foreground hover:bg-amber-50 dark:hover:bg-amber-950/50 hover:text-amber-700 dark:hover:text-amber-300 hover:shadow-sm border border-border hover:border-amber-200/60 dark:hover:border-amber-800/60'
                 }`}
               >
                 <span>{catName}</span>
                 {cat.productCount > 0 && (
-                  <span className={`text-[10px] ${isActive ? 'text-emerald-100' : 'text-muted-foreground'}`}>
+                  <span className={`text-[10px] ${isActive ? 'text-amber-100' : 'text-muted-foreground'}`}>
                     {cat.productCount}
                   </span>
                 )}
@@ -319,11 +319,11 @@ export function ShopPage() {
         </div>
       </div>
 
-      <Separator className="bg-emerald-100 dark:bg-emerald-900/50" />
+      <Separator className="bg-amber-100 dark:bg-amber-900/50" />
 
       {/* Price Range */}
       <div>
-        <Label className="text-xs font-semibold mb-3 block text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{t('priceRange')}</Label>
+        <Label className="text-xs font-semibold mb-3 block text-amber-700 dark:text-amber-400 uppercase tracking-wider">{t('priceRange')}</Label>
         <Slider
           value={priceRange}
           min={0}
@@ -336,21 +336,21 @@ export function ShopPage() {
           className="mb-3"
         />
         <div className="flex items-center justify-between text-sm">
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-semibold text-xs border border-emerald-200/50 dark:border-emerald-800/50">
+          <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold text-xs border border-amber-200/50 dark:border-amber-800/50">
             {formatPrice(priceRange[0])}
           </span>
-          <div className="flex-1 mx-2 h-px bg-emerald-200 dark:bg-emerald-800" />
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-semibold text-xs border border-emerald-200/50 dark:border-emerald-800/50">
+          <div className="flex-1 mx-2 h-px bg-amber-200 dark:bg-amber-800" />
+          <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold text-xs border border-amber-200/50 dark:border-amber-800/50">
             {formatPrice(priceRange[1])}
           </span>
         </div>
       </div>
 
-      <Separator className="bg-emerald-100 dark:bg-emerald-900/50" />
+      <Separator className="bg-amber-100 dark:bg-amber-900/50" />
 
       {/* Rating Filter */}
       <div>
-        <Label className="text-xs font-semibold mb-2 block text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{t('ratings')}</Label>
+        <Label className="text-xs font-semibold mb-2 block text-amber-700 dark:text-amber-400 uppercase tracking-wider">{t('ratings')}</Label>
         <div className="space-y-1">
           {[4, 3, 2, 1].map((rating) => (
             <button
@@ -361,8 +361,8 @@ export function ShopPage() {
               }}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
                 minRating === rating
-                  ? 'bg-emerald-100 dark:bg-emerald-900 shadow-sm border border-emerald-200 dark:border-emerald-800'
-                  : 'hover:bg-muted/60 border border-transparent hover:border-emerald-200/40 dark:hover:border-emerald-800/40'
+                  ? 'bg-amber-100 dark:bg-amber-900 shadow-sm border border-amber-200 dark:border-amber-800'
+                  : 'hover:bg-muted/60 border border-transparent hover:border-amber-200/40 dark:hover:border-amber-800/40'
               }`}
             >
               <div className="flex items-center">
@@ -379,14 +379,14 @@ export function ShopPage() {
         </div>
       </div>
 
-      <Separator className="bg-emerald-100 dark:bg-emerald-900/50" />
+      <Separator className="bg-amber-100 dark:bg-amber-900/50" />
 
       {/* Toggle Filters */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-colors">
+        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-amber-50/50 dark:hover:bg-amber-950/30 transition-colors">
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center size-7 rounded-md bg-emerald-100 dark:bg-emerald-900">
-              <Truck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center justify-center size-7 rounded-md bg-amber-100 dark:bg-amber-900">
+              <Truck className="size-3.5 text-amber-600 dark:text-amber-400" />
             </div>
             <Label className="text-sm cursor-pointer">{t('freeShipping')}</Label>
           </div>
@@ -399,10 +399,10 @@ export function ShopPage() {
           />
         </div>
 
-        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-colors">
+        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-amber-50/50 dark:hover:bg-amber-950/30 transition-colors">
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center size-7 rounded-md bg-emerald-100 dark:bg-emerald-900">
-              <Package className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center justify-center size-7 rounded-md bg-amber-100 dark:bg-amber-900">
+              <Package className="size-3.5 text-amber-600 dark:text-amber-400" />
             </div>
             <Label className="text-sm cursor-pointer">B2B Only</Label>
           </div>
@@ -415,7 +415,7 @@ export function ShopPage() {
           />
         </div>
 
-        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-colors">
+        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-amber-50/50 dark:hover:bg-amber-950/30 transition-colors">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center size-7 rounded-md bg-red-100 dark:bg-red-900">
               <Tag className="size-3.5 text-red-600 dark:text-red-400" />
@@ -475,7 +475,7 @@ export function ShopPage() {
             size="sm"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="gap-1 h-9 px-3 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 disabled:opacity-40"
+            className="gap-1 h-9 px-3 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950 disabled:opacity-40"
           >
             {isRTL ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
             <span className="hidden sm:inline">{t('back')}</span>
@@ -492,8 +492,8 @@ export function ShopPage() {
                 size="sm"
                 className={`h-9 w-9 p-0 transition-all duration-200 ${
                   page === num
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/25 border-emerald-600'
-                    : 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950'
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/25 border-amber-600'
+                    : 'border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950'
                 }`}
                 onClick={() => setPage(num)}
               >
@@ -508,7 +508,7 @@ export function ShopPage() {
             size="sm"
             disabled={page >= pages}
             onClick={() => setPage((p) => Math.min(pages, p + 1))}
-            className="gap-1 h-9 px-3 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 disabled:opacity-40"
+            className="gap-1 h-9 px-3 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950 disabled:opacity-40"
           >
             <span className="hidden sm:inline">{t('next')}</span>
             {isRTL ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />}
@@ -571,9 +571,9 @@ export function ShopPage() {
     <div className="container mx-auto px-4 py-4">
       {/* Active Filters Summary Bar */}
       {activeFilters.length > 0 && (
-        <div className="mb-4 p-3 bg-emerald-50/80 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/60 dark:border-emerald-800/60 backdrop-blur-sm">
+        <div className="mb-4 p-3 bg-amber-50/80 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-800/60 backdrop-blur-sm">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 me-1">
+            <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 me-1">
               <Filter className="size-3.5" />
               <span className="text-xs font-semibold uppercase tracking-wider">{t('activeFilters')}:</span>
             </div>
@@ -581,12 +581,12 @@ export function ShopPage() {
               <Badge
                 key={`${filter.type}-${filter.value}`}
                 variant="secondary"
-                className="gap-1 bg-white dark:bg-card text-emerald-700 dark:text-emerald-300 pr-1 pl-2.5 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 transition-all duration-200 shadow-sm"
+                className="gap-1 bg-white dark:bg-card text-amber-700 dark:text-amber-300 pr-1 pl-2.5 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/70 transition-all duration-200 shadow-sm"
               >
                 {filter.label}
                 <button
                   onClick={() => removeFilter(filter)}
-                  className="hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full p-0.5 transition-all hover:scale-110 active:scale-90 text-emerald-500 hover:text-red-500"
+                  className="hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full p-0.5 transition-all hover:scale-110 active:scale-90 text-amber-500 hover:text-red-500"
                   aria-label={t('removeFilter')}
                 >
                   <X className="size-3" />
@@ -609,16 +609,16 @@ export function ShopPage() {
       <div className="flex gap-6">
         {/* Desktop Sidebar Filters */}
         <aside className="hidden lg:block w-72 shrink-0">
-          <div className="sticky top-4 rounded-xl border border-emerald-200/60 dark:border-emerald-800/60 bg-card overflow-hidden shadow-sm shadow-emerald-500/5">
+          <div className="sticky top-4 rounded-xl border border-amber-200/60 dark:border-amber-800/60 bg-card overflow-hidden shadow-sm shadow-amber-500/5">
             {/* Gradient Accent Bar */}
-            <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
+            <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
 
             <div className="p-4 relative overflow-hidden">
               {/* Subtle decorative element */}
-              <div className="absolute top-6 end-2 w-20 h-20 rounded-full bg-emerald-100/30 dark:bg-emerald-900/20 blur-2xl pointer-events-none" />
+              <div className="absolute top-6 end-2 w-20 h-20 rounded-full bg-amber-100/30 dark:bg-amber-900/20 blur-2xl pointer-events-none" />
 
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <h3 className="font-semibold flex items-center gap-2 text-amber-700 dark:text-amber-400">
                   <SlidersHorizontal className="size-4" />
                   {t('filter')}
                 </h3>
@@ -649,11 +649,11 @@ export function ShopPage() {
               {/* Mobile Filter Button */}
               <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="lg:hidden gap-1.5 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 h-9">
+                  <Button variant="outline" size="sm" className="lg:hidden gap-1.5 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950 h-9">
                     <SlidersHorizontal className="size-4" />
                     {t('filter')}
                     {activeFilters.length > 0 && (
-                      <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0 ms-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                      <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 ms-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
                         {activeFilters.length}
                       </Badge>
                     )}
@@ -661,17 +661,17 @@ export function ShopPage() {
                 </SheetTrigger>
                 <SheetContent side={isRTL ? 'right' : 'left'} className="w-80 p-0">
                   {/* Gradient Accent Bar */}
-                  <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
+                  <div className="h-1.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500" />
                   <SheetHeader className="px-4 pt-4">
-                    <SheetTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                    <SheetTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                       <SlidersHorizontal className="size-4" />
                       {t('filter')}
                     </SheetTitle>
                   </SheetHeader>
                   <div className="px-4 pb-4 mt-2">
                     {activeFilters.length > 0 && (
-                      <div className="flex items-center gap-2 mb-3 p-2 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-lg">
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{activeFilters.length} {isRTL ? 'نشط' : 'active'}</span>
+                      <div className="flex items-center gap-2 mb-3 p-2 bg-amber-50/50 dark:bg-amber-950/30 rounded-lg">
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{activeFilters.length} {isRTL ? 'نشط' : 'active'}</span>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -695,7 +695,7 @@ export function ShopPage() {
                   <Skeleton className="h-4 w-32 inline-block" />
                 ) : (
                   <>
-                    <span className={`font-bold text-emerald-600 dark:text-emerald-400 ${countAnimating ? 'animate-product-count' : ''}`}>{total}</span>{' '}
+                    <span className={`font-bold text-amber-600 dark:text-amber-400 ${countAnimating ? 'animate-product-count' : ''}`}>{total}</span>{' '}
                     {isRTL ? 'منتج' : t('productsFound')}
                   </>
                 )}
@@ -711,8 +711,8 @@ export function ShopPage() {
                   setPage(1);
                 }}
               >
-                <SelectTrigger className="w-44 text-sm h-9 border-emerald-200 dark:border-emerald-800 focus:ring-emerald-500/30">
-                  <ArrowUp className="size-3.5 text-emerald-500 me-1" />
+                <SelectTrigger className="w-44 text-sm h-9 border-amber-200 dark:border-amber-800 focus:ring-amber-500/30">
+                  <ArrowUp className="size-3.5 text-amber-500 me-1" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -735,14 +735,14 @@ export function ShopPage() {
               </Select>
 
               {/* Grid/List View Toggle */}
-              <div className="flex items-center border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden">
+              <div className="flex items-center border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="icon"
                   className={`size-9 rounded-none transition-all duration-200 ${
                     viewMode === 'grid'
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      : 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950'
+                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950'
                   }`}
                   onClick={() => handleViewModeChange('grid')}
                   aria-label={t('gridView')}
@@ -754,8 +754,8 @@ export function ShopPage() {
                   size="icon"
                   className={`size-9 rounded-none transition-all duration-200 ${
                     viewMode === 'list'
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      : 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950'
+                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950'
                   }`}
                   onClick={() => handleViewModeChange('list')}
                   aria-label={t('listView')}
@@ -783,12 +783,12 @@ export function ShopPage() {
             <div className="text-center py-20">
               <div className="relative inline-block mb-6 overflow-hidden p-4">
                 {/* Decorative circles */}
-                <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 animate-pulse" />
-                <div className="absolute -bottom-2 -left-6 w-14 h-14 rounded-full bg-teal-100 dark:bg-teal-900/30 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                <div className="absolute top-1/2 -right-8 w-8 h-8 rounded-full bg-emerald-200 dark:bg-emerald-800/30" />
+                <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-900/30 animate-pulse" />
+                <div className="absolute -bottom-2 -left-6 w-14 h-14 rounded-full bg-yellow-100 dark:bg-yellow-900/30 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                <div className="absolute top-1/2 -right-8 w-8 h-8 rounded-full bg-amber-200 dark:bg-amber-800/30" />
                 {/* Main icon */}
-                <div className="relative bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl p-6 border border-emerald-200/60 dark:border-emerald-800/60">
-                  <PackageSearch className="size-16 text-emerald-400 dark:text-emerald-600" />
+                <div className="relative bg-amber-50 dark:bg-amber-950/40 rounded-2xl p-6 border border-amber-200/60 dark:border-amber-800/60">
+                  <PackageSearch className="size-16 text-amber-400 dark:text-amber-600" />
                 </div>
               </div>
               <h3 className="text-xl font-bold mb-2">{t('noProductsFound')}</h3>
@@ -798,14 +798,14 @@ export function ShopPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 {activeFilters.length > 0 && (
                   <Button
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/25"
+                    className="bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/25"
                     onClick={clearAllFilters}
                   >
                     <RotateCcw className="size-4 me-1.5" />
                     {t('clearFilters')}
                   </Button>
                 )}
-                <Button asChild variant="outline" className="border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950">
+                <Button asChild variant="outline" className="border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950">
                   <Link href="/shop">
                     <Store className="size-4 me-1.5" />
                     {t('browseAllProducts')}
@@ -841,12 +841,12 @@ export function ShopPage() {
                     className="block"
                   >
                   <Card
-                    className="overflow-hidden cursor-pointer hover:shadow-lg hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 group/list"
+                    className="overflow-hidden cursor-pointer hover:shadow-lg hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300 group/list"
                   >
                     <div className="flex gap-4 p-4">
                       <div className="w-24 h-24 sm:w-32 sm:h-32 shrink-0 rounded-lg bg-muted overflow-hidden relative">
-                        <div className="w-full h-full bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950 dark:to-teal-950 flex items-center justify-center">
-                          <ShoppingCart className="size-8 text-emerald-400 opacity-50" />
+                        <div className="w-full h-full bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-950 dark:to-yellow-950 flex items-center justify-center">
+                          <ShoppingCart className="size-8 text-amber-400 opacity-50" />
                         </div>
                         {/* Sale badge on list view - more prominent */}
                         {discount > 0 && (
@@ -858,7 +858,7 @@ export function ShopPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0 space-y-1.5">
-                        <h3 className="font-medium line-clamp-1 group-hover/list:text-emerald-600 dark:group-hover/list:text-emerald-400 transition-colors">{displayName}</h3>
+                        <h3 className="font-medium line-clamp-1 group-hover/list:text-amber-600 dark:group-hover/list:text-amber-400 transition-colors">{displayName}</h3>
                         {product.store && (
                           <p className="text-xs text-muted-foreground">{product.store.name}</p>
                         )}
@@ -869,18 +869,18 @@ export function ShopPage() {
                           <span className="text-[10px] text-muted-foreground">({product.reviewCount})</span>
                         </div>
                         <div className="flex items-baseline gap-2">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatPrice(product.price)}</span>
+                          <span className="font-bold text-amber-600 dark:text-amber-400">{formatPrice(product.price)}</span>
                           {product.originalPrice && discount > 0 && (
                             <span className="text-xs text-muted-foreground line-through">{formatPrice(product.originalPrice)}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 pt-1">
-                          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 rounded-lg shadow-sm shadow-emerald-500/20" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                          <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-7 rounded-lg shadow-sm shadow-amber-500/20" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                             <ShoppingCart className="size-3 me-1" />
                             {t('addToCart')}
                           </Button>
                           {product.hasFreeShipping && (
-                            <Badge variant="secondary" className="text-[9px] bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <Badge variant="secondary" className="text-[9px] bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                               <Truck className="size-2.5 me-0.5" />
                               {t('freeShipping')}
                             </Badge>
@@ -903,7 +903,7 @@ export function ShopPage() {
             <div className="text-center mt-6">
               <Button
                 variant="outline"
-                className="border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 shadow-sm"
+                className="border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 shadow-sm"
                 onClick={() => setPage((p) => p + 1)}
               >
                 {t('loadMore')}

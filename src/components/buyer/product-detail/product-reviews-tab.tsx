@@ -32,7 +32,7 @@ export function ProductReviewsTab(props: ProductReviewsTabProps) {
       {product.reviewCount > 0 && (
         <section className="mb-10">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500">
               <Sparkles className="size-5 text-white" />
             </div>
             {t('aiReviewSummary')}
@@ -49,19 +49,19 @@ export function ProductReviewsTab(props: ProductReviewsTabProps) {
       {/* Product Details Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-10">
         <TabsList className="w-full justify-start bg-muted/50 rounded-xl p-1 gap-0.5 tab-list-emerald">
-          <TabsTrigger value="description" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900 dark:data-[state=active]:text-emerald-300 data-[state=active]:shadow-sm">
+          <TabsTrigger value="description" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 dark:data-[state=active]:bg-amber-900 dark:data-[state=active]:text-amber-300 data-[state=active]:shadow-sm">
             {t('description')}
           </TabsTrigger>
-          <TabsTrigger value="specifications" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900 dark:data-[state=active]:text-emerald-300 data-[state=active]:shadow-sm">
+          <TabsTrigger value="specifications" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 dark:data-[state=active]:bg-amber-900 dark:data-[state=active]:text-amber-300 data-[state=active]:shadow-sm">
             {t('specifications')}
           </TabsTrigger>
-          <TabsTrigger value="reviews" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900 dark:data-[state=active]:text-emerald-300 data-[state=active]:shadow-sm">
+          <TabsTrigger value="reviews" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 dark:data-[state=active]:bg-amber-900 dark:data-[state=active]:text-amber-300 data-[state=active]:shadow-sm">
             {t('reviews')}
             <span className="ms-1 inline-flex items-center justify-center size-5 rounded-full bg-muted text-[10px] font-bold tab-count-badge">
               {product.reviewCount}
             </span>
           </TabsTrigger>
-          <TabsTrigger value="questions" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 dark:data-[state=active]:bg-emerald-900 dark:data-[state=active]:text-emerald-300 data-[state=active]:shadow-sm">
+          <TabsTrigger value="questions" className="rounded-lg tab-trigger-emerald data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 dark:data-[state=active]:bg-amber-900 dark:data-[state=active]:text-amber-300 data-[state=active]:shadow-sm">
             {t('questionsTab')}
             <span className="ms-1 inline-flex items-center justify-center size-5 rounded-full bg-muted text-[10px] font-bold tab-count-badge">
               {product.reviewCount > 0 ? Math.min(Math.round(product.reviewCount * 0.2), 10) : 0}

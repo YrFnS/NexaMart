@@ -11,7 +11,7 @@ interface ProductGallerySectionProps {
 
 export function ProductGallerySection({ images, displayName, categoryName }: ProductGallerySectionProps) {
   return (
-    <div className="zoom-lens-container rounded-xl shadow-lg shadow-emerald-500/5 border border-border/50">
+    <div className="zoom-lens-container rounded-xl shadow-lg shadow-amber-500/5 border border-border/50">
       <ProductGallery images={images} productName={displayName} category={categoryName} />
     </div>
   );

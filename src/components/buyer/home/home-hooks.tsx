@@ -127,10 +127,10 @@ export function SectionHeader({
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center gap-3">
-        {/* Decorative emerald accent line */}
-        <div className="w-1 h-8 rounded-full bg-gradient-to-b from-emerald-500 to-teal-500 shrink-0" />
-        <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/70">
-          <Icon className="size-5 text-emerald-600 dark:text-emerald-400" />
+        {/* Decorative gold accent line */}
+        <div className="w-1 h-8 rounded-full bg-[oklch(0.75_0.12_85)] shrink-0" />
+        <div className="p-1.5 rounded-lg bg-[oklch(0.98_0.01_80)] dark:bg-[oklch(0.75_0.12_85)]/10">
+          <Icon className="size-5 text-[oklch(0.75_0.12_85)] dark:text-[oklch(0.75_0.12_85)]" />
         </div>
         <div>
           <h2 className="text-xl md:text-2xl font-bold tracking-tight">{title}</h2>
@@ -140,7 +140,7 @@ export function SectionHeader({
         <Button
           variant="ghost"
           size="sm"
-          className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 group/viewall"
+          className="text-[oklch(0.75_0.12_85)] hover:text-[oklch(0.65_0.12_85)] hover:bg-[oklch(0.75_0.12_85)]/5 dark:hover:bg-[oklch(0.75_0.12_85)]/10 transition-all duration-200 group/viewall"
           onClick={onAction}
         >
           {actionLabel}
@@ -160,11 +160,11 @@ export function FlipDigit({ value, label, prevValue }: { value: number; label: s
   const changed = prevValue !== value;
   return (
     <div className="relative min-w-[50px]">
-      <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2 text-center overflow-hidden" style={{ perspective: '200px' }}>
-        <span className={`text-xl font-bold block leading-none ${changed ? 'animate-flip' : ''}`}>
+      <div className="bg-[oklch(0.75_0.12_85)]/15 rounded-lg px-3 py-2 text-center overflow-hidden" style={{ perspective: '200px' }}>
+        <span className={`text-xl font-bold block leading-none text-[oklch(0.75_0.12_85)] ${changed ? 'animate-flip' : ''}`}>
           {String(value).padStart(2, '0')}
         </span>
-        <span className="text-[10px] text-white/70">
+        <span className="text-[10px] text-[oklch(0.75_0.12_85)]/60">
           {label === 'hours' ? 'H' : label === 'minutes' ? 'M' : 'S'}
         </span>
       </div>

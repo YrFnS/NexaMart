@@ -213,7 +213,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
             {t('productNotFoundDesc')}
           </p>
           <Button asChild
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-amber-600 hover:bg-amber-700 text-white"
           >
             <Link href="/shop">
               <ArrowLeft className="size-4 me-2" />
@@ -278,7 +278,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       <div className="mb-4">
         <Link
           href="/shop"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
         >
           <BackIcon className="size-4" />
           {t('back')} / {t('shop')}
@@ -292,7 +292,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
                 {i > 0 && <ChevronRight className="size-2.5 text-muted-foreground/40 shrink-0" />}
                 <Link
                   href={`/product/${rv.id}`}
-                  className="text-[10px] text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors whitespace-nowrap max-w-[100px] truncate"
+                  className="text-[10px] text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors whitespace-nowrap max-w-[100px] truncate"
                 >
                   {isRTL && rv.nameAr ? rv.nameAr : rv.name}
                 </Link>

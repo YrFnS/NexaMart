@@ -118,7 +118,7 @@ function SidebarContent({
       {!isCollapsed && (
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
               N
             </div>
             <div className="flex-1 min-w-0">
@@ -130,7 +130,7 @@ function SidebarContent({
       )}
       {isCollapsed && (
         <div className="p-3 border-b border-border flex justify-center">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
             N
           </div>
         </div>
@@ -153,29 +153,29 @@ function SidebarContent({
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium h-10
                   transition-all duration-200 relative group
                   ${isActive
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 shadow-sm'
+                    ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 shadow-sm'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }
                   ${isCollapsed ? 'justify-center px-2 h-10' : ''}
                 `}
                 title={isCollapsed ? t(item.labelKey) : undefined}
               >
-                <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : ''}`} />
+                <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-amber-600 dark:text-amber-400' : ''}`} />
                 {!isCollapsed && (
                   <>
                     <span className="flex-1 text-start truncate">{t(item.labelKey)}</span>
                     {item.badge && (
-                      <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-emerald-500 text-white hover:bg-emerald-600">
+                      <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-amber-500 text-white hover:bg-amber-600">
                         {item.badge}
                       </Badge>
                     )}
                     {isActive && (
-                      <div className={`absolute top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-emerald-500 ${isRTL ? 'right-0' : 'left-0'}`} />
+                      <div className={`absolute top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-amber-500 ${isRTL ? 'right-0' : 'left-0'}`} />
                     )}
                   </>
                 )}
                 {isCollapsed && item.badge && (
-                  <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] bg-emerald-500 text-white hover:bg-emerald-600">
+                  <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] bg-amber-500 text-white hover:bg-amber-600">
                     {item.badge}
                   </Badge>
                 )}
@@ -188,13 +188,13 @@ function SidebarContent({
       {/* Bottom Section */}
       {!isCollapsed && (
         <div className="p-3 border-t border-border">
-          <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 p-3">
+          <div className="rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/50 dark:to-yellow-950/50 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{t('s_proPlan')}</span>
+              <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">{t('s_proPlan')}</span>
             </div>
             <p className="text-[11px] text-muted-foreground mb-2">{t('s_unlockAdvanced')}</p>
-            <Button size="sm" className="w-full h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button size="sm" className="w-full h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white">
               {t('s_upgrade')}
             </Button>
           </div>
@@ -210,7 +210,7 @@ const adTypeConfig: Record<string, { icon: React.ElementType; labelKey: string; 
   'featured-ad': { icon: Star, labelKey: 's_adFeatured', color: 'text-amber-500' },
   'premium-ad': { icon: Crown, labelKey: 's_adPremium', color: 'text-purple-500' },
   'urgent-badge': { icon: AlertTriangle, labelKey: 's_adUrgent', color: 'text-red-500' },
-  'spotlight': { icon: Zap, labelKey: 's_adSpotlight', color: 'text-emerald-500' },
+  'spotlight': { icon: Zap, labelKey: 's_adSpotlight', color: 'text-amber-500' },
 };
 
 function AdCenterTab() {
@@ -261,7 +261,7 @@ function AdCenterTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <Zap className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             {t('s_adCenter')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -270,7 +270,7 @@ function AdCenterTab() {
         </div>
         <Button
           onClick={() => nav.setView('promote-listing')}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+          className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white"
         >
           <Zap className="h-4 w-4 me-1.5" />
           {t('s_promoteListing')}
@@ -279,11 +279,11 @@ function AdCenterTab() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-emerald-200 dark:border-emerald-800 overflow-hidden">
+        <Card className="border-amber-200 dark:border-amber-800 overflow-hidden">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-                <Eye className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
+                <Eye className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalViews.toLocaleString()}</p>
@@ -299,7 +299,7 @@ function AdCenterTab() {
                 <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+{totalViewsIncrease.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">+{totalViewsIncrease.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">{t('s_viewsIncrease')}</p>
               </div>
             </div>
@@ -337,14 +337,14 @@ function AdCenterTab() {
       <Card className="overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Zap className="h-4 w-4 text-emerald-500" />
+            <Zap className="h-4 w-4 text-amber-500" />
             {t('s_activePromotions')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="h-6 w-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <div className="h-6 w-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : promotions.length === 0 ? (
             <div className="text-center py-8">
@@ -355,7 +355,7 @@ function AdCenterTab() {
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-3 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
+                className="mt-3 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300"
                 onClick={() => nav.setView('promote-listing')}
               >
                 <Zap className="h-3.5 w-3.5 me-1" />
@@ -533,7 +533,7 @@ function CouponManagementTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <Tag className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             {t('s_couponManagement')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -542,7 +542,7 @@ function CouponManagementTab() {
         </div>
         <Button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+          className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white"
         >
           <Tag className="h-4 w-4 me-1.5" />
           {t('s_createCoupon')}
@@ -554,13 +554,13 @@ function CouponManagementTab() {
         <Card className="overflow-hidden">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">{t('s_totalCoupons')}</p>
-            <p className="text-2xl font-bold text-emerald-600">{coupons.length}</p>
+            <p className="text-2xl font-bold text-amber-600">{coupons.length}</p>
           </CardContent>
         </Card>
         <Card className="overflow-hidden">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">{t('s_active')}</p>
-            <p className="text-2xl font-bold text-emerald-600">{activeCoupons}</p>
+            <p className="text-2xl font-bold text-amber-600">{activeCoupons}</p>
           </CardContent>
         </Card>
         <Card className="overflow-hidden">
@@ -579,10 +579,10 @@ function CouponManagementTab() {
 
       {/* Create Form */}
       {showCreateForm && (
-        <Card className="border-emerald-200 dark:border-emerald-800">
+        <Card className="border-amber-200 dark:border-amber-800">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Tag className="size-4 text-emerald-600" />
+              <Tag className="size-4 text-amber-600" />
               {t('s_createNewCoupon')}
             </CardTitle>
           </CardHeader>
@@ -677,7 +677,7 @@ function CouponManagementTab() {
                 size="sm"
                 onClick={handleCreateCoupon}
                 disabled={isCreating || !newCode || !newDiscount}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-amber-600 hover:bg-amber-700 text-white"
               >
                 {isCreating ? <Loader2 className="size-4 animate-spin me-1" /> : <Tag className="size-4 me-1" />}
                 {t('s_create')}
@@ -690,14 +690,14 @@ function CouponManagementTab() {
       {/* Coupon List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="size-8 text-emerald-600 animate-spin" />
+          <Loader2 className="size-8 text-amber-600 animate-spin" />
         </div>
       ) : coupons.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Tag className="size-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">{t('s_noCouponsYet')}</p>
-            <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setShowCreateForm(true)}>
+            <Button className="mt-4 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => setShowCreateForm(true)}>
               <Tag className="size-4 me-2" />
               {t('s_createCoupon')}
             </Button>
@@ -710,13 +710,13 @@ function CouponManagementTab() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${coupon.isActive ? 'bg-emerald-100 dark:bg-emerald-900' : 'bg-muted'}`}>
-                      <Tag className={`size-5 ${coupon.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${coupon.isActive ? 'bg-amber-100 dark:bg-amber-900' : 'bg-muted'}`}>
+                      <Tag className={`size-5 ${coupon.isActive ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm font-mono">{coupon.code}</span>
-                        <Badge className={`text-[10px] ${coupon.type === 'percentage' ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300' : coupon.type === 'free_shipping' ? 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300' : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'}`}>
+                        <Badge className={`text-[10px] ${coupon.type === 'percentage' ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300' : coupon.type === 'free_shipping' ? 'bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300' : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'}`}>
                           {coupon.type === 'percentage'
                             ? `${coupon.discount}% ${t('s_off')}`
                             : coupon.type === 'free_shipping'
@@ -744,7 +744,7 @@ function CouponManagementTab() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`text-xs shrink-0 ${coupon.isActive ? 'border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950' : 'border-emerald-200 dark:border-emerald-800 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950'}`}
+                    className={`text-xs shrink-0 ${coupon.isActive ? 'border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950' : 'border-amber-200 dark:border-amber-800 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950'}`}
                     onClick={() => handleToggleCoupon(coupon.id, coupon.isActive)}
                   >
                     {coupon.isActive
@@ -879,7 +879,7 @@ export function SellerDashboard() {
                 <Button variant="ghost" className="h-9 gap-2 px-2">
                   <Avatar className="h-7 w-7">
                     <AvatarImage src={user?.avatar} />
-                    <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 text-xs">
+                    <AvatarFallback className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs">
                       {user?.name?.charAt(0) || 'S'}
                     </AvatarFallback>
                   </Avatar>
@@ -906,7 +906,7 @@ export function SellerDashboard() {
               variant="outline"
               size="sm"
               onClick={() => nav.setView('home')}
-              className="hidden sm:flex h-8 text-xs border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+              className="hidden sm:flex h-8 text-xs border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
             >
               <ArrowRightLeft className="h-3.5 w-3.5 me-1.5" />
               {t('switchToShopping')}

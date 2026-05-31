@@ -92,13 +92,13 @@ export function RelatedProducts(props: RelatedProductsProps) {
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-                <ShoppingCart className="size-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+                <ShoppingCart className="size-5 text-amber-600 dark:text-amber-400" />
               </div>
               {t('frequentlyBoughtTogether')}
             </h2>
             {product.store && (
-              <Badge variant="secondary" className="text-[10px] bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <Badge variant="secondary" className="text-[10px] bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                 <Store className="size-2.5 me-0.5" />
                 {t('fromSameStore')}
               </Badge>
@@ -106,13 +106,13 @@ export function RelatedProducts(props: RelatedProductsProps) {
           </div>
           <div className="p-4 bg-card rounded-xl border border-border">
             <div className="flex flex-wrap items-center gap-3 mb-4">
-              <div className="flex items-center gap-2 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+              <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
                 <div className="w-16 h-16 rounded-md bg-muted flex items-center justify-center">
-                  <Package className="size-6 text-emerald-400" />
+                  <Package className="size-6 text-amber-400" />
                 </div>
                 <div className="max-w-[120px]">
                   <p className="text-xs font-medium line-clamp-1">{displayName}</p>
-                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatPrice(product.price)}</p>
+                  <p className="text-xs font-bold text-amber-600 dark:text-amber-400">{formatPrice(product.price)}</p>
                 </div>
               </div>
               <span className="text-lg font-bold text-muted-foreground">+</span>
@@ -123,7 +123,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
                   </div>
                   <div className="max-w-[120px]">
                     <p className="text-xs font-medium line-clamp-1">{isRTL && p.nameAr ? p.nameAr : p.name}</p>
-                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatPrice(p.price)}</p>
+                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400">{formatPrice(p.price)}</p>
                   </div>
                 </div>
               ))}
@@ -131,11 +131,11 @@ export function RelatedProducts(props: RelatedProductsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-sm text-muted-foreground">{t('bundlePrice')}: </span>
-                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
                   {formatPrice(product.price + relatedProducts.slice(0, 2).reduce((sum, p) => sum + p.price, 0))}
                 </span>
               </div>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
                 <ShoppingCart className="size-3.5 me-1" />
                 {t('addAllToCart')}
               </Button>
@@ -148,8 +148,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {relatedProducts.length > 0 && (
         <section className="mb-10">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-              <ShoppingCart className="size-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+              <ShoppingCart className="size-5 text-amber-600 dark:text-amber-400" />
             </div>
             {t('peopleAlsoBought')}
           </h2>
@@ -168,8 +168,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {/* Shipping & Returns - Expandable */}
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-            <Truck className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+            <Truck className="size-5 text-amber-600 dark:text-amber-400" />
           </div>
           {isRTL ? 'الشحن والإرجاع' : 'Shipping & Returns'}
         </h2>
@@ -180,8 +180,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
               onClick={() => setShippingExpanded(!shippingExpanded)}
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-                  <Truck className="size-4 text-emerald-600 dark:text-emerald-400" />
+                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
+                  <Truck className="size-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="text-start">
                   <h3 className="font-semibold text-sm">{isRTL ? 'خيارات الشحن' : 'Shipping Options'}</h3>
@@ -202,7 +202,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-muted-foreground flex items-center gap-2"><Truck className="size-3.5" />{isRTL ? 'مجاني فوق' : 'Free over'}</span>
-                  <span className="font-medium text-emerald-600 dark:text-emerald-400">{formatPrice(SHIPPING_CONFIG.freeShippingThreshold)}</span>
+                  <span className="font-medium text-amber-600 dark:text-amber-400">{formatPrice(SHIPPING_CONFIG.freeShippingThreshold)}</span>
                 </div>
               </div>
             )}
@@ -226,15 +226,15 @@ export function RelatedProducts(props: RelatedProductsProps) {
             {returnsExpanded && (
               <div className="px-4 pb-4 space-y-2 text-sm animate-expand">
                 <div className="flex items-center gap-2 py-2 border-b border-border">
-                  <PackageCheck className="size-4 text-emerald-500" />
+                  <PackageCheck className="size-4 text-amber-500" />
                   <span>{isRTL ? 'إرجاع مجاني خلال 30 يوم' : 'Free returns within 30 days'}</span>
                 </div>
                 <div className="flex items-center gap-2 py-2 border-b border-border">
-                  <Shield className="size-4 text-emerald-500" />
+                  <Shield className="size-4 text-amber-500" />
                   <span>{isRTL ? 'ضمان استرداد الأموال' : 'Money-back guarantee'}</span>
                 </div>
                 <div className="flex items-center gap-2 py-2">
-                  <CreditCard className="size-4 text-emerald-500" />
+                  <CreditCard className="size-4 text-amber-500" />
                   <span>{isRTL ? 'استرداد خلال 3-5 أيام عمل' : 'Refund in 3-5 business days'}</span>
                 </div>
               </div>
@@ -246,8 +246,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {/* Ask a Question Section */}
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-            <HelpCircle className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+            <HelpCircle className="size-5 text-amber-600 dark:text-amber-400" />
           </div>
           {isRTL ? 'اطرح سؤالاً' : 'Ask a Question'}
         </h2>
@@ -257,7 +257,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
               placeholder={isRTL ? 'اكتب سؤالك هنا...' : 'Type your question here...'}
               className="flex-1 input-emerald"
             />
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white shrink-0">
               {isRTL ? 'إرسال' : 'Submit'}
             </Button>
           </div>
@@ -268,7 +268,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
             ).map((q) => (
               <button
                 key={q}
-                className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400"
+                className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/50 transition-colors text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400"
               >
                 {q}
               </button>
@@ -280,7 +280,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {/* Share this Product */}
       <section className="mb-10">
         <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-          <Share2 className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <Share2 className="size-5 text-amber-600 dark:text-amber-400" />
           {isRTL ? 'شارك هذا المنتج' : 'Share this Product'}
         </h2>
         <div className="p-4 bg-card rounded-xl border border-border">
@@ -314,7 +314,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
               className="gap-2 social-icon-hover hover:bg-sky-50 dark:hover:bg-sky-950 hover:border-sky-300 dark:hover:border-sky-700"
               onClick={() => handleShare('copy')}
             >
-              {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4 text-sky-500" />}
+              {copied ? <Check className="size-4 text-amber-500" /> : <Copy className="size-4 text-sky-500" />}
               {copied ? (isRTL ? 'تم النسخ!' : 'Copied!') : (isRTL ? 'نسخ الرابط' : 'Copy Link')}
             </Button>
           </div>
@@ -326,8 +326,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-                <Heart className="size-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+                <Heart className="size-5 text-amber-600 dark:text-amber-400" />
               </div>
               {isRTL ? 'قد يعجبك أيضاً' : 'You May Also Like'}
             </h2>
@@ -366,8 +366,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {relatedProducts.length > 0 && (
         <section className="mb-10">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-              <ShoppingCart className="size-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+              <ShoppingCart className="size-5 text-amber-600 dark:text-amber-400" />
             </div>
             {t('similarProducts')}
           </h2>
@@ -387,8 +387,8 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {recentlyViewedProducts.length > 0 && (
         <section className="mb-10">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900">
-              <Clock className="size-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900">
+              <Clock className="size-5 text-amber-600 dark:text-amber-400" />
             </div>
             {t('recentlyViewed')}
           </h2>
@@ -408,7 +408,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
       {product.stock > 0 && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center justify-between gap-3 z-50 safe-area-bottom">
           <div>
-            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
               {formatPrice(effectivePrice)}
             </p>
             {product.originalPrice && product.originalPrice > product.price && (
@@ -421,7 +421,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
             <RippleButton
               size="lg"
               variant="outline"
-              className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 h-11 px-4"
+              className="border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 h-11 px-4"
               onClick={handleBuyNow}
             >
               <Zap className="size-4 me-1" />
@@ -429,7 +429,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
             </RippleButton>
             <RippleButton
               size="lg"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-4"
+              className="bg-amber-600 hover:bg-amber-700 text-white h-11 px-4"
               onClick={handleAddToCart}
             >
               <ShoppingCart className="size-4 me-1" />
@@ -470,7 +470,7 @@ export function RelatedProducts(props: RelatedProductsProps) {
             </Button>
             <Button
               variant="outline"
-              className="h-16 flex-col gap-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:border-emerald-300 dark:hover:border-emerald-700"
+              className="h-16 flex-col gap-1.5 hover:bg-amber-50 dark:hover:bg-amber-950 hover:border-amber-300 dark:hover:border-amber-700"
               onClick={() => handleShare('copy')}
             >
               <Copy className="size-5" />

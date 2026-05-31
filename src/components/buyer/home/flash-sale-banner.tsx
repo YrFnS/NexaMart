@@ -8,7 +8,6 @@ import { useI18n } from '@/lib/i18n';
 import { formatPrice } from '@/lib/currency';
 import { useAppNavigation } from '@/lib/use-app-navigation';
 import { ProductCard, type Product } from '@/components/buyer/product-card';
-import { AVATAR_GRADIENTS } from '@/lib/theme';
 import { AnimatedSection, ScrollableSection, FlipDigit, useInView, useCounter } from './home-hooks';
 
 // --- Stats Counter Card with animated counter ---
@@ -17,12 +16,12 @@ function StatsCounterCard({ value, suffix, label, icon: Icon, isInView }: {
 }) {
   const count = useCounter(value, 2000, isInView);
   return (
-    <div className="flex items-center gap-3 p-4 md:p-5 rounded-xl bg-card border border-border hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 hover:shadow-md hover:shadow-emerald-500/5 hover:-translate-y-0.5">
-      <div className="p-2.5 rounded-lg bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/50 dark:to-teal-900/50">
-        <Icon className="size-5 text-emerald-600 dark:text-emerald-400" />
+    <div className="flex items-center gap-3 p-4 md:p-5 rounded-xl bg-card border border-border hover:border-[oklch(0.75_0.12_85)]/40 dark:hover:border-[oklch(0.75_0.12_85)]/30 transition-all duration-300 hover:shadow-md hover:shadow-[oklch(0.75_0.12_85)]/5">
+      <div className="p-2.5 rounded-lg bg-[oklch(0.98_0.01_80)] dark:bg-[oklch(0.75_0.12_85)]/10">
+        <Icon className="size-5 text-[oklch(0.75_0.12_85)] dark:text-[oklch(0.75_0.12_85)]" />
       </div>
       <div>
-        <div className="text-xl md:text-2xl font-bold gradient-text">{count.toLocaleString()}{suffix}</div>
+        <div className="text-xl md:text-2xl font-bold text-[oklch(0.18_0.02_270)] dark:text-gray-100">{count.toLocaleString()}{suffix}</div>
         <div className="text-xs text-muted-foreground">{label}</div>
       </div>
     </div>
@@ -51,20 +50,27 @@ function DealOfDaySpotlight({ products, locale }: { products: Product[]; locale:
 
   return (
     <section className="container mx-auto px-4 py-2">
-      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden pulse-glow border-2 border-emerald-400/30 dark:border-emerald-500/30">
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 md:p-8 text-white relative overflow-hidden">
-          {/* Decorative elements */}
-          <div className="absolute top-0 end-0 w-64 h-64 rounded-full bg-white/5 -translate-y-1/3 translate-x-1/3" />
-          <div className="absolute bottom-0 start-0 w-48 h-48 rounded-full bg-white/5 translate-y-1/3 -translate-x-1/4" />
+      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-[oklch(0.75_0.12_85)]/20">
+        <div className="bg-[oklch(0.18_0.02_270)] p-6 md:p-8 text-white relative overflow-hidden">
+          {/* Background image with overlay */}
+          <div className="absolute inset-0 opacity-10">
+            <img
+              src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80"
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+          {/* Subtle gold accent */}
+          <div className="absolute top-0 start-0 w-full h-1 bg-gradient-to-r from-transparent via-[oklch(0.75_0.12_85)] to-transparent" />
 
           <div className="relative flex flex-col md:flex-row items-center gap-6">
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-2">
-                <Badge className="bg-white/20 backdrop-blur-sm text-white border-0 text-xs px-3 py-1">
-                  <Flame className="size-3 me-1 animate-pulse" />
+                <Badge className="bg-[oklch(0.75_0.12_85)]/20 backdrop-blur-sm text-[oklch(0.75_0.12_85)] border-0 text-xs px-3 py-1">
+                  <Flame className="size-3 me-1" />
                   {t('b_dealOfDayBadge')}
                 </Badge>
-                <Badge className="bg-red-500 text-white border-0 text-xs px-2 py-1 animate-pulse-subtle">
+                <Badge className="bg-[oklch(0.75_0.12_85)] text-[oklch(0.18_0.02_270)] border-0 text-xs px-2 py-1 font-bold">
                   -{discount}% {t('off')}
                 </Badge>
               </div>
@@ -74,25 +80,25 @@ function DealOfDaySpotlight({ products, locale }: { products: Product[]; locale:
               <div className="flex items-center gap-3">
                 <span className="text-3xl font-bold">{formatPrice(bestDeal.price)}</span>
                 {bestDeal.originalPrice && (
-                  <span className="text-lg text-white/60 line-through">{formatPrice(bestDeal.originalPrice)}</span>
+                  <span className="text-lg text-white/50 line-through">{formatPrice(bestDeal.originalPrice)}</span>
                 )}
               </div>
               {/* Progress bar showing % claimed */}
               <div className="max-w-sm">
-                <div className="flex justify-between text-xs text-white/70 mb-1">
+                <div className="flex justify-between text-xs text-white/60 mb-1">
                   <span>{t('b_percentClaimed', { claimed })}</span>
                   <span>{t('b_hurry')}</span>
                 </div>
-                <div className="h-2.5 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-white/80 transition-all duration-1000"
+                    className="h-full rounded-full bg-[oklch(0.75_0.12_85)] transition-all duration-1000"
                     style={{ width: `${claimed}%` }}
                   />
                 </div>
               </div>
               <Button
                 size="lg"
-                className="bg-white text-emerald-700 hover:bg-white/90 font-bold shadow-lg mt-2"
+                className="bg-[oklch(0.75_0.12_85)] text-[oklch(0.18_0.02_270)] hover:bg-[oklch(0.70_0.12_85)] font-bold shadow-lg mt-2"
                 onClick={() => nav.selectProduct(bestDeal.id)}
               >
                 {t('shopNow')}
@@ -180,30 +186,29 @@ export function FlashSaleBanner({ saleProducts, platformStats }: FlashSaleBanner
       <AnimatedSection>
         {saleProducts.length > 0 && (
           <section className="container mx-auto px-4 py-2">
-            <div className="bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 rounded-2xl md:rounded-3xl p-6 md:p-8 text-white relative overflow-hidden">
-              {/* Decorative elements */}
-              <div className="absolute top-0 end-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/4 translate-x-1/4" />
-              <div className="absolute bottom-0 start-0 w-32 h-32 rounded-full bg-white/5 translate-y-1/4 -translate-x-1/4" />
+            <div className="bg-[oklch(0.18_0.02_270)] rounded-2xl md:rounded-3xl p-6 md:p-8 text-white relative overflow-hidden">
+              {/* Subtle gold accent line */}
+              <div className="absolute top-0 start-0 w-full h-1 bg-gradient-to-r from-transparent via-[oklch(0.75_0.12_85)] to-transparent" />
 
               <div className="relative">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-white/10">
-                      <Flame className="size-7 animate-pulse" />
+                    <div className="p-2 rounded-xl bg-[oklch(0.75_0.12_85)]/15">
+                      <Flame className="size-7 text-[oklch(0.75_0.12_85)]" />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold">{t('todaysDeals')}</h2>
-                      <p className="text-white/80 text-sm">Limited time offers</p>
+                      <p className="text-white/60 text-sm">Limited time offers</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Timer className="size-5" />
+                    <Timer className="size-5 text-[oklch(0.75_0.12_85)]" />
                     <span className="text-sm font-medium">{t('endsIn')}:</span>
                     <div className="flex gap-2">
                       <FlipDigit value={timeLeft.hours} label="hours" prevValue={prevTime.hours} />
-                      <span className="text-white/50 self-center text-lg font-bold">:</span>
+                      <span className="text-[oklch(0.75_0.12_85)]/50 self-center text-lg font-bold">:</span>
                       <FlipDigit value={timeLeft.minutes} label="minutes" prevValue={prevTime.minutes} />
-                      <span className="text-white/50 self-center text-lg font-bold">:</span>
+                      <span className="text-[oklch(0.75_0.12_85)]/50 self-center text-lg font-bold">:</span>
                       <FlipDigit value={timeLeft.seconds} label="seconds" prevValue={prevTime.seconds} />
                     </div>
                   </div>
@@ -213,17 +218,17 @@ export function FlashSaleBanner({ saleProducts, platformStats }: FlashSaleBanner
                     const claimed = Math.min(90, 50 + Math.floor(Math.random() * 40));
                     return (
                       <div key={product.id} className="w-44 md:w-52 flex-shrink-0">
-                        <div className="bg-white/10 backdrop-blur-sm rounded-xl overflow-hidden hover:bg-white/15 transition-colors">
+                        <div className="bg-white/[0.07] rounded-xl overflow-hidden hover:bg-white/10 transition-colors">
                           <ProductCard product={product} onQuickView={handleQuickView} />
                           {/* Flash sale progress bar */}
                           <div className="px-3 pb-2">
-                            <div className="h-1.5 rounded-full bg-white/20 overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-white/70 transition-all duration-1000"
+                                className="h-full rounded-full bg-[oklch(0.75_0.12_85)] transition-all duration-1000"
                                 style={{ width: `${claimed}%` }}
                               />
                             </div>
-                            <p className="text-[9px] text-white/60 mt-0.5">{claimed}% {t('b_claimed')}</p>
+                            <p className="text-[9px] text-white/50 mt-0.5">{claimed}% {t('b_claimed')}</p>
                           </div>
                         </div>
                       </div>

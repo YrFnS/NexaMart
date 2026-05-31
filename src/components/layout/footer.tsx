@@ -118,10 +118,10 @@ export function Footer() {
       className="bg-gray-900 text-gray-300 mt-auto max-w-full overflow-x-hidden"
     >
       {/* Gradient separator above footer */}
-      <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+      <div className="h-1 bg-gradient-to-r from-amber-500 via-yellow-500 to-sky-500" />
 
       {/* Newsletter Section */}
-      <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-amber-700 via-yellow-700 to-sky-700 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-4 start-10 w-24 h-24 rounded-full bg-white" />
@@ -136,7 +136,7 @@ export function Footer() {
               </div>
               <div>
                 <h3 className="font-bold text-lg">{t('stayUpdated')}</h3>
-                <p className="text-sm text-emerald-100 max-w-md">{t('stayUpdatedDesc')}</p>
+                <p className="text-sm text-amber-100 max-w-md">{t('stayUpdatedDesc')}</p>
               </div>
             </div>
             <form
@@ -150,12 +150,12 @@ export function Footer() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-11 bg-white/15 border-white/25 text-white placeholder:text-emerald-200 focus-visible:border-white/50 focus-visible:ring-white/20 backdrop-blur-sm rounded-xl"
+                  className="h-11 bg-white/15 border-white/25 text-white placeholder:text-amber-200 focus-visible:border-white/50 focus-visible:ring-white/20 backdrop-blur-sm rounded-xl"
                 />
               </div>
               <Button
                 type="submit"
-                className="h-11 bg-white text-emerald-700 hover:bg-emerald-50 font-semibold shrink-0 rounded-xl px-6 shadow-lg"
+                className="h-11 bg-white text-amber-700 hover:bg-amber-50 font-semibold shrink-0 rounded-xl px-6 shadow-lg"
               >
                 <Send className="size-4 me-1.5" />
                 {subscribed ? '✓' : t('subscribe')}
@@ -187,11 +187,11 @@ export function Footer() {
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-4 lg:mb-0">
             <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center justify-center size-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
+              <div className="flex items-center justify-center size-9 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 shadow-lg shadow-amber-500/20">
                 <Sparkles className="size-5 text-white" />
               </div>
               <span className="text-xl font-bold text-white">
-                <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-amber-400 to-yellow-400 bg-clip-text text-transparent">
                   Nexa
                 </span>
                 <span>Mart</span>
@@ -202,15 +202,15 @@ export function Footer() {
             </p>
             <div className="space-y-2 text-sm text-gray-400">
               <div className="flex items-center gap-2">
-                <MapPin className="size-4 shrink-0 text-emerald-400" />
+                <MapPin className="size-4 shrink-0 text-amber-400" />
                 <span>{APP_ADDRESS}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Phone className="size-4 shrink-0 text-emerald-400" />
+                <Phone className="size-4 shrink-0 text-amber-400" />
                 <span>{APP_SUPPORT_PHONE}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Mail className="size-4 shrink-0 text-emerald-400" />
+                <Mail className="size-4 shrink-0 text-amber-400" />
                 <span>{APP_SUPPORT_EMAIL}</span>
               </div>
             </div>
@@ -220,7 +220,7 @@ export function Footer() {
           {footerColumns.map((section, idx) => (
             <div key={section.title}>
               <h3 className="font-semibold text-sm text-white mb-4 flex items-center gap-2">
-                <span className="w-6 h-0.5 bg-emerald-500 rounded-full" />
+                <span className="w-6 h-0.5 bg-amber-500 rounded-full" />
                 {section.title}
               </h3>
               <ul className="space-y-2.5">
@@ -228,10 +228,10 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-gray-400 hover:text-emerald-400 transition-colors flex items-center gap-1 group"
+                      className="text-sm text-gray-400 hover:text-amber-400 transition-colors flex items-center gap-1 group"
                     >
                       {link.label}
-                      <ArrowUpRight className="size-2.5 text-transparent group-hover:text-emerald-400 transition-all -translate-x-1 group-hover:translate-x-0 rtl:translate-x-1 rtl:group-hover:-translate-x-0" />
+                      <ArrowUpRight className="size-2.5 text-transparent group-hover:text-amber-400 transition-all -translate-x-1 group-hover:translate-x-0 rtl:translate-x-1 rtl:group-hover:-translate-x-0" />
                     </Link>
                   </li>
                 ))}
@@ -251,14 +251,14 @@ export function Footer() {
             <div>
               <h4 className="font-semibold text-sm text-white mb-3">{t('downloadOurApp')}</h4>
               <div className="flex items-center gap-3">
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 hover:border-emerald-500/50 transition-colors group">
+                <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 hover:border-amber-500/50 transition-colors group">
                   <Apple className="size-5 text-gray-300 group-hover:text-white transition-colors" />
                   <div className="text-start">
                     <p className="text-[8px] text-gray-500 leading-none">{t('footerDownloadOn')}</p>
                     <p className="text-xs font-semibold text-white leading-tight">{t('footerAppStore')}</p>
                   </div>
                 </button>
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 hover:border-emerald-500/50 transition-colors group">
+                <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 hover:border-amber-500/50 transition-colors group">
                   <Download className="size-5 text-gray-300 group-hover:text-white transition-colors" />
                   <div className="text-start">
                     <p className="text-[8px] text-gray-500 leading-none">{t('footerGetItOn')}</p>
@@ -292,8 +292,8 @@ export function Footer() {
                 href={item.href}
                 className="flex flex-col items-center gap-1.5 p-2 rounded-lg hover:bg-gray-800 transition-colors group"
               >
-                <item.icon className="size-5 text-gray-500 group-hover:text-emerald-400 transition-colors" />
-                <span className="text-[10px] text-gray-500 group-hover:text-emerald-400 transition-colors">{item.label}</span>
+                <item.icon className="size-5 text-gray-500 group-hover:text-amber-400 transition-colors" />
+                <span className="text-[10px] text-gray-500 group-hover:text-amber-400 transition-colors">{item.label}</span>
               </Link>
             ))}
           </div>
@@ -323,7 +323,7 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           {/* Copyright */}
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <ShieldCheck className="size-4 text-emerald-500" />
+            <ShieldCheck className="size-4 text-amber-500" />
             <span>© {currentYear} {APP_NAME}. {t('allRightsReserved')}</span>
           </div>
 
@@ -332,7 +332,7 @@ export function Footer() {
             {/* Language Switcher */}
             <button
               onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-xs text-gray-300 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-xs text-gray-300 hover:border-amber-500/50 hover:text-amber-400 transition-colors"
             >
               <span>{locale === 'en' ? '🇺🇸' : '🇸🇦'}</span>
               <span>{locale === 'en' ? 'EN' : 'AR'}</span>

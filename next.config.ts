@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   // SPA rewrite removed — app now uses proper Next.js file-based routing
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

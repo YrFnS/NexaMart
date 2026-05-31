@@ -200,7 +200,7 @@ export function Header() {
       }`}
     >
       {/* Top gradient accent bar */}
-      <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+      <div className="h-1 w-full bg-gradient-to-r from-amber-500 via-yellow-500 to-sky-500" />
 
       {/* Main header content */}
       <div className="container mx-auto px-4">
@@ -219,11 +219,11 @@ export function Header() {
               href="/"
               className="flex items-center gap-2 group"
             >
-              <div className="relative flex items-center justify-center size-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow animate-[bounce_0.6s_ease-in-out_1]">
+              <div className="relative flex items-center justify-center size-9 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 shadow-lg shadow-amber-500/20 group-hover:shadow-amber-500/40 transition-shadow animate-[bounce_0.6s_ease-in-out_1]">
                 <Sparkles className="size-5 text-white group-hover:animate-pulse" />
               </div>
               <span className="text-xl font-bold tracking-tight hidden sm:inline">
-                <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">
                   Nexa
                 </span>
                 <span className="text-foreground">Mart</span>
@@ -256,7 +256,7 @@ export function Header() {
                     <Button
                       variant={showMegaMenu ? 'secondary' : 'ghost'}
                       size="sm"
-                      className={showMegaMenu ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : ''}
+                      className={showMegaMenu ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400' : ''}
                       onClick={() => {
                         nav.setView('shop');
                         setShowMegaMenu(false);
@@ -288,7 +288,7 @@ export function Header() {
                   size="sm"
                   className={
                     isActive
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900'
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900'
                       : ''
                   }
                 >
@@ -302,7 +302,7 @@ export function Header() {
                 <Button
                   variant={moreLinks.some(l => { const u = getViewUrl(l.view); return pathname === u || (u !== '/' && pathname.startsWith(u)); }) ? 'secondary' : 'ghost'}
                   size="sm"
-                  className={moreLinks.some(l => { const u = getViewUrl(l.view); return pathname === u || (u !== '/' && pathname.startsWith(u)); }) ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : ''}
+                  className={moreLinks.some(l => { const u = getViewUrl(l.view); return pathname === u || (u !== '/' && pathname.startsWith(u)); }) ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400' : ''}
                 >
                   {isRTL ? 'المزيد' : 'More'}
                   <ChevronDown className="size-3 ms-0.5" />
@@ -316,7 +316,7 @@ export function Header() {
                     <DropdownMenuItem
                       key={link.key}
                       asChild
-                      className={isActive ? 'bg-emerald-50 dark:bg-emerald-950' : ''}
+                      className={isActive ? 'bg-amber-50 dark:bg-amber-950' : ''}
                     >
                       <Link href={linkUrl}>
                         <span className="me-2">{link.icon}</span>
@@ -343,7 +343,7 @@ export function Header() {
                 }}
                 onFocus={() => setShowSearchSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
-                className={`${isRTL ? 'ps-9 pe-16' : 'ps-9 pe-16'} h-10 bg-muted/50 border-transparent focus-visible:border-emerald-500/50 focus-visible:ring-2 focus-visible:ring-emerald-500/30 rounded-xl text-sm transition-all duration-300`}
+                className={`${isRTL ? 'ps-9 pe-16' : 'ps-9 pe-16'} h-10 bg-muted/50 border-transparent focus-visible:border-amber-500/50 focus-visible:ring-2 focus-visible:ring-amber-500/30 rounded-xl text-sm transition-all duration-300`}
               />
               <kbd className={`pointer-events-none absolute top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground ${isRTL ? 'left-2' : 'right-2'}`}>
                 <Command className="size-2.5" />K
@@ -360,7 +360,7 @@ export function Header() {
                     {(isRTL ? ['سماعات', 'ساعات ذكية', 'أحذية'] : ['Wireless Headphones', 'Smart Watch', 'Running Shoes']).map((term) => (
                       <button
                         key={term}
-                        className="text-xs px-2.5 py-1 rounded-full bg-muted/50 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                        className="text-xs px-2.5 py-1 rounded-full bg-muted/50 hover:bg-amber-100 dark:hover:bg-amber-900 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
                         onMouseDown={() => {
                           setSearchQuery(term);
                           nav.setView('search');
@@ -380,14 +380,14 @@ export function Header() {
                     {(isRTL ? ['أجهزة لوحية', 'مكياج', 'حقائب'] : ['Laptops', 'Skincare', 'Gaming']).map((term) => (
                       <button
                         key={term}
-                        className="text-xs px-2.5 py-1 rounded-full border border-border hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors flex items-center gap-1"
+                        className="text-xs px-2.5 py-1 rounded-full border border-border hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300 transition-colors flex items-center gap-1"
                         onMouseDown={() => {
                           setSearchQuery(term);
                           nav.setView('search');
                           setShowSearchSuggestions(false);
                         }}
                       >
-                        <Zap className="size-2.5 text-emerald-500" />
+                        <Zap className="size-2.5 text-amber-500" />
                         {term}
                       </button>
                     ))}
@@ -404,7 +404,7 @@ export function Header() {
               asChild
               variant="outline"
               size="sm"
-              className="hidden xl:flex gap-1.5 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-xs"
+              className="hidden xl:flex gap-1.5 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 text-xs"
             >
               <Link href={getViewUrl('seller-dashboard')}>
                 <Store className="size-3.5" />
@@ -416,7 +416,7 @@ export function Header() {
             <Button
               asChild
               size="sm"
-              className="hidden lg:flex gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 text-xs"
+              className="hidden lg:flex gap-1.5 bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/20 text-xs"
             >
               <Link href={getViewUrl('quick-post')}>
                 <Megaphone className="size-3.5" />
@@ -450,13 +450,13 @@ export function Header() {
               <DropdownMenuContent align={isRTL ? 'start' : 'end'}>
                 <DropdownMenuItem
                   onClick={() => setLocale('en')}
-                  className={locale === 'en' ? 'bg-emerald-50 dark:bg-emerald-950' : ''}
+                  className={locale === 'en' ? 'bg-amber-50 dark:bg-amber-950' : ''}
                 >
                   🇺🇸 English
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setLocale('ar')}
-                  className={locale === 'ar' ? 'bg-emerald-50 dark:bg-emerald-950' : ''}
+                  className={locale === 'ar' ? 'bg-amber-50 dark:bg-amber-950' : ''}
                 >
                   🇸🇦 العربية
                 </DropdownMenuItem>
@@ -494,7 +494,7 @@ export function Header() {
                 <Link href={getViewUrl('cart')}>
                   <ShoppingCart className="size-4" />
                   {itemCount > 0 && (
-                    <Badge className={`absolute -top-1 ${isRTL ? '-left-1' : '-right-1'} size-4 p-0 flex items-center justify-center text-[10px] bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 ${cartPulse ? 'animate-badge-pulse' : ''}`}>
+                    <Badge className={`absolute -top-1 ${isRTL ? '-left-1' : '-right-1'} size-4 p-0 flex items-center justify-center text-[10px] bg-gradient-to-r from-amber-500 to-yellow-500 text-white border-0 ${cartPulse ? 'animate-badge-pulse' : ''}`}>
                       {itemCount > 99 ? '99+' : itemCount}
                     </Badge>
                   )}
@@ -506,7 +506,7 @@ export function Header() {
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold">{isRTL ? 'السلة' : 'Cart'} ({itemCount})</span>
-                      <Button asChild variant="ghost" size="sm" className="text-xs text-emerald-600">
+                      <Button asChild variant="ghost" size="sm" className="text-xs text-amber-600">
                         <Link href={getViewUrl('cart')}>
                           {isRTL ? 'عرض الكل' : 'View All'}
                         </Link>
@@ -517,7 +517,7 @@ export function Header() {
                         <div className="w-8 h-8 rounded bg-muted flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs truncate">{item.name}</p>
-                          <p className="text-[10px] text-emerald-600 font-medium">{formatPrice(item.price, currency)} × {item.quantity}</p>
+                          <p className="text-[10px] text-amber-600 font-medium">{formatPrice(item.price, currency)} × {item.quantity}</p>
                         </div>
                       </div>
                     ))}
@@ -541,7 +541,7 @@ export function Header() {
                         src={user.avatar}
                         alt={user.name}
                       />
-                      <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs">
+                      <AvatarFallback className="bg-gradient-to-br from-amber-500 to-yellow-600 text-white text-xs">
                         {user.name
                           .split(' ')
                           .map((n) => n[0])
@@ -549,7 +549,7 @@ export function Header() {
                       </AvatarFallback>
                     </Avatar>
                     {/* Green dot when user is logged in */}
-                    <span className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 size-2.5 rounded-full bg-emerald-500 border-2 border-background`} />
+                    <span className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 size-2.5 rounded-full bg-amber-500 border-2 border-background`} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align={isRTL ? 'start' : 'end'} className="w-56">
@@ -648,7 +648,7 @@ export function Header() {
                 <Button
                   size="sm"
                   onClick={handleDemoLogin}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md shadow-emerald-500/20"
+                  className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white shadow-md shadow-amber-500/20"
                 >
                   {t('quickDemoLogin')}
                 </Button>
@@ -667,7 +667,7 @@ export function Header() {
                 placeholder={t('search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`${isRTL ? 'ps-9 pe-9' : 'ps-9 pe-9'} h-10 bg-muted/50 border-transparent focus-visible:border-emerald-500/50 rounded-xl`}
+                className={`${isRTL ? 'ps-9 pe-9' : 'ps-9 pe-9'} h-10 bg-muted/50 border-transparent focus-visible:border-amber-500/50 rounded-xl`}
                 autoFocus
               />
               <Button
@@ -692,10 +692,10 @@ export function Header() {
         >
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <div className="flex items-center justify-center size-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 animate-[bounce_0.6s_ease-in-out_1]">
+              <div className="flex items-center justify-center size-8 rounded-lg bg-gradient-to-br from-amber-500 to-yellow-600 animate-[bounce_0.6s_ease-in-out_1]">
                 <Sparkles className="size-4 text-white" />
               </div>
-              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent font-bold">
+              <span className="bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent font-bold">
                 Nexa
               </span>
               <span>Mart</span>
@@ -709,7 +709,7 @@ export function Header() {
                 <div className="relative">
                   <Avatar className="size-10">
                     <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+                    <AvatarFallback className="bg-gradient-to-br from-amber-500 to-yellow-600 text-white">
                       {user.name
                         .split(' ')
                         .map((n) => n[0])
@@ -717,7 +717,7 @@ export function Header() {
                     </AvatarFallback>
                   </Avatar>
                   {/* Green dot for logged in user */}
-                  <span className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 size-2.5 rounded-full bg-emerald-500 border-2 border-background`} />
+                  <span className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 size-2.5 rounded-full bg-amber-500 border-2 border-background`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{user.name}</p>
@@ -740,7 +740,7 @@ export function Header() {
                       asChild
                       key={link.key}
                       variant="ghost"
-                      className="w-full justify-start gap-3 text-emerald-600 dark:text-emerald-400 font-semibold"
+                      className="w-full justify-start gap-3 text-amber-600 dark:text-amber-400 font-semibold"
                     >
                       <Link
                         href={getViewUrl('shop')}
@@ -762,7 +762,7 @@ export function Header() {
                     variant={isActive ? 'secondary' : 'ghost'}
                     className={`w-full justify-start gap-3 ${
                       isActive
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
                         : ''
                     }`}
                   >
@@ -783,7 +783,7 @@ export function Header() {
                   <ShoppingCart className="size-4" />
                   {t('cart')}
                   {itemCount > 0 && (
-                    <Badge className={`ms-auto bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 ${cartPulse ? 'animate-badge-pulse' : ''}`}>
+                    <Badge className={`ms-auto bg-gradient-to-r from-amber-500 to-yellow-500 text-white border-0 ${cartPulse ? 'animate-badge-pulse' : ''}`}>
                       {itemCount}
                     </Badge>
                   )}
@@ -920,7 +920,7 @@ export function Header() {
               </Button>
 
               {/* Sell on NexaMart - mobile */}
-              <Button asChild variant="ghost" className="w-full justify-start gap-3 text-emerald-600 dark:text-emerald-400">
+              <Button asChild variant="ghost" className="w-full justify-start gap-3 text-amber-600 dark:text-amber-400">
                 <Link href={getViewUrl('seller-dashboard')} onClick={() => setIsMobileMenuOpen(false)}>
                   <Store className="size-4" />
                   {t('sellOnPlatform')}
@@ -928,7 +928,7 @@ export function Header() {
               </Button>
 
               {/* Post Free Ad - mobile */}
-              <Button asChild variant="ghost" className="w-full justify-start gap-3 text-emerald-600 dark:text-emerald-400 font-semibold">
+              <Button asChild variant="ghost" className="w-full justify-start gap-3 text-amber-600 dark:text-amber-400 font-semibold">
                 <Link href={getViewUrl('quick-post')} onClick={() => setIsMobileMenuOpen(false)}>
                   <Megaphone className="size-4" />
                   {t('postFreeAd')}

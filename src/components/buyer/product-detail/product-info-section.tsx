@@ -70,7 +70,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
       <div>
         <div className="flex flex-wrap items-center gap-2 mb-2">
           {product.isNew && (
-            <Badge className="bg-emerald-500 text-white text-xs">{t('new')}</Badge>
+            <Badge className="bg-amber-500 text-white text-xs">{t('new')}</Badge>
           )}
           {product.isSale && (
             <Badge className="bg-red-500 text-white text-xs sale-badge-shimmer relative overflow-hidden">
@@ -87,7 +87,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="size-9 shrink-0 text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded-full"
+            className="size-9 shrink-0 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-full"
             onClick={async () => {
               if (navigator.share) {
                 try {
@@ -108,10 +108,10 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
               }
             }}
           >
-            {copied ? <Check className="size-4 text-emerald-500" /> : <Share2 className="size-4" />}
+            {copied ? <Check className="size-4 text-amber-500" /> : <Share2 className="size-4" />}
           </Button>
           {copied && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium animate-in fade-in">
+            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium animate-in fade-in">
               {t('productLinkCopied')}
             </span>
           )}
@@ -147,7 +147,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
       {/* Price */}
       <div className="space-y-2 py-2">
         <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="text-4xl md:text-5xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
+          <span className="text-4xl md:text-5xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
             {formatPrice(effectivePrice)}
           </span>
           {product.originalPrice && product.originalPrice > product.price && (
@@ -162,13 +162,13 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
           )}
         </div>
         {product.originalPrice && product.originalPrice > product.price && (
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg w-fit">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg w-fit">
             <Sparkles className="size-3.5" />
             {t('youSaveAmount', { amount: formatPrice(product.originalPrice - product.price) })}
           </div>
         )}
         {effectivePrice < product.price && (
-          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+          <p className="text-xs text-amber-600 dark:text-amber-400">
             {t('bulkPriceApplied', { quantity })}
           </p>
         )}
@@ -249,7 +249,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           {stockStatus === 'inStock' && (
-            <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 gap-1">
+            <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 gap-1">
               <BadgeCheck className="size-3" />
               {t('inStock')}
             </Badge>
@@ -291,10 +291,10 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
 
       {/* Estimated Delivery Date */}
       {product.stock > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-teal-50 dark:bg-teal-950/30 rounded-lg border border-teal-200 dark:border-teal-800">
-          <Truck className="size-5 text-teal-600 dark:text-teal-400" />
+        <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <Truck className="size-5 text-yellow-600 dark:text-yellow-400" />
           <div>
-            <span className="text-sm font-medium text-teal-700 dark:text-teal-300">
+            <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
               {(() => {
                 const now = new Date();
                 const hoursLeft = 23 - now.getHours();
@@ -309,7 +309,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
               })()}
             </span>
             {product.hasFreeShipping && (
-              <p className="text-xs text-teal-600/70 dark:text-teal-400/70">{t('freeShipping')}</p>
+              <p className="text-xs text-yellow-600/70 dark:text-yellow-400/70">{t('freeShipping')}</p>
             )}
           </div>
         </div>
@@ -317,10 +317,10 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
 
       {/* Shipping Info */}
       {product.hasFreeShipping && (
-        <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg border border-emerald-200 dark:border-emerald-800">
-          <Truck className="size-5 text-emerald-600" />
+        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/50 rounded-lg border border-amber-200 dark:border-amber-800">
+          <Truck className="size-5 text-amber-600" />
           <div>
-            <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
               {t('freeShipping')}
             </span>
             <p className="text-xs text-muted-foreground">{t('fastDeliveryDesc')}</p>
@@ -338,19 +338,19 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
       {product.store && (
         <Link
           href={`/store/${product.storeId}`}
-          className="block p-4 rounded-xl border border-border hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 cursor-pointer card-hover-glow seller-card-gradient relative overflow-hidden"
+          className="block p-4 rounded-xl border border-border hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300 cursor-pointer card-hover-glow seller-card-gradient relative overflow-hidden"
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/80 via-transparent to-teal-50/50 dark:from-emerald-950/30 dark:via-transparent dark:to-teal-950/20 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-50/80 via-transparent to-yellow-50/50 dark:from-amber-950/30 dark:via-transparent dark:to-yellow-950/20 pointer-events-none" />
           <div className="relative">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-lg shadow-md ring-2 ring-white dark:ring-gray-800">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-white font-bold text-lg shadow-md ring-2 ring-white dark:ring-gray-800">
                 {product.store.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold truncate">{product.store.name}</span>
                   {product.store.isVerified && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full verified-check-anim">
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-full verified-check-anim">
                       <BadgeCheck className="size-3" />
                       {t('verified')}
                     </span>
@@ -363,7 +363,7 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
                       {(product.store?.rating ?? 0).toFixed(1)}
                     </span>
                   </div>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 font-medium">
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5 font-medium">
                     <Clock className="size-2.5" />
                     {t('responseTime')}
                   </span>
@@ -371,11 +371,11 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
               </div>
             </div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm">
                 <Store className="size-3.5" />
                 {t('visitStore')}
               </span>
-              <Button variant="ghost" size="sm" className="text-emerald-600 gap-1 shrink-0 h-8" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+              <Button variant="ghost" size="sm" className="text-amber-600 gap-1 shrink-0 h-8" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                 <MessageCircle className="size-3.5" />
                 {t('chatWithSeller')}
               </Button>

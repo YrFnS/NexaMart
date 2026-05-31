@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Zap, TrendingUp, Flame, ShoppingBag, Package } from 'lucide-react';
+import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, ShoppingBag, Users, ShieldCheck, Package } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/use-app-navigation';
@@ -21,16 +22,20 @@ interface HeroSectionProps {
   bestDiscount: number;
 }
 
+const SHOWCASE_IMAGES = [
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80',
+  'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&q=80',
+  'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80',
+];
+
+const SHOWCASE_LABELS = ['Edison Smart Watch', 'Studio Headphones', 'Polaroid Camera'];
+const SHOWCASE_PRICES = ['AED 299', 'AED 449', 'AED 189'];
+
 export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
   const { t, locale } = useI18n();
   const { setView } = useAppNavigation();
   const isRTL = locale === 'ar';
   const [currentSlide, setCurrentSlide] = useState(0);
-
-  const iconMap: Record<string, React.ElementType> = {
-    Sparkles, Zap, TrendingUp, Flame, ShoppingBag, Star: Sparkles,
-    Gift: ShoppingBag, Globe: TrendingUp,
-  };
 
   // Auto-advance hero
   useEffect(() => {
@@ -47,68 +52,57 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
   const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
 
-  return (
-    <section className="relative overflow-hidden container mx-auto px-4">
-      {/* Hero Banner Carousel */}
-      {heroSlides.map((slide, i) => (
-        <div
-          key={i}
-          className={`absolute inset-0 transition-all duration-800 ease-in-out ${
-            i === currentSlide ? 'opacity-100 scale-100 hero-slide-enter' : 'opacity-0 scale-105 hero-slide-exit'
-          }`}
-          aria-hidden={i !== currentSlide}
-        >
-          <div className={`relative bg-gradient-to-br ${slide.gradient} h-full w-full`}>
-            {/* Subtle pattern overlay */}
-            <div className="absolute inset-0 opacity-[0.04]" style={{
-              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-            }} />
-          </div>
-        </div>
-      ))}
+  const currentIndex = currentSlide % SHOWCASE_IMAGES.length;
 
-      {/* Particle/Sparkle overlay */}
-      <div className="absolute inset-0 z-[2] pointer-events-none overflow-hidden">
-        {Array.from({ length: 20 }, (_, i) => (
-          <div
-            key={i}
-            className="hero-sparkle"
-            style={{
-              left: `${5 + (i * 4.7) % 90}%`,
-              top: `${10 + (i * 7.3) % 80}%`,
-              '--sparkle-duration': `${2 + (i % 4)}s`,
-              '--sparkle-delay': `${(i * 0.3) % 3}s`,
-              width: `${2 + (i % 3)}px`,
-              height: `${2 + (i % 3)}px`,
-              opacity: 0.4 + (i % 5) * 0.1,
-            } as React.CSSProperties}
-          />
-        ))}
+  return (
+    <section className="relative overflow-hidden w-full">
+      {/* Full-width editorial background image */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80"
+          alt="Premium MENA marketplace shopping experience"
+          fill
+          priority
+          className="object-cover"
+          sizes="100vw"
+          quality={85}
+        />
+        {/* Overlay gradient: espresso/black at bottom to transparent at top */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
       </div>
 
-      {/* Vignette effect */}
-      <div className="hero-vignette" />
+      {/* Hero content */}
+      <div className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8">
+        <div className="py-16 md:py-24 lg:py-28 min-h-[520px] md:min-h-[580px] lg:min-h-[640px] flex items-center">
+          <div className="w-full grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 items-center">
 
-      {/* Hero content - sits on top of slides */}
-      <div className="relative z-10">
-        <div className="px-6 py-14 md:px-12 lg:px-16 md:py-20 lg:py-24 text-white min-h-[340px] md:min-h-[440px] lg:min-h-[480px] flex items-center">
-          <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            {/* Left: Text content */}
-            <div className="space-y-5 md:space-y-6">
-              <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-medium">
-                {React.createElement(iconMap[heroSlides[currentSlide].icon] || Sparkles, { className: 'size-4 text-emerald-200' })}
-                <span className="text-white/95">{t('appName')}</span>
+            {/* Left side (60%) – Typography + CTA */}
+            <div className="lg:col-span-3 space-y-6 md:space-y-7">
+              {/* Seasonal tag */}
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-medium border border-white/10">
+                <ShoppingBag className="size-4" style={{ color: '#d4a853' }} />
+                <span className="text-white/90">{t('appName')}</span>
+                <span style={{ color: '#d4a853' }}>◆</span>
+                <span className="text-white/70 text-xs">{t('heroTitle')}</span>
               </div>
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-white drop-shadow-sm">
+
+              {/* Main heading */}
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-white">
                 {heroSlides[currentSlide].title}
               </h1>
-              <p className="text-lg md:text-xl lg:text-2xl text-white/90 max-w-lg leading-relaxed font-medium">
+
+              {/* Subheading */}
+              <p className="text-lg md:text-xl text-white/80 max-w-xl leading-relaxed">
                 {heroSlides[currentSlide].description}
               </p>
-              <div className="flex flex-wrap gap-4 pt-3">
+
+              {/* CTA buttons */}
+              <div className="flex flex-wrap gap-4 pt-2">
                 <Button
                   size="lg"
-                  className="glassmorphism-btn text-white font-bold rounded-xl px-8 h-12 shadow-lg"
+                  className="font-bold rounded-xl px-8 h-12 shadow-lg text-black hover:brightness-110 transition-all"
+                  style={{ backgroundColor: '#d4a853' }}
                   onClick={() => {
                     const link = heroSlides[currentSlide]?.ctaLink || '/shop';
                     if (link.startsWith('/')) {
@@ -128,67 +122,100 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="glassmorphism-btn text-white font-bold rounded-xl px-8 h-12"
+                  className="font-bold rounded-xl px-8 h-12 border-white/40 text-white bg-transparent hover:bg-white/10 backdrop-blur-sm transition-all"
                   onClick={() => setView('deals')}
                 >
-                  <Flame className="size-5 me-2" />
+                  <ShoppingBag className="size-5 me-2" />
                   {t('deals')}
                 </Button>
               </div>
+
+              {/* Trust badges */}
+              <div className="flex flex-wrap gap-6 pt-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                    <Package className="size-4" style={{ color: '#d4a853' }} />
+                  </div>
+                  <span className="text-white/70 text-sm font-medium">10K+ Products</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                    <Users className="size-4" style={{ color: '#d4a853' }} />
+                  </div>
+                  <span className="text-white/70 text-sm font-medium">500+ Sellers</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                    <ShieldCheck className="size-4" style={{ color: '#d4a853' }} />
+                  </div>
+                  <span className="text-white/70 text-sm font-medium">{t('securePayments')}</span>
+                </div>
+              </div>
             </div>
 
-            {/* Right: Floating product showcase cards */}
-            <div className="hidden lg:flex justify-center items-center relative">
+            {/* Right side (40%) – Editorial product showcase card */}
+            <div className="lg:col-span-2 hidden lg:flex justify-center items-center">
               <div className="relative">
-                {/* Main floating card */}
-                <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 border border-white/25 shadow-2xl w-72 animate-float-slow">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                      <ShoppingBag className="size-5 text-white" />
+                {/* Product card */}
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black/40 backdrop-blur-md w-72">
+                  {/* Product image */}
+                  <div className="relative h-64 w-full">
+                    <Image
+                      src={SHOWCASE_IMAGES[currentIndex]}
+                      alt={SHOWCASE_LABELS[currentIndex]}
+                      fill
+                      className="object-cover transition-opacity duration-700"
+                      sizes="(max-width: 768px) 100vw, 288px"
+                      key={currentIndex}
+                    />
+                    {/* Gradient overlay on image */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {/* Price badge */}
+                    <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1">
+                      <span className="text-white font-bold text-sm">{SHOWCASE_PRICES[currentIndex]}</span>
                     </div>
+                    {/* Gold accent tag */}
+                    <div
+                      className="absolute top-3 right-3 rounded-md px-2 py-0.5 text-xs font-bold text-black"
+                      style={{ backgroundColor: '#d4a853' }}
+                    >
+                      {bestDiscount > 0 ? `-${bestDiscount}%` : 'NEW'}
+                    </div>
+                  </div>
+                  {/* Card content */}
+                  <div className="p-4 space-y-3">
                     <div>
-                      <p className="text-white font-semibold text-sm">{t('featuredProducts')}</p>
-                      <p className="text-white/60 text-xs">{t('aiPowered')}</p>
+                      <p className="text-white font-semibold text-sm">{SHOWCASE_LABELS[currentIndex]}</p>
+                      <p className="text-white/50 text-xs mt-0.5">{t('featuredProducts')}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <svg key={star} className="size-3.5" style={{ color: star <= 4 ? '#d4a853' : '#444' }} viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                      <span className="text-white/40 text-xs ms-1">(4.0)</span>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    {[0, 1, 2].map((idx) => (
-                      <div key={idx} className="flex items-center gap-3 bg-white/10 rounded-lg p-2.5">
-                        <div className="w-9 h-9 rounded-md bg-white/20 flex items-center justify-center shrink-0">
-                          <Package className="size-4 text-white/70" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="h-2.5 bg-white/25 rounded-full w-3/4" />
-                          <div className="h-2 bg-white/15 rounded-full w-1/2 mt-1.5" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
 
-                {/* Small floating badge */}
-                <div className="absolute -top-4 -right-4 bg-white/20 backdrop-blur-md rounded-xl px-3 py-2 border border-white/30 shadow-lg animate-float-delayed">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="size-3.5 text-emerald-300" />
-                    <span className="text-white text-xs font-bold">AI</span>
-                  </div>
-                </div>
-
-                {/* Small floating discount badge */}
-                <div className="absolute -bottom-3 -left-3 bg-white/20 backdrop-blur-md rounded-xl px-3 py-2 border border-white/30 shadow-lg animate-float">
-                  <div className="flex items-center gap-1.5">
-                    <Flame className="size-3.5 text-orange-300" />
-                    <span className="text-white text-xs font-bold">{bestDiscount > 0 ? `-${bestDiscount}%` : ''}</span>
-                  </div>
-                </div>
+                {/* Decorative gold ring */}
+                <div
+                  className="absolute -z-10 rounded-2xl border-2 w-72 h-80"
+                  style={{
+                    borderColor: 'rgba(212, 168, 83, 0.2)',
+                    top: '1rem',
+                    [isRTL ? 'left' : 'right']: '1rem',
+                  }}
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Carousel Navigation Dots + Progress Bar */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20">
+      {/* Carousel Navigation Dots + Gold progress bar */}
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20">
         <div className="flex items-center gap-2.5">
           {heroSlides.map((_, i) => (
             <button
@@ -196,9 +223,10 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
               onClick={() => goToSlide(i)}
               className={`transition-all duration-300 rounded-full ${
                 i === currentSlide
-                  ? 'w-10 h-3 bg-white shadow-lg shadow-white/40'
-                  : 'w-3 h-3 bg-white/40 hover:bg-white/60 hover:scale-125'
+                  ? 'w-10 h-3 shadow-lg'
+                  : 'w-3 h-3 bg-white/30 hover:bg-white/50 hover:scale-125'
               }`}
+              style={i === currentSlide ? { backgroundColor: '#d4a853', boxShadow: '0 0 12px rgba(212, 168, 83, 0.5)' } : undefined}
               aria-label={`Go to slide ${i + 1}`}
             />
           ))}
@@ -207,26 +235,20 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
         <div className="w-32 h-0.5 rounded-full bg-white/20 overflow-hidden">
           <div
             key={currentSlide}
-            className="hero-progress-bar"
-            style={{ '--carousel-duration': `${UI_CONFIG.carouselAutoAdvanceMs}ms` } as React.CSSProperties}
+            className="h-full rounded-full hero-progress-bar"
+            style={{
+              '--carousel-duration': `${UI_CONFIG.carouselAutoAdvanceMs}ms`,
+              backgroundColor: '#d4a853',
+            } as React.CSSProperties}
           />
         </div>
       </div>
 
-      {/* Scroll down indicator */}
-      <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1 opacity-60">
-        <span className="text-white/70 text-[10px] tracking-widest uppercase font-medium">{isRTL ? 'مرر للأسفل' : 'Scroll'}</span>
-        <svg className="animate-scroll-bounce size-4 text-white/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 13l5 5 5-5" />
-          <path d="M7 6l5 5 5-5" />
-        </svg>
-      </div>
-
-      {/* Arrows */}
+      {/* Arrow navigation */}
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-1/2 -translate-y-1/2 left-3 md:left-5 size-10 md:size-12 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm text-white border-none z-20 transition-all duration-300 hover:scale-110"
+        className="absolute top-1/2 -translate-y-1/2 left-3 md:left-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110"
         onClick={prevSlide}
       >
         <PrevIcon className="size-5 md:size-6" />
@@ -234,7 +256,7 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-1/2 -translate-y-1/2 right-3 md:right-5 size-10 md:size-12 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-sm text-white border-none z-20 transition-all duration-300 hover:scale-110"
+        className="absolute top-1/2 -translate-y-1/2 right-3 md:right-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110"
         onClick={nextSlide}
       >
         <NextIcon className="size-5 md:size-6" />

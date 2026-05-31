@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Star, Shield, TrendingUp, Sparkles, Clock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Star, TrendingUp, Sparkles, Clock, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
@@ -36,13 +36,7 @@ export function FeaturedProductsSection({ featuredProducts, newProducts, mostPop
             />
             <ScrollableSection>
               {featuredProducts.map((product) => (
-                <div key={product.id} className="w-48 md:w-56 flex-shrink-0 relative">
-                  {product.store?.isVerified && (
-                    <div className="absolute top-2 end-2 z-30 flex items-center gap-0.5 bg-emerald-500/90 backdrop-blur-sm text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full shadow-md">
-                      <Shield className="size-2.5" />
-                      {isRTL ? 'بائع موثق' : 'Verified'}
-                    </div>
-                  )}
+                <div key={product.id} className="w-48 md:w-56 flex-shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}
@@ -67,7 +61,7 @@ export function FeaturedProductsSection({ featuredProducts, newProducts, mostPop
                 <div key={product.id} className="w-48 md:w-56 flex-shrink-0 relative">
                   {/* NEW badge overlay */}
                   <div className="absolute top-2 start-2 z-20">
-                    <Badge className="bg-emerald-500 text-white border-0 text-[10px] font-bold px-2 py-0.5 shadow-md animate-pulse-subtle">
+                    <Badge className="bg-[oklch(0.75_0.12_85)] text-[oklch(0.18_0.02_270)] border-0 text-[10px] font-bold px-2 py-0.5 shadow-md">
                       {t('new').toUpperCase()}
                     </Badge>
                   </div>
@@ -77,7 +71,7 @@ export function FeaturedProductsSection({ featuredProducts, newProducts, mostPop
             </ScrollableSection>
             {/* View All link */}
             <div className="mt-4 text-center">
-              <Link href={getViewUrl('shop')} className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors group/link">
+              <Link href={getViewUrl('shop')} className="inline-flex items-center gap-1.5 text-sm font-medium text-[oklch(0.75_0.12_85)] hover:text-[oklch(0.65_0.12_85)] transition-colors group/link">
                 {t('viewAllNewArrivals')}
                 {isRTL ? (
                   <ArrowLeft className="size-4 transition-transform group-hover/link:-translate-x-0.5" />
@@ -93,7 +87,7 @@ export function FeaturedProductsSection({ featuredProducts, newProducts, mostPop
       {/* Most Popular Products */}
       <AnimatedSection>
         {mostPopularProducts.length > 0 && (
-          <section className="bg-muted/20 dark:bg-muted/5 py-8 md:py-12">
+          <section className="bg-[oklch(0.98_0.01_80)]/50 dark:bg-muted/5 py-8 md:py-12">
             <div className="container mx-auto px-4">
               <SectionHeader
                 title={t('mostPopular')}
@@ -127,12 +121,7 @@ export function FeaturedProductsSection({ featuredProducts, newProducts, mostPop
             />
             <ScrollableSection>
               {newProducts.map((product) => (
-                <div key={product.id} className="w-48 md:w-56 flex-shrink-0 relative">
-                  <div className="absolute top-2 end-2 z-30">
-                    <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] px-1.5 py-0 border-0 shadow-sm">
-                      {t('new')}
-                    </Badge>
-                  </div>
+                <div key={product.id} className="w-48 md:w-56 flex-shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}

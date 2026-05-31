@@ -56,7 +56,7 @@ export function ProductActions(props: ProductActionsProps) {
         <div className="flex flex-col sm:flex-row gap-3 rounded-xl bg-background p-1">
           <RippleButton
             size="lg"
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-base h-12 rounded-lg"
+            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-base h-12 rounded-lg"
             onClick={handleAddToCart}
             disabled={stock === 0}
           >
@@ -66,7 +66,7 @@ export function ProductActions(props: ProductActionsProps) {
           <RippleButton
             size="lg"
             variant="outline"
-            className="flex-1 border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-base h-12 rounded-lg"
+            className="flex-1 border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 text-base h-12 rounded-lg"
             onClick={handleBuyNow}
             disabled={stock === 0}
           >
@@ -90,7 +90,7 @@ export function ProductActions(props: ProductActionsProps) {
         <Button
           variant="outline"
           size="sm"
-          className={`gap-1.5 ${isComparing ? 'text-emerald-600 border-emerald-300' : ''}`}
+          className={`gap-1.5 ${isComparing ? 'text-amber-600 border-amber-300' : ''}`}
           onClick={() => toggleCompare(productId)}
         >
           <GitCompare className="size-4" />
@@ -118,7 +118,7 @@ export function ProductActions(props: ProductActionsProps) {
             }
           }}
         >
-          {shareWebSuccess ? <Check className="size-4 text-emerald-500" /> : <Share2 className="size-4" />}
+          {shareWebSuccess ? <Check className="size-4 text-amber-500" /> : <Share2 className="size-4" />}
           {shareWebSuccess ? t('copied') : t('shareProduct')}
         </Button>
       </div>

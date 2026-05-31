@@ -83,7 +83,7 @@ export function MobileNav() {
                 transition-colors duration-200
                 ${
                   active
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-amber-600 dark:text-amber-400'
                     : 'text-muted-foreground hover:text-foreground'
                 }
               `}
@@ -95,7 +95,7 @@ export function MobileNav() {
                   }`}
                 />
                 {item.badge !== undefined && item.badge > 0 && (
-                  <Badge className="absolute -top-2 -right-3 size-4 p-0 flex items-center justify-center text-[9px] bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0">
+                  <Badge className="absolute -top-2 -right-3 size-4 p-0 flex items-center justify-center text-[9px] bg-gradient-to-r from-amber-500 to-yellow-500 text-white border-0">
                     {item.badge > 99 ? '99+' : item.badge}
                   </Badge>
                 )}
@@ -108,7 +108,7 @@ export function MobileNav() {
                 {item.label}
               </span>
               {active && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full" />
               )}
             </Link>
           );
