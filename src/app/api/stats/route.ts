@@ -1,28 +1,28 @@
-import { db } from '@/lib/db';
+import { db } from "@/lib/db";
 
 export async function GET() {
-  try {
-    const [productCount, storeCount, userCount] = await Promise.all([
-      // Count ALL products — not just active — so seeded data shows immediately
-      db.product.count(),
-      db.store.count(),
-      db.user.count(),
-    ]);
+	try {
+		const [productCount, storeCount, userCount] = await Promise.all([
+			// Count ALL products — not just active — so seeded data shows immediately
+			db.product.count(),
+			db.store.count(),
+			db.user.count(),
+		]);
 
-    // Count distinct countries from user addresses
-    const countryResult = await db.address.findMany({
-      select: { country: true },
-      distinct: ['country'],
-    });
+		// Count distinct countries from user addresses
+		const countryResult = await db.address.findMany({
+			select: { country: true },
+			distinct: ["country"],
+		});
 
-    return Response.json({
-      products: productCount,
-      sellers: storeCount,
-      users: userCount,
-      countries: countryResult.length,
-    });
-  } catch (error) {
-    console.error('Stats API error:', error);
-    return Response.json({ error: 'Failed to fetch stats' }, { status: 500 });
-  }
+		return Response.json({
+			products: productCount,
+			sellers: storeCount,
+			users: userCount,
+			countries: countryResult.length,
+		});
+	} catch (error) {
+		console.error("Stats API error:", error);
+		return Response.json({ error: "Failed to fetch stats" }, { status: 500 });
+	}
 }
