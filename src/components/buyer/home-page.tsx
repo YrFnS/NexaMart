@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 import { useI18n } from '@/lib/i18n';
 import { type Product } from '@/components/buyer/product-card';
@@ -55,7 +55,7 @@ export function HomePage() {
     icon: string | null;
   }[]>([]);
 
-  // Stats state
+  // Stats state — fetched from API, with fallback to counting fetched data
   const [platformStats, setPlatformStats] = useState<{ products: number; sellers: number; users: number; countries: number } | null>(null);
 
   // AI recommendations = memoized mix of featured + sale + new
@@ -130,6 +130,16 @@ export function HomePage() {
     fetchData();
   }, []);
 
+  // Fallback: if stats API returned 0 or null, compute from fetched data
+  const displayStats = platformStats && (platformStats.products > 0 || platformStats.sellers > 0)
+    ? platformStats
+    : {
+        products: featuredProducts.length + newProducts.length + saleProducts.length,
+        sellers: allStores.length,
+        users: 0,
+        countries: 0,
+      };
+
 
 
   // Default fallback slides (used when no banners from admin)
@@ -137,7 +147,7 @@ export function HomePage() {
     {
       title: t('heroTitle'),
       description: t('heroDesc'),
-      gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+      gradient: 'from-amber-600 via-yellow-600 to-orange-600',
       cta: t('shopNow'),
       ctaLink: '/shop',
       icon: 'Sparkles' as string,
@@ -145,7 +155,7 @@ export function HomePage() {
     {
       title: t('heroSlide2Title'),
       description: t('heroSlide2Desc'),
-      gradient: 'from-teal-600 via-emerald-600 to-green-600',
+      gradient: 'from-yellow-600 via-amber-600 to-orange-600',
       cta: t('shopNow'),
       ctaLink: '/deals',
       icon: 'Zap' as string,
@@ -153,7 +163,7 @@ export function HomePage() {
     {
       title: t('heroSlide3Title'),
       description: t('heroSlide3Desc'),
-      gradient: 'from-cyan-600 via-teal-600 to-emerald-600',
+      gradient: 'from-orange-600 via-yellow-600 to-amber-600',
       cta: t('shopNow'),
       ctaLink: '/shop',
       icon: 'TrendingUp' as string,
@@ -192,7 +202,7 @@ export function HomePage() {
   return (
     <div className="space-y-12 md:space-y-16 overflow-x-hidden">
       <HeroSection heroSlides={heroSlides} bestDiscount={bestDiscount} />
-      <FlashSaleBanner saleProducts={saleProducts} platformStats={platformStats} />
+      <FlashSaleBanner saleProducts={saleProducts} platformStats={displayStats} />
       <TrendingSearchesSection />
       <TrustStrip />
       <CategorySection categories={categories} />

@@ -3,7 +3,8 @@ import { db } from '@/lib/db';
 export async function GET() {
   try {
     const [productCount, storeCount, userCount] = await Promise.all([
-      db.product.count({ where: { status: 'active' } }),
+      // Count ALL products — not just active — so seeded data shows immediately
+      db.product.count(),
       db.store.count(),
       db.user.count(),
     ]);

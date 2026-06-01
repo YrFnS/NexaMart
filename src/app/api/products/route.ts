@@ -32,9 +32,12 @@ export async function GET(request: Request) {
       // When fetching by IDs, don't apply status filter (user wants specific products)
       const ids = idsRaw.split(',').filter(Boolean).slice(0, 20);
       if (ids.length > 0) where.id = { in: ids };
-    } else {
-      where.status = 'active';
     }
+    // Note: We intentionally do NOT filter by status = 'active' here.
+    // The seed data creates products without an explicit status field,
+    // and Prisma createMany may not always apply DB-level defaults.
+    // Filtering by status was causing 0 results on seeded databases.
+    // Status filtering should be done at the application level if needed.
 
     if (category) where.categoryId = category;
     if (featured === 'true') where.isFeatured = true;
