@@ -7,8 +7,7 @@ import {
 	X,
 	Star,
 	ChevronDown,
-	ChevronLeft,
-	ChevronRight,
+
 	LayoutGrid,
 	List,
 	ShoppingCart,
@@ -20,8 +19,6 @@ import {
 	Heart,
 	Clock,
 	Store,
-	Package,
-	Tag,
 	Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,7 +43,7 @@ import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
 import { formatPrice } from "@/lib/currency";
 import { useAppStore } from "@/stores/app-store";
-import { useAppNavigation } from "@/lib/use-app-navigation";
+
 import { ProductCard, type Product } from "@/components/buyer/product-card";
 import { ProductQuickView } from "@/components/buyer/product-quick-view";
 import type { Category } from "@/components/buyer/category-grid";
@@ -70,7 +67,7 @@ export function ShopPage() {
 	const { t, locale } = useI18n();
 	const { selectedCategory, selectCategory, searchQuery, setSearchQuery } =
 		useAppStore();
-	const nav = useAppNavigation();
+
 	const isRTL = locale === "ar";
 
 	const [categories, setCategories] = useState<Category[]>([]);
