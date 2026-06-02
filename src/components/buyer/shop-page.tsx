@@ -7,7 +7,6 @@ import {
 	X,
 	Star,
 	ChevronDown,
-
 	LayoutGrid,
 	List,
 	ShoppingCart,
