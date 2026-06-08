@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { Shield, Key, LogIn, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ export function AdminLoginGate({ children }: { children: React.ReactNode }) {
   const [key, setKey] = useState('');
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [mounted, setMounted] = useState(false);
+
 
   const verifyKey = React.useCallback(async (customKey?: string) => {
     setVerifying(true);
@@ -42,12 +42,10 @@ export function AdminLoginGate({ children }: { children: React.ReactNode }) {
     setVerifying(false);
   }, []);
 
-  // Check localStorage on mount — eslint-disable for setMounted in effect
+  // Track client-side mount to avoid hydration mismatch
   useEffect(() => {
-     
-    setMounted(true);
     if (hasAdminKey()) {
-      // Verify the stored key is still valid by making a test request
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       verifyKey();
     }
   }, [verifyKey]);
@@ -68,6 +66,11 @@ export function AdminLoginGate({ children }: { children: React.ReactNode }) {
   };
 
   // Avoid hydration mismatch — don't render until mounted
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   if (!mounted) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">

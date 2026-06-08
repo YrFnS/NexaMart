@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign,
   ShoppingCart,
@@ -172,8 +172,8 @@ export function AdminAnalytics() {
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdown[]>([]);
   const [revenueByStore, setRevenueByStore] = useState<RevenueByStore[]>([]);
   const [orderStatus, setOrderStatus] = useState<OrderStatusBreakdown[]>([]);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [geoData, setGeoData] = useState<GeoData[]>([]);
+  const [topProducts, _setTopProducts] = useState<TopProduct[]>([]);
+  const [geoData, _setGeoData] = useState<GeoData[]>([]);
 
   const categoryChartConfig: ChartConfig = Object.fromEntries(
     categoryBreakdown.map((item, i) => [item.name, { label: item.name, color: PIE_COLORS[i % PIE_COLORS.length] }])
@@ -197,7 +197,7 @@ export function AdminAnalytics() {
     return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
   };
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     const { from, to } = getDateRange();
     try {
@@ -238,12 +238,12 @@ export function AdminAnalytics() {
       // keep empty data
     }
     setLoading(false);
-  };
+  }, [getDateRange]);
 
   useEffect(() => {
-     
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAllData();
-  }, [datePreset]);
+  }, [datePreset, fetchAllData]);
 
   const kpiCards = [
     { title: t('adminKpiGMV'), value: formatPrice(overview.totalRevenue), change: 0, icon: DollarSign, color: 'emerald' },
