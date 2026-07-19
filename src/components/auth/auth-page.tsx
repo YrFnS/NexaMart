@@ -41,11 +41,11 @@ export function AuthPage() {
 
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = async (role: 'buyer' | 'seller' = 'buyer') => {
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/auth/demo');
+      const res = await fetch(`/api/auth/demo?role=${role}`);
       const data = await res.json();
       if (data.user) {
         setUser({
@@ -248,16 +248,27 @@ export function AuthPage() {
                     </div>
 
                     {/* Demo Login */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-10 rounded-xl border-emerald-300 dark:border-emerald-700 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-2"
-                      onClick={handleDemoLogin}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? <Loader2 className="size-4 animate-spin" /> : null}
-                      {t('quickDemoLogin')}
-                    </Button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-xl border-emerald-300 dark:border-emerald-700 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-2"
+                        onClick={() => handleDemoLogin('buyer')}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? <Loader2 className="size-4 animate-spin" /> : null}
+                        Buyer Demo
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-xl border-teal-300 dark:border-teal-700 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 gap-2"
+                        onClick={() => handleDemoLogin('seller')}
+                        disabled={isLoading}
+                      >
+                        Seller Demo
+                      </Button>
+                    </div>
 
                     <p className="text-xs text-center text-muted-foreground">
                       {t('dontHaveAccount')}{' '}
