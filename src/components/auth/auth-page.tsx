@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mail, Lock, User, Phone, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +26,7 @@ export function AuthPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const demoLoginStarted = useRef(false);
 
   // Login form
   const [loginEmail, setLoginEmail] = useState('');
@@ -41,7 +42,7 @@ export function AuthPage() {
 
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleDemoLogin = async (role: 'buyer' | 'seller' = 'buyer') => {
+  const handleDemoLogin = useCallback(async (role: 'buyer' | 'seller' = 'buyer') => {
     setIsLoading(true);
     setError('');
     try {
@@ -70,7 +71,15 @@ export function AuthPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [nav, setUser, t]);
+
+  useEffect(() => {
+    const role = new URLSearchParams(window.location.search).get('demo');
+    if ((role === 'buyer' || role === 'seller') && !demoLoginStarted.current) {
+      demoLoginStarted.current = true;
+      void handleDemoLogin(role);
+    }
+  }, [handleDemoLogin]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
