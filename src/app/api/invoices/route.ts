@@ -1,140 +1,179 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { requireAuthenticatedUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { validateEnum, validatePagination } from '@/lib/security';
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const orderId = searchParams.get('orderId');
-    const invoiceId = searchParams.get('id');
-    const sellerId = searchParams.get('sellerId');
-    const buyerId = searchParams.get('buyerId');
-    const status = searchParams.get('status');
-
-    // Get specific invoice by order ID
-    if (orderId) {
-      const invoice = await db.invoice.findFirst({
-        where: { orderId },
+const invoiceInclude = {
+  order: {
+    select: {
+      orderNumber: true,
+      shippingAddress: true,
+      items: {
         include: {
-          order: {
-            select: { orderNumber: true, items: { include: { product: { select: { name: true } } } } },
-          },
-          seller: { select: { name: true, store: { select: { name: true, nameAr: true } } } },
-          buyer: { select: { name: true, email: true } },
+          product: { select: { id: true, name: true, nameAr: true } },
         },
-      });
-
-      if (!invoice) {
-        return NextResponse.json({ error: 'Invoice not found for this order' }, { status: 404 });
-      }
-
-      const sellerStore = await db.store.findFirst({ where: { ownerId: invoice.sellerId } });
-      const mappedInvoice = mapInvoice(invoice, invoice.order, sellerStore);
-      return NextResponse.json(mappedInvoice);
-    }
-
-    // Get specific invoice by invoice ID
-    if (invoiceId) {
-      const invoice = await db.invoice.findUnique({
-        where: { id: invoiceId },
-        include: {
-          order: {
-            select: { orderNumber: true, items: { include: { product: { select: { name: true } } } } },
-          },
-          seller: { select: { name: true, store: { select: { name: true, nameAr: true } } } },
-          buyer: { select: { name: true, email: true } },
-        },
-      });
-
-      if (!invoice) {
-        return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
-      }
-
-      const sellerStore = await db.store.findFirst({ where: { ownerId: invoice.sellerId } });
-      const mappedInvoice = mapInvoice(invoice, invoice.order, sellerStore);
-      return NextResponse.json(mappedInvoice);
-    }
-
-    // List invoices with optional filters
-    const where: Record<string, unknown> = {};
-    if (sellerId) where.sellerId = sellerId;
-    if (buyerId) where.buyerId = buyerId;
-    if (status) where.status = status;
-
-    const invoices = await db.invoice.findMany({
-      where,
-      include: {
-        order: {
-          select: { orderNumber: true, items: { include: { product: { select: { name: true } } } } },
-        },
-        seller: { select: { name: true } },
-        buyer: { select: { name: true, email: true } },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    },
+  },
+  seller: {
+    select: {
+      name: true,
+      email: true,
+      phone: true,
+      store: { select: { name: true, nameAr: true, location: true } },
+    },
+  },
+  buyer: { select: { name: true, email: true, phone: true } },
+} satisfies Prisma.InvoiceInclude;
 
-    const mapped = await Promise.all(invoices.map(async (inv) => {
-      const sellerStore = await db.store.findFirst({ where: { ownerId: inv.sellerId } });
-      return mapInvoice(inv, inv.order, sellerStore);
-    }));
+type InvoiceWithRelations = Prisma.InvoiceGetPayload<{
+  include: typeof invoiceInclude;
+}>;
 
-    return NextResponse.json({
-      invoices: mapped,
-      total: mapped.length,
-    });
-  } catch (error) {
-    console.error('Invoices API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
+const VALID_STATUSES = ['paid', 'unpaid', 'overdue'] as const;
+
+function parseAddress(value: string | null) {
+  if (!value) return {} as Record<string, string>;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, item]) => [key, item == null ? '' : String(item)]),
+    );
+  } catch {
+    return { address1: value };
   }
 }
 
-function mapInvoice(invoice: Record<string, unknown>, order: Record<string, unknown>, store: Record<string, unknown> | null) {
-  const items = (order?.items as Array<Record<string, unknown>>)?.map((item) => ({
-    productId: item.productId as string,
-    name: (item.product as Record<string, unknown>)?.name || '',
-    quantity: item.quantity as number,
-    unitPrice: item.price as number,
-    lineTotal: item.total as number,
-  })) || [];
+function mapInvoice(invoice: InvoiceWithRelations) {
+  const shippingAddress = parseAddress(invoice.order.shippingAddress);
+  const sellerStore = invoice.seller.store;
 
   return {
     id: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
     orderId: invoice.orderId,
-    orderNumber: order?.orderNumber || '',
-    invoiceDate: (invoice.createdAt as Date).toISOString().split('T')[0],
-    dueDate: (invoice.dueDate as Date)?.toISOString().split('T')[0] || (invoice.createdAt as Date).toISOString().split('T')[0],
+    orderNumber: invoice.order.orderNumber,
+    invoiceDate: invoice.createdAt.toISOString().slice(0, 10),
+    dueDate: (invoice.dueDate || invoice.createdAt).toISOString().slice(0, 10),
     seller: {
-      storeName: store?.name || '',
-      storeNameAr: store?.nameAr || '',
-      address: '',
-      addressAr: '',
+      storeName: sellerStore?.name || invoice.seller.name || '',
+      storeNameAr: sellerStore?.nameAr || '',
+      address: sellerStore?.location || '',
+      addressAr: sellerStore?.location || '',
       city: '',
       country: '',
-      phone: '',
-      email: '',
-      taxId: (invoice as Record<string, unknown>).taxId as string || undefined,
+      phone: invoice.seller.phone || '',
+      email: invoice.seller.email,
+      taxId: invoice.taxId || undefined,
     },
     buyer: {
-      name: ((invoice as Record<string, unknown>).buyer as Record<string, unknown>)?.name || '',
-      email: ((invoice as Record<string, unknown>).buyer as Record<string, unknown>)?.email || '',
-      phone: '',
-      address: '',
-      addressAr: '',
-      city: '',
-      state: '',
-      postalCode: '',
-      country: '',
+      name: invoice.buyer.name || invoice.buyer.email,
+      email: invoice.buyer.email,
+      phone: invoice.buyer.phone || shippingAddress.phone || '',
+      address: shippingAddress.address1 || '',
+      addressAr: shippingAddress.address1 || '',
+      city: shippingAddress.city || '',
+      state: shippingAddress.state || '',
+      postalCode: shippingAddress.postalCode || '',
+      country: shippingAddress.country || '',
     },
-    items,
-    subtotal: invoice.subtotal as number,
+    items: invoice.order.items.map((item) => ({
+      productId: item.productId,
+      name: item.product.name,
+      nameAr: item.product.nameAr,
+      quantity: item.quantity,
+      unitPrice: Number(item.price),
+      lineTotal: Number(item.total),
+    })),
+    subtotal: Number(invoice.subtotal),
     taxRate: 0,
-    taxAmount: invoice.tax as number,
-    shippingCost: invoice.shipping as number,
-    discount: invoice.discount as number,
-    grandTotal: invoice.total as number,
+    taxAmount: Number(invoice.tax),
+    shippingCost: Number(invoice.shipping),
+    discount: Number(invoice.discount),
+    grandTotal: Number(invoice.total),
     currency: 'USD',
-    paymentMethod: (invoice as Record<string, unknown>).paymentMethod as string || '',
+    paymentMethod: invoice.paymentMethod || '',
     paymentMethodAr: '',
-    paymentStatus: (invoice as Record<string, unknown>).status === 'paid' ? 'paid' : 'unpaid',
+    paymentStatus: invoice.status === 'paid' ? 'paid' : 'unpaid',
   };
+}
+
+export async function GET(request: Request) {
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const orderId = searchParams.get('orderId');
+    const invoiceId = searchParams.get('id');
+    const requestedSellerId = searchParams.get('sellerId');
+    const requestedBuyerId = searchParams.get('buyerId');
+    const statusRaw = searchParams.get('status');
+    const status = statusRaw ? validateEnum(statusRaw, VALID_STATUSES) : null;
+    const { page, limit } = validatePagination(
+      searchParams.get('page'),
+      searchParams.get('limit'),
+      100,
+    );
+
+    if (statusRaw && !status) {
+      return NextResponse.json({ error: 'Invalid invoice status.' }, { status: 400 });
+    }
+
+    const ownership: Prisma.InvoiceWhereInput =
+      auth.user.role === 'admin'
+        ? {}
+        : auth.user.role === 'seller'
+          ? { sellerId: auth.user.id }
+          : { buyerId: auth.user.id };
+
+    if (invoiceId || orderId) {
+      const invoice = await db.invoice.findFirst({
+        where: {
+          AND: [
+            ownership,
+            invoiceId ? { id: invoiceId } : { orderId: orderId || undefined },
+          ],
+        },
+        include: invoiceInclude,
+      });
+
+      if (!invoice) {
+        return NextResponse.json({ error: 'Invoice not found.' }, { status: 404 });
+      }
+      return NextResponse.json(mapInvoice(invoice));
+    }
+
+    const filters: Prisma.InvoiceWhereInput[] = [ownership];
+    if (status) filters.push({ status });
+    if (auth.user.role === 'admin' && requestedSellerId) {
+      filters.push({ sellerId: requestedSellerId });
+    }
+    if (auth.user.role === 'admin' && requestedBuyerId) {
+      filters.push({ buyerId: requestedBuyerId });
+    }
+    const where: Prisma.InvoiceWhereInput = { AND: filters };
+
+    const [invoices, total] = await db.$transaction([
+      db.invoice.findMany({
+        where,
+        include: invoiceInclude,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.invoice.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      invoices: invoices.map(mapInvoice),
+      total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    console.error('Invoices API error:', error);
+    return NextResponse.json({ error: 'Failed to fetch invoices.' }, { status: 500 });
+  }
 }
