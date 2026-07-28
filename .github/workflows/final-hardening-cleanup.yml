@@ -30,9 +30,6 @@ jobs:
       - name: Refresh exact dependency lockfile
         run: npm install --package-lock-only --ignore-scripts
 
-      - name: Format Prisma schema
-        run: npx prisma format
-
       - name: Commit generated artifacts
         run: |
           git config user.name "github-actions[bot]"
