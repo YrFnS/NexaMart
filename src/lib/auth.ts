@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
 export const SESSION_COOKIE_NAME = 'nexamart_session';
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const USER_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const ADMIN_SESSION_TTL_SECONDS = 60 * 30;
 const PASSWORD_PREFIX = 'scrypt';
 
 export type UserRole = 'buyer' | 'seller' | 'admin';
@@ -28,6 +29,10 @@ export interface SessionClaims {
   exp: number;
   ver: 1;
 }
+
+export type AuthenticationResult =
+  | { user: PublicUser; response: null }
+  | { user: null; response: NextResponse };
 
 type UserRecord = {
   id: string;
@@ -57,6 +62,10 @@ function getAuthSecret(): string {
   return secret;
 }
 
+function getSessionTtl(role: UserRole): number {
+  return role === 'admin' ? ADMIN_SESSION_TTL_SECONDS : USER_SESSION_TTL_SECONDS;
+}
+
 function sign(encodedPayload: string): string {
   return createHmac('sha256', getAuthSecret()).update(encodedPayload).digest('base64url');
 }
@@ -78,7 +87,7 @@ export function createSessionToken(user: Pick<PublicUser, 'id' | 'role'>): strin
   const claims: SessionClaims = {
     sub: user.id,
     role: user.role,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+    exp: Math.floor(Date.now() / 1000) + getSessionTtl(user.role),
     ver: 1,
   };
   const encodedPayload = Buffer.from(JSON.stringify(claims)).toString('base64url');
@@ -168,7 +177,7 @@ export async function getCurrentUser(request: Request): Promise<PublicUser | nul
 
 export async function requireAuthenticatedUser(
   request: Request,
-): Promise<{ user: PublicUser | null; response: NextResponse | null }> {
+): Promise<AuthenticationResult> {
   const user = await getCurrentUser(request);
   if (!user) {
     return {
@@ -182,9 +191,9 @@ export async function requireAuthenticatedUser(
 export async function requireRole(
   request: Request,
   roles: UserRole[],
-): Promise<{ user: PublicUser | null; response: NextResponse | null }> {
+): Promise<AuthenticationResult> {
   const auth = await requireAuthenticatedUser(request);
-  if (auth.response || !auth.user) return auth;
+  if (auth.response) return auth;
   if (!roles.includes(auth.user.role)) {
     return {
       user: null,
@@ -195,6 +204,8 @@ export async function requireRole(
 }
 
 export function attachSessionCookie(response: NextResponse, token: string): NextResponse {
+  const claims = verifySessionToken(token);
+  const maxAge = claims ? Math.max(0, claims.exp - Math.floor(Date.now() / 1000)) : 0;
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: token,
@@ -202,7 +213,7 @@ export function attachSessionCookie(response: NextResponse, token: string): Next
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: SESSION_TTL_SECONDS,
+    maxAge,
   });
   return response;
 }
