@@ -1,26 +1,33 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
-import { DirectionProvider } from "@/components/common/direction-provider";
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono, Noto_Sans_Arabic } from 'next/font/google';
+import { ThemeProvider } from 'next-themes';
+import './globals.css';
+import { Toaster } from '@/components/ui/toaster';
+import { DirectionProvider } from '@/components/common/direction-provider';
+import { AuthSessionSync } from '@/components/auth/auth-session-sync';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
+
+const notoSansArabic = Noto_Sans_Arabic({
+  variable: '--font-noto-arabic',
+  subsets: ['arabic'],
 });
 
 export const metadata: Metadata = {
-  title: "NexaMart - AI-Powered Multi-Vendor Commerce Platform",
-  description: "Discover AI-powered shopping with smart search, visual discovery, and millions of products from verified sellers worldwide.",
-  keywords: ["NexaMart", "e-commerce", "AI shopping", "multi-vendor", "marketplace"],
+  title: 'NexaMart - AI-Powered Multi-Vendor Commerce Platform',
+  description:
+    'Discover AI-powered shopping with smart search, visual discovery, and products from verified sellers worldwide.',
+  keywords: ['NexaMart', 'e-commerce', 'AI shopping', 'multi-vendor', 'marketplace'],
   icons: {
-    icon: "/logo.svg",
+    icon: '/logo.svg',
   },
 };
 
@@ -40,7 +47,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoSansArabic.variable} antialiased bg-background text-foreground overflow-x-hidden`}
       >
         <ThemeProvider
           attribute="class"
@@ -49,6 +56,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <DirectionProvider>
+            <AuthSessionSync />
             {children}
           </DirectionProvider>
           <Toaster />
