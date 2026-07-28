@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuthenticatedUser } from '@/lib/auth';
-import { SHIPPING_CONFIG } from '@/lib/config';
-import { getTaxRate } from '@/lib/tax';
+import { SHIPPING_CONFIG, STORE_LIMITS } from '@/lib/config';
+import { COUNTRY_TAX_RATES, getTaxRate } from '@/lib/tax';
 import {
   checkApiRateLimit,
   RATE_LIMITS,
@@ -20,10 +20,47 @@ const VALID_PAYMENT_METHODS = [
   'stc_pay',
 ] as const;
 
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  iraq: 'iq',
+  'saudi arabia': 'sa',
+  'united arab emirates': 'ae',
+  uae: 'ae',
+  kuwait: 'kw',
+  bahrain: 'bh',
+  qatar: 'qa',
+  oman: 'om',
+  jordan: 'jo',
+  lebanon: 'lb',
+  egypt: 'eg',
+  morocco: 'ma',
+  algeria: 'dz',
+  tunisia: 'tn',
+  palestine: 'ps',
+  syria: 'sy',
+};
+
+type ShippingMethod = (typeof VALID_SHIPPING_METHODS)[number];
+type PaymentMethod = (typeof VALID_PAYMENT_METHODS)[number];
+
 interface CheckoutLineInput {
   productId: string;
   quantity: number;
   variation: string | null;
+}
+
+interface EnrichedLine extends CheckoutLineInput {
+  productName: string;
+  unitPrice: number;
+  lineTotal: number;
+  storeId: string;
+  sellerId: string;
+}
+
+interface OrderGroup {
+  storeId: string;
+  sellerId: string;
+  subtotal: number;
+  items: EnrichedLine[];
 }
 
 interface ShippingAddressInput {
@@ -55,6 +92,14 @@ interface StoredCheckout {
   response: CheckoutResult;
 }
 
+interface AppliedCouponState {
+  id: string;
+  code: string;
+  type: string;
+  storeId: string | null;
+  usageLimit: number | null;
+}
+
 class CheckoutError extends Error {
   constructor(
     message: string,
@@ -79,17 +124,20 @@ function cleanText(value: unknown, maxLength: number): string {
 function normalizeVariation(value: unknown): string | null {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value === 'string') return cleanText(value, 500) || null;
-  if (typeof value === 'object') {
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
     try {
       const entries = Object.entries(value as Record<string, unknown>)
         .map(([key, item]) => [cleanText(key, 80), cleanText(item, 160)] as const)
         .filter(([key]) => Boolean(key))
         .sort(([left], [right]) => left.localeCompare(right));
-      return JSON.stringify(Object.fromEntries(entries)).slice(0, 500) || null;
+      const normalized = JSON.stringify(Object.fromEntries(entries));
+      return normalized.length > 2 ? normalized.slice(0, 500) : null;
     } catch {
       return null;
     }
   }
+
   return cleanText(value, 500) || null;
 }
 
@@ -100,7 +148,7 @@ function parseLines(value: unknown): CheckoutLineInput[] {
 
   const merged = new Map<string, CheckoutLineInput>();
   for (const rawLine of value) {
-    if (!rawLine || typeof rawLine !== 'object') {
+    if (!rawLine || typeof rawLine !== 'object' || Array.isArray(rawLine)) {
       throw new CheckoutError('Invalid cart item.', 400);
     }
 
@@ -131,7 +179,7 @@ function parseLines(value: unknown): CheckoutLineInput[] {
 }
 
 function parseAddress(value: unknown): ShippingAddressInput {
-  if (!value || typeof value !== 'object') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new CheckoutError('Shipping address is required.', 400);
   }
 
@@ -153,6 +201,28 @@ function parseAddress(value: unknown): ShippingAddressInput {
   return parsed;
 }
 
+function resolveCountryCode(addressCountry: string, suppliedCode: unknown): string {
+  const normalizedCountry = addressCountry.toLowerCase().trim();
+  const derivedCode =
+    normalizedCountry.length === 2
+      ? normalizedCountry
+      : COUNTRY_NAME_TO_CODE[normalizedCountry];
+
+  if (!derivedCode || !COUNTRY_TAX_RATES[derivedCode]) {
+    throw new CheckoutError(
+      'Checkout tax configuration is unavailable for the selected country.',
+      400,
+    );
+  }
+
+  const clientCode = cleanText(suppliedCode, 2).toLowerCase();
+  if (clientCode && clientCode !== derivedCode) {
+    throw new CheckoutError('Shipping country and checkout country do not match.', 400);
+  }
+
+  return derivedCode;
+}
+
 function parseStoredCheckout(value: string): StoredCheckout | null {
   try {
     const parsed = JSON.parse(value) as Partial<StoredCheckout>;
@@ -170,10 +240,17 @@ function replayResponse(stored: StoredCheckout, requestHash: string): NextRespon
       { status: 409 },
     );
   }
+
   const response = NextResponse.json(stored.response);
   response.headers.set('X-Idempotent-Replay', 'true');
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
+}
+
+function createOrderNumber(index: number): string {
+  return `NXM-${Date.now().toString(36).toUpperCase()}-${randomUUID()
+    .slice(0, 6)
+    .toUpperCase()}-${index + 1}`;
 }
 
 export async function POST(request: Request) {
@@ -187,6 +264,7 @@ export async function POST(request: Request) {
 
   const auth = await requireAuthenticatedUser(request);
   if (auth.response || !auth.user) return auth.response;
+  const currentUser = auth.user;
 
   const contentLength = Number(request.headers.get('content-length') || 0);
   if (contentLength > 64 * 1024) {
@@ -203,15 +281,48 @@ export async function POST(request: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    const parsedBody: unknown = await request.json();
+    if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+      throw new Error('Invalid object body');
+    }
+    body = parsedBody as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
+  const lines = (() => {
+    try {
+      return parseLines(body.items);
+    } catch (error) {
+      if (error instanceof CheckoutError) throw error;
+      throw new CheckoutError('Invalid cart.', 400);
+    }
+  })();
+  const address = parseAddress(body.shippingAddress);
+  const countryCode = resolveCountryCode(address.country, body.countryCode);
+  const shippingMethod = cleanText(body.shippingMethod, 30) as ShippingMethod;
+  const paymentMethod = cleanText(body.paymentMethod, 30) as PaymentMethod;
+  const couponCode = cleanText(body.couponCode, 80).toUpperCase();
+
+  if (!VALID_SHIPPING_METHODS.includes(shippingMethod)) {
+    return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 });
+  }
+  if (!VALID_PAYMENT_METHODS.includes(paymentMethod)) {
+    return NextResponse.json({ error: 'Invalid payment method.' }, { status: 400 });
+  }
+
+  const normalizedRequest = {
+    items: lines,
+    shippingAddress: address,
+    shippingMethod,
+    paymentMethod,
+    couponCode,
+    countryCode,
+  };
   const requestHash = createHash('sha256')
-    .update(JSON.stringify(body))
+    .update(JSON.stringify(normalizedRequest))
     .digest('hex');
-  const idempotencyStorageKey = `checkout.idempotency.${auth.user.id}.${createHash('sha256')
+  const idempotencyStorageKey = `checkout.idempotency.${currentUser.id}.${createHash('sha256')
     .update(idempotencyKey)
     .digest('hex')}`;
 
@@ -224,179 +335,6 @@ export async function POST(request: Request) {
       const stored = parseStoredCheckout(previous.value);
       if (stored) return replayResponse(stored, requestHash);
     }
-
-    const lines = parseLines(body.items);
-    const address = parseAddress(body.shippingAddress);
-    const shippingMethod = cleanText(body.shippingMethod, 30);
-    const paymentMethod = cleanText(body.paymentMethod, 30);
-    const countryCode = cleanText(body.countryCode, 2).toLowerCase() || 'iq';
-    const couponCode = cleanText(body.couponCode, 80).toUpperCase();
-
-    if (!VALID_SHIPPING_METHODS.includes(shippingMethod as (typeof VALID_SHIPPING_METHODS)[number])) {
-      throw new CheckoutError('Invalid shipping method.', 400);
-    }
-    if (!VALID_PAYMENT_METHODS.includes(paymentMethod as (typeof VALID_PAYMENT_METHODS)[number])) {
-      throw new CheckoutError('Invalid payment method.', 400);
-    }
-
-    const uniqueProductIds = [...new Set(lines.map(line => line.productId))];
-    const products = await db.product.findMany({
-      where: { id: { in: uniqueProductIds }, status: 'active' },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        stock: true,
-        storeId: true,
-        store: { select: { ownerId: true } },
-      },
-    });
-
-    if (products.length !== uniqueProductIds.length) {
-      throw new CheckoutError('One or more products are unavailable.', 409);
-    }
-
-    const productById = new Map(products.map(product => [product.id, product]));
-    const enrichedLines = lines.map(line => {
-      const product = productById.get(line.productId);
-      if (!product) throw new CheckoutError('Product not found.', 409);
-      if (product.stock < line.quantity) {
-        throw new CheckoutError(`Insufficient stock for ${product.name}.`, 409);
-      }
-      const unitPrice = money(Number(product.price));
-      return {
-        ...line,
-        unitPrice,
-        lineTotal: money(unitPrice * line.quantity),
-        storeId: product.storeId,
-        sellerId: product.store.ownerId,
-      };
-    });
-
-    const groups = new Map<
-      string,
-      {
-        storeId: string;
-        sellerId: string;
-        subtotal: number;
-        items: typeof enrichedLines;
-      }
-    >();
-
-    for (const line of enrichedLines) {
-      const group = groups.get(line.storeId) || {
-        storeId: line.storeId,
-        sellerId: line.sellerId,
-        subtotal: 0,
-        items: [],
-      };
-      group.items.push(line);
-      group.subtotal = money(group.subtotal + line.lineTotal);
-      groups.set(line.storeId, group);
-    }
-
-    const orderGroups = [...groups.values()];
-    const subtotal = money(orderGroups.reduce((sum, group) => sum + group.subtotal, 0));
-    if (subtotal <= 0) throw new CheckoutError('Cart total must be greater than zero.', 400);
-
-    let coupon:
-      | {
-          id: string;
-          type: string;
-          discount: number;
-          minOrder: number;
-          maxDiscount: number | null;
-          storeId: string | null;
-        }
-      | null = null;
-    let discount = 0;
-
-    if (couponCode) {
-      const record = await db.coupon.findUnique({ where: { code: couponCode } });
-      const now = new Date();
-      if (
-        !record ||
-        !record.isActive ||
-        (record.expiresAt && record.expiresAt <= now) ||
-        (record.usageLimit !== null && record.usedCount >= record.usageLimit)
-      ) {
-        throw new CheckoutError('Coupon is invalid or no longer available.', 409);
-      }
-
-      const eligibleSubtotal = record.storeId
-        ? money(orderGroups
-            .filter(group => group.storeId === record.storeId)
-            .reduce((sum, group) => sum + group.subtotal, 0))
-        : subtotal;
-
-      if (eligibleSubtotal <= 0) {
-        throw new CheckoutError('Coupon does not apply to these products.', 409);
-      }
-      if (eligibleSubtotal < Number(record.minOrder)) {
-        throw new CheckoutError('The order does not meet the coupon minimum.', 409);
-      }
-
-      if (record.type === 'percentage') {
-        discount = money(eligibleSubtotal * (Number(record.discount) / 100));
-        if (record.maxDiscount !== null) {
-          discount = Math.min(discount, money(Number(record.maxDiscount)));
-        }
-      } else if (record.type === 'fixed') {
-        discount = Math.min(eligibleSubtotal, money(Number(record.discount)));
-      }
-
-      coupon = {
-        id: record.id,
-        type: record.type,
-        discount: Number(record.discount),
-        minOrder: Number(record.minOrder),
-        maxDiscount: record.maxDiscount === null ? null : Number(record.maxDiscount),
-        storeId: record.storeId,
-      };
-    }
-
-    let shippingCost =
-      shippingMethod === 'next_day'
-        ? SHIPPING_CONFIG.methods.nextDay.price
-        : shippingMethod === 'express'
-          ? SHIPPING_CONFIG.methods.express.price
-          : subtotal >= SHIPPING_CONFIG.freeShippingThreshold
-            ? 0
-            : SHIPPING_CONFIG.defaultShippingRate;
-
-    if (coupon?.type === 'free_shipping') shippingCost = 0;
-    shippingCost = money(shippingCost);
-
-    const taxRate = getTaxRate(countryCode);
-    const eligibleGroupSubtotal = coupon?.storeId
-      ? orderGroups
-          .filter(group => group.storeId === coupon.storeId)
-          .reduce((sum, group) => sum + group.subtotal, 0)
-      : subtotal;
-
-    let allocatedDiscount = 0;
-    const discountEligibleGroups = orderGroups.filter(
-      group => !coupon?.storeId || group.storeId === coupon.storeId,
-    );
-
-    const allocations = orderGroups.map(group => {
-      let groupDiscount = 0;
-      if (discount > 0 && discountEligibleGroups.some(item => item.storeId === group.storeId)) {
-        const eligibleIndex = discountEligibleGroups.findIndex(item => item.storeId === group.storeId);
-        const isLastEligible = eligibleIndex === discountEligibleGroups.length - 1;
-        groupDiscount = isLastEligible
-          ? money(discount - allocatedDiscount)
-          : money(discount * (group.subtotal / eligibleGroupSubtotal));
-        allocatedDiscount = money(allocatedDiscount + groupDiscount);
-      }
-      const taxableAmount = Math.max(0, money(group.subtotal - groupDiscount));
-      const groupTax = money(taxableAmount * (taxRate / 100));
-      return { ...group, discount: groupDiscount, tax: groupTax };
-    });
-
-    const tax = money(allocations.reduce((sum, group) => sum + group.tax, 0));
-    const total = money(subtotal + shippingCost + tax - discount);
-    const paymentStatus = paymentMethod === 'wallet' ? 'paid' : 'pending';
 
     const transactionResult = await db.$transaction(
       async tx => {
@@ -416,9 +354,179 @@ export async function POST(request: Request) {
           return stored.response;
         }
 
+        const uniqueProductIds = [...new Set(lines.map(line => line.productId))];
+        const products = await tx.product.findMany({
+          where: { id: { in: uniqueProductIds }, status: 'active' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            stock: true,
+            storeId: true,
+            store: { select: { ownerId: true } },
+          },
+        });
+
+        if (products.length !== uniqueProductIds.length) {
+          throw new CheckoutError('One or more products are unavailable.', 409);
+        }
+
+        const productById = new Map(products.map(product => [product.id, product]));
+        const enrichedLines: EnrichedLine[] = lines.map(line => {
+          const product = productById.get(line.productId);
+          if (!product) throw new CheckoutError('Product not found.', 409);
+          if (product.stock < line.quantity) {
+            throw new CheckoutError(`Insufficient stock for ${product.name}.`, 409);
+          }
+
+          const unitPrice = money(Number(product.price));
+          if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+            throw new CheckoutError(`Invalid price for ${product.name}.`, 409);
+          }
+
+          return {
+            ...line,
+            productName: product.name,
+            unitPrice,
+            lineTotal: money(unitPrice * line.quantity),
+            storeId: product.storeId,
+            sellerId: product.store.ownerId,
+          };
+        });
+
+        const groups = new Map<string, OrderGroup>();
+        for (const line of enrichedLines) {
+          let group = groups.get(line.storeId);
+          if (!group) {
+            group = {
+              storeId: line.storeId,
+              sellerId: line.sellerId,
+              subtotal: 0,
+              items: [],
+            };
+            groups.set(line.storeId, group);
+          }
+          group.items.push(line);
+          group.subtotal = money(group.subtotal + line.lineTotal);
+        }
+
+        const orderGroups = [...groups.values()];
+        const subtotal = money(orderGroups.reduce((sum, group) => sum + group.subtotal, 0));
+        if (subtotal < STORE_LIMITS.minOrderAmount) {
+          throw new CheckoutError('Order total is below the minimum amount.', 400);
+        }
+        if (subtotal > STORE_LIMITS.maxOrderAmount) {
+          throw new CheckoutError('Order total exceeds the maximum amount.', 400);
+        }
+
+        let coupon: AppliedCouponState | null = null;
+        let discount = 0;
+        let eligibleGroupSubtotal = subtotal;
+
+        if (couponCode) {
+          const record = await tx.coupon.findUnique({ where: { code: couponCode } });
+          const now = new Date();
+          if (
+            !record ||
+            !record.isActive ||
+            (record.expiresAt && record.expiresAt <= now) ||
+            (record.usageLimit !== null && record.usedCount >= record.usageLimit)
+          ) {
+            throw new CheckoutError('Coupon is invalid or no longer available.', 409);
+          }
+
+          eligibleGroupSubtotal = record.storeId
+            ? money(
+                orderGroups
+                  .filter(group => group.storeId === record.storeId)
+                  .reduce((sum, group) => sum + group.subtotal, 0),
+              )
+            : subtotal;
+
+          if (eligibleGroupSubtotal <= 0) {
+            throw new CheckoutError('Coupon does not apply to these products.', 409);
+          }
+          if (eligibleGroupSubtotal < Number(record.minOrder)) {
+            throw new CheckoutError('The order does not meet the coupon minimum.', 409);
+          }
+
+          if (record.type === 'percentage') {
+            const percentage = Math.min(100, Math.max(0, Number(record.discount)));
+            discount = money(eligibleGroupSubtotal * (percentage / 100));
+            if (record.maxDiscount !== null) {
+              discount = Math.min(discount, money(Number(record.maxDiscount)));
+            }
+          } else if (record.type === 'fixed') {
+            discount = Math.min(
+              eligibleGroupSubtotal,
+              Math.max(0, money(Number(record.discount))),
+            );
+          } else if (record.type !== 'free_shipping') {
+            throw new CheckoutError('Coupon type is not supported.', 409);
+          }
+
+          coupon = {
+            id: record.id,
+            code: record.code,
+            type: record.type,
+            storeId: record.storeId,
+            usageLimit: record.usageLimit,
+          };
+        }
+
+        let shippingCost =
+          shippingMethod === 'next_day'
+            ? SHIPPING_CONFIG.methods.nextDay.price
+            : shippingMethod === 'express'
+              ? SHIPPING_CONFIG.methods.express.price
+              : subtotal >= SHIPPING_CONFIG.freeShippingThreshold
+                ? 0
+                : SHIPPING_CONFIG.defaultShippingRate;
+        if (coupon?.type === 'free_shipping') shippingCost = 0;
+        shippingCost = money(shippingCost);
+
+        const taxRate = getTaxRate(countryCode);
+        const discountEligibleGroups = orderGroups.filter(
+          group => !coupon?.storeId || group.storeId === coupon.storeId,
+        );
+        let allocatedDiscount = 0;
+
+        const allocations = orderGroups.map(group => {
+          let groupDiscount = 0;
+          if (
+            discount > 0 &&
+            discountEligibleGroups.some(item => item.storeId === group.storeId)
+          ) {
+            const eligibleIndex = discountEligibleGroups.findIndex(
+              item => item.storeId === group.storeId,
+            );
+            const isLastEligible = eligibleIndex === discountEligibleGroups.length - 1;
+            groupDiscount = isLastEligible
+              ? money(discount - allocatedDiscount)
+              : money(discount * (group.subtotal / eligibleGroupSubtotal));
+            allocatedDiscount = money(allocatedDiscount + groupDiscount);
+          }
+
+          const taxableAmount = Math.max(0, money(group.subtotal - groupDiscount));
+          return {
+            ...group,
+            discount: groupDiscount,
+            tax: money(taxableAmount * (taxRate / 100)),
+          };
+        });
+
+        const tax = money(allocations.reduce((sum, group) => sum + group.tax, 0));
+        const total = money(subtotal + shippingCost + tax - discount);
+        if (total < STORE_LIMITS.minOrderAmount || total > STORE_LIMITS.maxOrderAmount) {
+          throw new CheckoutError('Final order total is outside the allowed range.', 400);
+        }
+
+        const paymentStatus: 'paid' | 'pending' =
+          paymentMethod === 'wallet' ? 'paid' : 'pending';
+
         if (paymentMethod === 'wallet') {
           const walletUpdate = await tx.user.updateMany({
-            where: { id: auth.user.id, walletBalance: { gte: total } },
+            where: { id: currentUser.id, walletBalance: { gte: total } },
             data: { walletBalance: { decrement: total } },
           });
           if (walletUpdate.count !== 1) {
@@ -439,16 +547,25 @@ export async function POST(request: Request) {
             },
           });
           if (stockUpdate.count !== 1) {
-            throw new CheckoutError('Product stock changed. Review the cart and try again.', 409);
+            throw new CheckoutError(
+              `Stock changed for ${line.productName}. Review the cart and try again.`,
+              409,
+            );
           }
         }
 
         if (coupon) {
+          const usageCondition =
+            coupon.usageLimit === null
+              ? {}
+              : { usedCount: { lt: coupon.usageLimit } };
           const couponUpdate = await tx.coupon.updateMany({
             where: {
               id: coupon.id,
+              code: coupon.code,
               isActive: true,
-              ...(couponCode ? { code: couponCode } : {}),
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+              ...usageCondition,
             },
             data: { usedCount: { increment: 1 } },
           });
@@ -464,14 +581,12 @@ export async function POST(request: Request) {
           const groupTotal = money(
             group.subtotal + groupShipping + group.tax - group.discount,
           );
-          const orderNumber = `NXM-${Date.now().toString(36).toUpperCase()}-${randomUUID()
-            .slice(0, 6)
-            .toUpperCase()}-${index + 1}`;
+          const orderNumber = createOrderNumber(index);
 
           const order = await tx.order.create({
             data: {
               orderNumber,
-              userId: auth.user.id,
+              userId: currentUser.id,
               storeId: group.storeId,
               status: paymentStatus === 'paid' ? 'processing' : 'pending',
               subtotal: group.subtotal,
@@ -499,7 +614,7 @@ export async function POST(request: Request) {
               orderId: order.id,
               invoiceNumber: `INV-${orderNumber.slice(4)}`,
               sellerId: group.sellerId,
-              buyerId: auth.user.id,
+              buyerId: currentUser.id,
               subtotal: group.subtotal,
               shipping: groupShipping,
               discount: group.discount,
@@ -526,10 +641,11 @@ export async function POST(request: Request) {
           requiresPayment: paymentStatus !== 'paid',
         };
 
+        const storedCheckout: StoredCheckout = { requestHash, response: result };
         await tx.platformSettings.create({
           data: {
             key: idempotencyStorageKey,
-            value: JSON.stringify({ requestHash, response: result } satisfies StoredCheckout),
+            value: JSON.stringify(storedCheckout),
           },
         });
 
@@ -550,6 +666,7 @@ export async function POST(request: Request) {
       error && typeof error === 'object' && 'code' in error
         ? String((error as { code?: unknown }).code)
         : '';
+
     if (code === 'P2002') {
       const replay = await db.platformSettings.findUnique({
         where: { key: idempotencyStorageKey },
@@ -561,7 +678,17 @@ export async function POST(request: Request) {
       }
     }
 
+    if (code === 'P2034') {
+      return NextResponse.json(
+        { error: 'Checkout data changed during processing. Please retry safely.' },
+        { status: 409 },
+      );
+    }
+
     console.error('Checkout error:', error);
-    return NextResponse.json({ error: 'Checkout failed. No partial order was saved.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Checkout failed. No partial order was saved.' },
+      { status: 500 },
+    );
   }
 }
