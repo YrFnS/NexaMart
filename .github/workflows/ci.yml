@@ -70,5 +70,8 @@ jobs:
       - name: Type-check
         run: bun run typecheck
 
+      - name: Security tests
+        run: bun run test
+
       - name: Build
         run: bun run build
