@@ -201,7 +201,7 @@ function parseAddress(value: unknown): ShippingAddressInput {
   return parsed;
 }
 
-function resolveCountryCode(addressCountry: string, suppliedCode: unknown): string {
+function resolveCountryCode(addressCountry: string): string {
   const normalizedCountry = addressCountry.toLowerCase().trim();
   const derivedCode =
     normalizedCountry.length === 2
@@ -213,11 +213,6 @@ function resolveCountryCode(addressCountry: string, suppliedCode: unknown): stri
       'Checkout tax configuration is unavailable for the selected country.',
       400,
     );
-  }
-
-  const clientCode = cleanText(suppliedCode, 2).toLowerCase();
-  if (clientCode && clientCode !== derivedCode) {
-    throw new CheckoutError('Shipping country and checkout country do not match.', 400);
   }
 
   return derivedCode;
@@ -263,7 +258,7 @@ export async function POST(request: Request) {
   }
 
   const auth = await requireAuthenticatedUser(request);
-  if (auth.response || !auth.user) return auth.response;
+  if (auth.response) return auth.response;
   const currentUser = auth.user;
 
   const contentLength = Number(request.headers.get('content-length') || 0);
@@ -290,16 +285,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const lines = (() => {
-    try {
-      return parseLines(body.items);
-    } catch (error) {
-      if (error instanceof CheckoutError) throw error;
-      throw new CheckoutError('Invalid cart.', 400);
+  let lines: CheckoutLineInput[];
+  let address: ShippingAddressInput;
+  let countryCode: string;
+  try {
+    lines = parseLines(body.items);
+    address = parseAddress(body.shippingAddress);
+    countryCode = resolveCountryCode(address.country);
+  } catch (error) {
+    if (error instanceof CheckoutError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
-  })();
-  const address = parseAddress(body.shippingAddress);
-  const countryCode = resolveCountryCode(address.country, body.countryCode);
+    return NextResponse.json({ error: 'Invalid checkout details.' }, { status: 400 });
+  }
+
   const shippingMethod = cleanText(body.shippingMethod, 30) as ShippingMethod;
   const paymentMethod = cleanText(body.paymentMethod, 30) as PaymentMethod;
   const couponCode = cleanText(body.couponCode, 80).toUpperCase();
