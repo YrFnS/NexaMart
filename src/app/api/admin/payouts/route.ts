@@ -1,99 +1,170 @@
+import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
-import { checkApiRateLimit, RATE_LIMITS, requireAdminAuth } from '@/lib/security';
+import { validateAdminRequest, validatePagination } from '@/lib/security';
+import { getSessionClaims } from '@/lib/session';
+
+const updateSchema = z.object({
+  payoutId: z.string().min(1).max(64),
+  action: z.enum(['process', 'reject']),
+  notes: z.string().trim().max(500).optional(),
+});
+
+class PayoutError extends Error {
+  constructor(
+    message: string,
+    readonly status = 400,
+  ) {
+    super(message);
+  }
+}
 
 export async function GET(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
-  }
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || '';
+    const status = searchParams.get('status') || undefined;
+    const { page, limit } = validatePagination(
+      searchParams.get('page'),
+      searchParams.get('limit'),
+      100,
+    );
+    const where = status ? { status } : {};
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
+    const [payouts, total] = await db.$transaction([
+      db.payout.findMany({
+        where,
+        orderBy: { requestedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          store: { select: { id: true, name: true } },
+          seller: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      db.payout.count({ where }),
+    ]);
 
-    const payouts = await db.payout.findMany({
-      where,
-      orderBy: { requestedAt: 'desc' },
-      include: {
-        store: { select: { id: true, name: true } },
-        seller: { select: { id: true, name: true, email: true } },
-      },
+    return NextResponse.json({
+      payouts: payouts.map((payout) => ({
+        id: payout.id,
+        store: payout.store.name,
+        storeId: payout.storeId,
+        sellerId: payout.sellerId,
+        sellerName: payout.seller.name || payout.seller.email,
+        amount: Number(payout.amount),
+        method: payout.method,
+        status: payout.status,
+        requestedDate: payout.requestedAt.toISOString().slice(0, 10),
+        processedAt: payout.processedAt?.toISOString().slice(0, 10) || null,
+        notes: payout.notes,
+      })),
+      total,
+      page,
+      limit,
     });
-
-    const result = payouts.map(p => ({
-      id: p.id,
-      store: p.store.name,
-      storeId: p.storeId,
-      sellerId: p.sellerId,
-      sellerName: p.seller.name || 'Unknown',
-      amount: p.amount,
-      method: p.method,
-      status: p.status,
-      requestedDate: p.requestedAt.toISOString().slice(0, 10),
-      processedAt: p.processedAt?.toISOString().slice(0, 10),
-      notes: p.notes,
-    }));
-
-    return NextResponse.json({ payouts: result, total: result.length });
   } catch (error) {
     console.error('Admin payouts GET error:', error);
-    return NextResponse.json({ payouts: [], total: 0 });
+    return NextResponse.json({ error: 'Failed to fetch payouts.' }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const parsed = updateSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid payout action.' }, { status: 400 });
   }
+
+  const adminId = getSessionClaims(request)?.sub;
+
   try {
-    const body = await request.json();
-    const { payoutId, action, notes, adminId } = body;
-
-    if (!payoutId || !action) {
-      return NextResponse.json({ error: 'Missing payoutId or action' }, { status: 400 });
-    }
-
-    const payout = await db.payout.findUnique({ where: { id: payoutId } });
-    if (!payout) {
-      return NextResponse.json({ error: 'Payout not found' }, { status: 404 });
-    }
-
-    const status = action === 'process' ? 'completed' : action === 'reject' ? 'rejected' : null;
-    if (!status) {
-      return NextResponse.json({ error: 'Invalid action. Use "process" or "reject"' }, { status: 400 });
-    }
-
-    await db.payout.update({
-      where: { id: payoutId },
-      data: {
-        status,
-        processedAt: new Date(),
-        notes: notes || null,
-      },
-    });
-
-    // When completed, deduct from seller's walletBalance
-    if (status === 'completed') {
-      const seller = await db.user.findUnique({ where: { id: payout.sellerId } });
-      if (seller && seller.walletBalance >= payout.amount) {
-        await db.user.update({
-          where: { id: payout.sellerId },
-          data: { walletBalance: seller.walletBalance - payout.amount },
+    const result = await db.$transaction(
+      async (tx) => {
+        const payout = await tx.payout.findUnique({
+          where: { id: parsed.data.payoutId },
         });
-      }
-    }
+        if (!payout) throw new PayoutError('Payout not found.', 404);
 
-    return NextResponse.json({ success: true, payoutId, status });
+        const targetStatus = parsed.data.action === 'process' ? 'completed' : 'rejected';
+        if (payout.status === targetStatus) {
+          return { payoutId: payout.id, status: payout.status, idempotentReplay: true };
+        }
+        if (payout.status === 'completed' || payout.status === 'rejected') {
+          throw new PayoutError(
+            `A ${payout.status} payout cannot be changed.`,
+            409,
+          );
+        }
+
+        if (targetStatus === 'completed') {
+          const wallet = await tx.user.updateMany({
+            where: {
+              id: payout.sellerId,
+              walletBalance: { gte: payout.amount },
+            },
+            data: { walletBalance: { decrement: payout.amount } },
+          });
+          if (wallet.count !== 1) {
+            throw new PayoutError('Seller wallet balance is insufficient.', 409);
+          }
+        }
+
+        const updated = await tx.payout.updateMany({
+          where: {
+            id: payout.id,
+            status: { in: ['pending', 'processing'] },
+          },
+          data: {
+            status: targetStatus,
+            processedAt: new Date(),
+            notes: parsed.data.notes || null,
+          },
+        });
+        if (updated.count !== 1) {
+          throw new PayoutError('Payout status changed during processing.', 409);
+        }
+
+        if (adminId) {
+          await tx.auditLog.create({
+            data: {
+              adminId,
+              action: targetStatus === 'completed' ? 'process' : 'reject',
+              targetType: 'payout',
+              targetId: payout.id,
+              details: JSON.stringify({
+                amount: Number(payout.amount),
+                sellerId: payout.sellerId,
+                notes: parsed.data.notes || null,
+              }),
+            },
+          });
+        }
+
+        return {
+          payoutId: payout.id,
+          status: targetStatus,
+          idempotentReplay: false,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 5_000,
+        timeout: 10_000,
+      },
+    );
+
+    return NextResponse.json({ success: true, ...result });
   } catch (error) {
+    if (error instanceof PayoutError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Admin payouts PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update payout' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update payout.' }, { status: 500 });
   }
 }
