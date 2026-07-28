@@ -15,7 +15,9 @@
     "db:deploy": "prisma migrate deploy",
     "typecheck": "tsc --noEmit",
     "check": "npm test && npm run lint && npm run typecheck && npm run build",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:seed": "prisma db seed",
+    "auth:set-password": "node --experimental-strip-types scripts/set-user-password.ts"
   },
   "dependencies": {
     "@babel/helper-compilation-targets": "^7.29.7",
@@ -103,5 +105,8 @@
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "node --experimental-strip-types prisma/seed.ts"
   }
 }

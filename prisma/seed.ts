@@ -1,9 +1,17 @@
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "../src/lib/password.ts";
 
 const db = new PrismaClient();
 
 async function main() {
 	const now = new Date();
+	const seedPassword = process.env.SEED_DEMO_PASSWORD;
+	if (!seedPassword || seedPassword.length < 12) {
+		throw new Error(
+			"SEED_DEMO_PASSWORD with at least 12 characters is required before seeding.",
+		);
+	}
+	const passwordHash = await hashPassword(seedPassword);
 
 	// ─── CLEANUP ──────────────────────────────────────────────────────────────────
 	await db.auditLog.deleteMany({});
@@ -43,6 +51,7 @@ async function main() {
 		data: [
 			{
 				email: "demo@nexamart.com",
+				passwordHash,
 				name: "Demo User",
 				phone: "+9647701234567",
 				role: "buyer",
@@ -54,6 +63,7 @@ async function main() {
 			},
 			{
 				email: "seller@nexamart.com",
+				passwordHash,
 				name: "TechStore Pro",
 				phone: "+9647709876543",
 				role: "seller",
@@ -65,6 +75,7 @@ async function main() {
 			},
 			{
 				email: "admin@nexamart.com",
+				passwordHash,
 				name: "Admin User",
 				role: "admin",
 				isVerified: true,
@@ -74,6 +85,7 @@ async function main() {
 			},
 			{
 				email: "fashion@nexamart.com",
+				passwordHash,
 				name: "Fashion Hub Seller",
 				role: "seller",
 				isVerified: true,
@@ -83,6 +95,7 @@ async function main() {
 			},
 			{
 				email: "home@nexamart.com",
+				passwordHash,
 				name: "Home Essentials Seller",
 				role: "seller",
 				isVerified: true,
@@ -92,6 +105,7 @@ async function main() {
 			},
 			{
 				email: "beauty@nexamart.com",
+				passwordHash,
 				name: "Beauty World Seller",
 				role: "seller",
 				isVerified: true,
@@ -101,6 +115,7 @@ async function main() {
 			},
 			{
 				email: "sports@nexamart.com",
+				passwordHash,
 				name: "Sports Zone Seller",
 				role: "seller",
 				isVerified: true,
@@ -110,6 +125,7 @@ async function main() {
 			},
 			{
 				email: "ahmed@nexamart.com",
+				passwordHash,
 				name: "Ahmed Al-Rashid",
 				phone: "+966501234567",
 				role: "buyer",
@@ -120,6 +136,7 @@ async function main() {
 			},
 			{
 				email: "fatima@nexamart.com",
+				passwordHash,
 				name: "Fatima Al-Zahra",
 				phone: "+971501112233",
 				role: "buyer",
@@ -130,6 +147,7 @@ async function main() {
 			},
 			{
 				email: "omar@nexamart.com",
+				passwordHash,
 				name: "Omar Hassan",
 				phone: "+962799887766",
 				role: "buyer",
