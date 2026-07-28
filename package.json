@@ -10,7 +10,11 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "postinstall": "prisma generate",
+    "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@babel/helper-compilation-targets": "^7.29.7",
@@ -85,10 +89,10 @@
     "vaul": "^1.1.2",
     "z-ai-web-dev-sdk": "^0.0.18",
     "zod": "^4.0.2",
-    "zustand": "^5.0.6"
+    "zustand": "^5.0.6",
+    "@prisma/client": "6.19.2"
   },
   "devDependencies": {
-    "@prisma/client": "6.19.2",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
