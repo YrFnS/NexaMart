@@ -7,14 +7,15 @@
     "build": "next build",
     "start": "NODE_ENV=production node .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
+    "db:deploy": "prisma migrate deploy",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run build",
-    "postinstall": "prisma generate",
-    "db:deploy": "prisma migrate deploy"
+    "check": "npm test && npm run lint && npm run typecheck && npm run build",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@babel/helper-compilation-targets": "^7.29.7",
@@ -28,6 +29,7 @@
     "@floating-ui/utils": "^0.2.11",
     "@hookform/resolvers": "^5.1.1",
     "@mdxeditor/editor": "^3.39.1",
+    "@prisma/client": "6.19.2",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -89,8 +91,7 @@
     "vaul": "^1.1.2",
     "z-ai-web-dev-sdk": "^0.0.18",
     "zod": "^4.0.2",
-    "zustand": "^5.0.6",
-    "@prisma/client": "6.19.2"
+    "zustand": "^5.0.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
