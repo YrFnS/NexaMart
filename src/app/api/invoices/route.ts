@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
 
   const auth = await requireAuthenticatedUser(request);
-  if (auth.response || !auth.user) return auth.response;
+  if (auth.response) return auth.response;
+  const currentUser = auth.user;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -48,9 +49,9 @@ export async function GET(request: NextRequest) {
     }
 
     const accessFilter =
-      auth.user.role === 'admin'
+      currentUser.role === 'admin'
         ? {}
-        : { OR: [{ buyerId: auth.user.id }, { sellerId: auth.user.id }] };
+        : { OR: [{ buyerId: currentUser.id }, { sellerId: currentUser.id }] };
 
     if (orderId || invoiceId) {
       const invoice = await db.invoice.findFirst({
