@@ -57,28 +57,31 @@ export function SecureAuthPage() {
     router.refresh();
   }, [refreshSession, router, searchParams]);
 
-  const submit = async (endpoint: string, body: Record<string, unknown>, action: string) => {
-    setLoadingAction(action);
-    setError('');
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = (await response.json().catch(() => ({}))) as AuthResponse;
-      if (!response.ok) {
-        setError(data.error || t('authFailedConnect'));
-        return;
+  const submit = useCallback(
+    async (endpoint: string, body: Record<string, unknown>, action: string) => {
+      setLoadingAction(action);
+      setError('');
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = (await response.json().catch(() => ({}))) as AuthResponse;
+        if (!response.ok) {
+          setError(data.error || t('authFailedConnect'));
+          return;
+        }
+        await finishAuthentication();
+      } catch {
+        setError(t('authFailedConnect'));
+      } finally {
+        setLoadingAction(null);
       }
-      await finishAuthentication();
-    } catch {
-      setError(t('authFailedConnect'));
-    } finally {
-      setLoadingAction(null);
-    }
-  };
+    },
+    [finishAuthentication, t],
+  );
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -114,9 +117,7 @@ export function SecureAuthPage() {
     async (role: 'buyer' | 'seller') => {
       await submit('/api/auth/demo', { role }, `demo-${role}`);
     },
-    // submit intentionally uses the current form/navigation state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [finishAuthentication, t],
+    [submit],
   );
 
   useEffect(() => {
