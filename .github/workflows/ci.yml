@@ -54,10 +54,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Validate Prisma schema
+      - name: Validate and deploy Prisma migrations
         run: |
           bunx prisma validate
-          bunx prisma db push --skip-generate
+          bunx prisma migrate deploy
+          bunx prisma migrate status
+          bunx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
 
       - name: Lint
         run: bun run lint
