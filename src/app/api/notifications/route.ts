@@ -8,11 +8,12 @@ export async function GET(request: Request) {
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
 
   const auth = await requireAuthenticatedUser(request);
-  if (auth.response || !auth.user) return auth.response;
+  if (auth.response) return auth.response;
+  const currentUser = auth.user;
 
   try {
-    const requestedUserId = new URL(request.url).searchParams.get('userId') || auth.user.id;
-    if (requestedUserId !== auth.user.id && auth.user.role !== 'admin') {
+    const requestedUserId = new URL(request.url).searchParams.get('userId') || currentUser.id;
+    if (requestedUserId !== currentUser.id && currentUser.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
