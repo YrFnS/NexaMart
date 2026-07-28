@@ -1,145 +1,275 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { requireAuthenticatedUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import {
+  checkApiRateLimit,
+  RATE_LIMITS,
+  validateCsrf,
+  validateEnum,
+  validatePagination,
+} from '@/lib/security';
 
-export async function GET(request: NextRequest) {
+const RETURN_STATUSES = [
+  'pending',
+  'approved',
+  'rejected',
+  'processing',
+  'completed',
+] as const;
+
+const createSchema = z.object({
+  orderId: z.string().min(1).max(64),
+  productId: z.string().min(1).max(64),
+  quantity: z.number().int().min(1).max(100),
+  reason: z.enum([
+    'wrong_item',
+    'defective',
+    'not_as_described',
+    'changed_mind',
+    'damaged_shipping',
+    'other',
+  ]),
+  details: z.string().trim().max(2_000).optional(),
+  resolution: z.enum(['refund', 'exchange', 'store_credit']).default('refund'),
+  evidencePhotos: z.array(z.string().trim().max(2_000)).max(10).default([]),
+});
+
+function parseArray(value: string | null): unknown[] {
+  if (!value) return [];
   try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    const buyerId = searchParams.get('buyerId');
-    const sellerId = searchParams.get('sellerId');
-
-    const where: Record<string, unknown> = {};
-
-    if (status && status !== 'all') where.status = status;
-    if (buyerId) where.buyerId = buyerId;
-    if (sellerId) where.sellerId = sellerId;
-
-    const returns = await db.return.findMany({
-      where,
-      include: {
-        order: { select: { orderNumber: true } },
-        product: { select: { name: true, images: true } },
-        buyer: { select: { name: true } },
-        seller: { select: { name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const mapped = returns.map((r) => ({
-      id: r.id,
-      orderId: r.orderId,
-      orderNumber: r.order.orderNumber,
-      productId: r.productId,
-      productName: r.product.name,
-      productImage: r.product.images ? JSON.parse(r.product.images)[0] || '/placeholder-product.svg' : '/placeholder-product.svg',
-      quantity: r.quantity,
-      refundAmount: r.refundAmount,
-      reason: r.reason,
-      reasonLabel: r.reason.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      details: r.details || '',
-      status: r.status,
-      resolution: r.resolution,
-      resolutionLabel: r.resolution.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-      sellerName: r.seller.name,
-      sellerId: r.sellerId,
-      buyerName: r.buyer.name,
-      buyerId: r.buyerId,
-      sellerNote: r.sellerNote || undefined,
-      timeline: r.timeline ? JSON.parse(r.timeline) : [],
-      evidencePhotos: r.evidencePhotos ? JSON.parse(r.evidencePhotos) : [],
-    }));
-
-    return NextResponse.json({
-      returns: mapped,
-      total: mapped.length,
-    });
-  } catch (error) {
-    console.error('Returns API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch returns' }, { status: 500 });
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
 }
 
-export async function POST(request: NextRequest) {
+function label(value: string) {
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function firstImage(images: string) {
+  const parsed = parseArray(images);
+  return typeof parsed[0] === 'string' ? parsed[0] : '/placeholder-product.svg';
+}
+
+const returnInclude = {
+  order: { select: { orderNumber: true } },
+  product: { select: { name: true, images: true } },
+  buyer: { select: { name: true, email: true } },
+  seller: { select: { name: true, email: true } },
+} satisfies Prisma.ReturnInclude;
+
+type ReturnWithRelations = Prisma.ReturnGetPayload<{
+  include: typeof returnInclude;
+}>;
+
+function mapReturn(record: ReturnWithRelations) {
+  return {
+    id: record.id,
+    orderId: record.orderId,
+    orderNumber: record.order.orderNumber,
+    productId: record.productId,
+    productName: record.product.name,
+    productImage: firstImage(record.product.images),
+    quantity: record.quantity,
+    refundAmount: Number(record.refundAmount),
+    reason: record.reason,
+    reasonLabel: label(record.reason),
+    details: record.details || '',
+    status: record.status,
+    resolution: record.resolution,
+    resolutionLabel: label(record.resolution),
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+    sellerName: record.seller.name || record.seller.email,
+    sellerId: record.sellerId,
+    buyerName: record.buyer.name || record.buyer.email,
+    buyerId: record.buyerId,
+    sellerNote: record.sellerNote || undefined,
+    timeline: parseArray(record.timeline),
+    evidencePhotos: parseArray(record.evidencePhotos),
+  };
+}
+
+export async function GET(request: Request) {
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+
   try {
-    const body = await request.json();
+    const { searchParams } = new URL(request.url);
+    const statusRaw = searchParams.get('status');
+    const status =
+      statusRaw && statusRaw !== 'all'
+        ? validateEnum(statusRaw, RETURN_STATUSES)
+        : null;
+    if (statusRaw && statusRaw !== 'all' && !status) {
+      return NextResponse.json({ error: 'Invalid return status.' }, { status: 400 });
+    }
 
-    const { orderId, productId, buyerId, sellerId, quantity, refundAmount, reason, details, resolution, evidencePhotos } = body;
+    const { page, limit } = validatePagination(
+      searchParams.get('page'),
+      searchParams.get('limit'),
+      100,
+    );
+    const ownership: Prisma.ReturnWhereInput =
+      auth.user.role === 'admin'
+        ? {}
+        : auth.user.role === 'seller'
+          ? { sellerId: auth.user.id }
+          : { buyerId: auth.user.id };
+    const where: Prisma.ReturnWhereInput = {
+      AND: [ownership, ...(status ? [{ status }] : [])],
+    };
 
-    if (!orderId || !productId || !buyerId || !sellerId) {
+    const [records, total] = await db.$transaction([
+      db.return.findMany({
+        where,
+        include: returnInclude,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.return.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      returns: records.map(mapReturn),
+      total,
+      page,
+      limit,
+    });
+  } catch (error) {
+    console.error('Returns GET error:', error);
+    return NextResponse.json({ error: 'Failed to fetch returns.' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.write);
+  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+
+  const csrf = validateCsrf(request);
+  if (!csrf.valid) {
+    return NextResponse.json(
+      { error: csrf.error || 'Invalid request origin.' },
+      { status: 403 },
+    );
+  }
+
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  if (auth.user.role === 'seller') {
+    return NextResponse.json({ error: 'Buyer access is required.' }, { status: 403 });
+  }
+
+  const parsed = createSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid return request.' }, { status: 400 });
+  }
+
+  try {
+    const created = await db.$transaction(
+      async (tx) => {
+        const order = await tx.order.findFirst({
+          where: {
+            id: parsed.data.orderId,
+            userId: auth.user.id,
+            status: 'delivered',
+          },
+          include: {
+            store: { select: { ownerId: true } },
+            items: {
+              where: { productId: parsed.data.productId },
+              select: { productId: true, quantity: true, price: true },
+            },
+          },
+        });
+
+        if (!order || !order.store) {
+          throw new Error('RETURN_ORDER_NOT_ELIGIBLE');
+        }
+
+        const orderedQuantity = order.items.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        );
+        if (orderedQuantity === 0) throw new Error('RETURN_PRODUCT_NOT_FOUND');
+
+        const existingReturns = await tx.return.aggregate({
+          where: {
+            orderId: order.id,
+            productId: parsed.data.productId,
+            status: { in: ['pending', 'approved', 'processing', 'completed'] },
+          },
+          _sum: { quantity: true },
+        });
+        const alreadyRequested = existingReturns._sum.quantity || 0;
+        if (alreadyRequested + parsed.data.quantity > orderedQuantity) {
+          throw new Error('RETURN_QUANTITY_EXCEEDED');
+        }
+
+        const unitPrice = Number(order.items[0].price);
+        const timeline = [
+          {
+            status: 'Return Requested',
+            date: new Date().toISOString(),
+            note: 'Buyer submitted return request',
+          },
+        ];
+
+        return tx.return.create({
+          data: {
+            orderId: order.id,
+            productId: parsed.data.productId,
+            buyerId: auth.user.id,
+            sellerId: order.store.ownerId,
+            quantity: parsed.data.quantity,
+            refundAmount: Math.round(unitPrice * parsed.data.quantity * 100) / 100,
+            reason: parsed.data.reason,
+            details: parsed.data.details || null,
+            resolution: parsed.data.resolution,
+            status: 'pending',
+            evidencePhotos: JSON.stringify(parsed.data.evidencePhotos),
+            timeline: JSON.stringify(timeline),
+          },
+          include: returnInclude,
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+
+    return NextResponse.json(
+      { return: mapReturn(created), message: 'Return request submitted.' },
+      { status: 201 },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'RETURN_ORDER_NOT_ELIGIBLE') {
       return NextResponse.json(
-        { error: 'Missing required fields: orderId, productId, buyerId, sellerId' },
-        { status: 400 }
+        { error: 'Only delivered orders owned by this account can be returned.' },
+        { status: 409 },
+      );
+    }
+    if (message === 'RETURN_PRODUCT_NOT_FOUND') {
+      return NextResponse.json(
+        { error: 'This product is not part of the order.' },
+        { status: 404 },
+      );
+    }
+    if (message === 'RETURN_QUANTITY_EXCEEDED') {
+      return NextResponse.json(
+        { error: 'The requested quantity exceeds the returnable quantity.' },
+        { status: 409 },
       );
     }
 
-    const timeline = [
-      {
-        status: 'Return Requested',
-        date: new Date().toISOString(),
-        note: 'Buyer submitted return request',
-      },
-    ];
-
-    const returnRecord = await db.return.create({
-      data: {
-        orderId,
-        productId,
-        buyerId,
-        sellerId,
-        quantity: quantity || 1,
-        refundAmount: refundAmount ? parseFloat(refundAmount) : 0,
-        reason: reason || 'other',
-        details: details || null,
-        resolution: resolution || 'refund',
-        status: 'pending',
-        evidencePhotos: evidencePhotos ? JSON.stringify(evidencePhotos) : '[]',
-        timeline: JSON.stringify(timeline),
-      },
-      include: {
-        order: { select: { orderNumber: true } },
-        product: { select: { name: true, images: true } },
-        buyer: { select: { name: true } },
-        seller: { select: { name: true } },
-      },
-    });
-
-    const mappedReturn = {
-      id: returnRecord.id,
-      orderId: returnRecord.orderId,
-      orderNumber: returnRecord.order.orderNumber,
-      productId: returnRecord.productId,
-      productName: returnRecord.product.name,
-      productImage: returnRecord.product.images ? JSON.parse(returnRecord.product.images)[0] || '/placeholder-product.svg' : '/placeholder-product.svg',
-      quantity: returnRecord.quantity,
-      refundAmount: returnRecord.refundAmount,
-      reason: returnRecord.reason,
-      reasonLabel: returnRecord.reason.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-      details: returnRecord.details || '',
-      status: returnRecord.status,
-      resolution: returnRecord.resolution,
-      resolutionLabel: returnRecord.resolution.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-      createdAt: returnRecord.createdAt.toISOString(),
-      updatedAt: returnRecord.updatedAt.toISOString(),
-      sellerName: returnRecord.seller.name,
-      sellerId: returnRecord.sellerId,
-      buyerName: returnRecord.buyer.name,
-      buyerId: returnRecord.buyerId,
-      sellerNote: returnRecord.sellerNote || undefined,
-      timeline: returnRecord.timeline ? JSON.parse(returnRecord.timeline) : [],
-      evidencePhotos: returnRecord.evidencePhotos ? JSON.parse(returnRecord.evidencePhotos) : [],
-    };
-
-    return NextResponse.json(
-      { return: mappedReturn, message: 'Return request submitted successfully' },
-      { status: 201 }
-    );
-  } catch (error) {
     console.error('Returns POST error:', error);
     return NextResponse.json(
-      { error: 'Failed to create return request' },
-      { status: 500 }
+      { error: 'Failed to create return request.' },
+      { status: 500 },
     );
   }
 }
