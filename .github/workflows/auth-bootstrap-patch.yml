@@ -1,0 +1,35 @@
+name: Authentication bootstrap patch
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[auth-bootstrap-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch seed and bootstrap configuration
+        run: python3 scripts/patch-auth-bootstrap.py
+
+      - name: Commit configuration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prisma/seed.ts package.json .env.example README.md
+          if git diff --cached --quiet; then
+            echo "No authentication bootstrap changes were required"
+          else
+            git commit -m "fix: configure seeded authentication bootstrap [auth-bootstrap-generated]"
+            git push
+          fi
