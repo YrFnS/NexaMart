@@ -19,8 +19,8 @@ describe('password credentials', () => {
     const firstHash = hashPassword(password);
     const secondHash = hashPassword(password);
 
-    expect(firstHash).toStartWith('scrypt$');
-    expect(secondHash).toStartWith('scrypt$');
+    expect(firstHash.startsWith('scrypt$')).toBe(true);
+    expect(secondHash.startsWith('scrypt$')).toBe(true);
     expect(firstHash).not.toBe(secondHash);
     expect(verifyPassword(password, firstHash)).toBe(true);
     expect(verifyPassword('wrong-password', firstHash)).toBe(false);
