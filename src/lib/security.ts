@@ -137,7 +137,7 @@ export function isValidId(id: string): boolean {
 export function validateSearchParam(search: string, maxLength = 200): string {
   return search
     .slice(0, maxLength)
-    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
     .trim();
 }
