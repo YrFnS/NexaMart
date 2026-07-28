@@ -97,22 +97,6 @@ export function AIChatWidget() {
     }
   }, [isOpen, isMinimized]);
 
-  // Add welcome message when opened for the first time
-  useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: isRTL
-            ? 'مرحباً! 👋 أنا مساعدك الذكي للتسوق. كيف يمكنني مساعدتك اليوم؟'
-            : t('aiAssistant') + '! 👋 How can I help you today?',
-          timestamp: new Date(),
-        },
-      ]);
-    }
-  }, [isOpen, messages.length, t, isRTL]);
-
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isLoading) return;
@@ -170,6 +154,18 @@ export function AIChatWidget() {
   };
 
   const handleToggleOpen = () => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: isRTL
+            ? 'مرحباً! 👋 أنا مساعدك الذكي للتسوق. كيف يمكنني مساعدتك اليوم؟'
+            : `${t('aiAssistant')}! 👋 How can I help you today?`,
+          timestamp: new Date(),
+        },
+      ]);
+    }
     setIsOpen(true);
     setIsMinimized(false);
   };

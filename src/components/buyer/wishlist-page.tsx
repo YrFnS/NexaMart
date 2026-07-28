@@ -157,17 +157,17 @@ export function WishlistPage() {
     fetchWishlist();
   }, [user?.id]);
 
-  // Update collection counts when items change
-  useEffect(() => {
-    setCollections((prev) =>
-      prev.map((c) => ({
-        ...c,
-        count: c.id === 'all'
-          ? wishlistItems.length
-          : wishlistItems.filter((i) => i.collection === c.id).length,
-      }))
-    );
-  }, [wishlistItems]);
+  const collectionsWithCounts = useMemo(
+    () =>
+      collections.map((collection) => ({
+        ...collection,
+        count:
+          collection.id === 'all'
+            ? wishlistItems.length
+            : wishlistItems.filter((item) => item.collection === collection.id).length,
+      })),
+    [collections, wishlistItems],
+  );
 
   const filteredItems = useMemo(() => {
     let items = activeCollection === 'all' ? wishlistItems : wishlistItems.filter((item) => item.collection === activeCollection);
@@ -382,7 +382,7 @@ export function WishlistPage() {
 
       {/* Collection Tabs */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin">
-        {collections.map((col) => (
+        {collectionsWithCounts.map((col) => (
           <Button
             key={col.id}
             variant={activeCollection === col.id ? 'default' : 'outline'}

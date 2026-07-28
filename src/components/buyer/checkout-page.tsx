@@ -177,12 +177,19 @@ export function CheckoutPage() {
   }, [user]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LS_KEYS.country);
-      if (saved) setCountryCode(saved.toLowerCase());
-    } catch {
-      // Storage may be unavailable.
-    }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const saved = localStorage.getItem(LS_KEYS.country);
+        if (saved) setCountryCode(saved.toLowerCase());
+      } catch {
+        // Storage may be unavailable.
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const itemCount = getItemCount();

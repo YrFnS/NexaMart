@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search, X, Clock, TrendingUp, ArrowRight, Sparkles,
   ShoppingBag, Store, Grid3X3, FileSearch, Loader2,
@@ -66,10 +66,17 @@ export function SearchPage() {
   const [results, setResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [didYouMean, setDidYouMean] = useState('');
   const [resultTab, setResultTab] = useState<ResultTab>('all');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [localRecentSearches, setLocalRecentSearches] = useState<string[]>([]);
+  const [localRecentSearches, setLocalRecentSearches] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(LS_RECENT_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [searchError, setSearchError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -129,37 +136,22 @@ export function SearchPage() {
     return filtered;
   }, [results, selectedCategory, priceRange, sortOption]);
 
-  // Load recent searches from localStorage and read URL query param
+  // Read the initial query once after hydration.
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LS_RECENT_KEY);
-      if (stored) {
-        setLocalRecentSearches(JSON.parse(stored));
-      }
-    } catch {
-      // ignore
-    }
+    const urlQuery = new URLSearchParams(window.location.search).get('q') || '';
+    const initialQuery = appSearchQuery.trim() || urlQuery.trim();
+    if (!initialQuery) return;
 
-    // Read URL query parameter ?q=...
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlQuery = urlParams.get('q') || '';
-
-    // If navigated from header search, use the stored query
-    if (appSearchQuery.trim()) {
-      setQuery(appSearchQuery);
-      performSearch(appSearchQuery);
-      saveRecentSearch(appSearchQuery);
-      setSearchQuery(''); // Clear to prevent re-triggering
-    } else if (urlQuery.trim()) {
-      // If navigated directly via URL with ?q= parameter
-      setQuery(urlQuery);
-      performSearch(urlQuery);
-      saveRecentSearch(urlQuery);
-    }
+    queueMicrotask(() => {
+      setQuery(initialQuery);
+      void performSearch(initialQuery);
+      saveRecentSearch(initialQuery);
+      if (appSearchQuery.trim()) setSearchQuery('');
+    });
   }, []);
 
   // Save recent search to localStorage
-  const saveRecentSearch = useCallback((searchText: string) => {
+  function saveRecentSearch(searchText: string) {
     setLocalRecentSearches((prev) => {
       const filtered = prev.filter((s) => s.toLowerCase() !== searchText.toLowerCase());
       const updated = [searchText, ...filtered].slice(0, MAX_RECENT);
@@ -170,7 +162,7 @@ export function SearchPage() {
       }
       return updated;
     });
-  }, []);
+  }
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -187,25 +179,16 @@ export function SearchPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Did you mean
-  useEffect(() => {
-    if (query.length >= 3) {
-      const misspellMap: Record<string, string> = {
-        'hedphones': 'headphones',
-        'earbds': 'earbuds',
-        'smatwatch': 'smartwatch',
-        'laptp': 'laptop',
-        'sneekers': 'sneakers',
-      };
-      const lower = query.toLowerCase();
-      if (misspellMap[lower]) {
-        setDidYouMean(misspellMap[lower]);
-      } else {
-        setDidYouMean('');
-      }
-    } else {
-      setDidYouMean('');
-    }
+  const didYouMean = useMemo(() => {
+    if (query.length < 3) return '';
+    const misspellMap: Record<string, string> = {
+      hedphones: 'headphones',
+      earbds: 'earbuds',
+      smatwatch: 'smartwatch',
+      laptp: 'laptop',
+      sneekers: 'sneakers',
+    };
+    return misspellMap[query.toLowerCase()] || '';
   }, [query]);
 
   // Search suggestions based on query
@@ -219,16 +202,16 @@ export function SearchPage() {
     : [];
 
   // Debounced search function
-  const debouncedSearch = useCallback((searchText: string) => {
+  function debouncedSearch(searchText: string) {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
-      performSearch(searchText);
+      void performSearch(searchText);
     }, 300);
-  }, []);
+  }
 
-  const performSearch = async (searchText: string) => {
+  async function performSearch(searchText: string) {
     if (!searchText.trim()) return;
     setIsSearching(true);
     setSearchError(false);
@@ -239,18 +222,14 @@ export function SearchPage() {
       const res = await fetch(`/api/products?search=${encodeURIComponent(searchText)}&limit=20`);
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      if (data.products && data.products.length > 0) {
-        setResults(data.products);
-      } else {
-        setResults([]);
-      }
+      setResults(data.products?.length ? data.products : []);
     } catch {
       setResults([]);
       setSearchError(true);
     } finally {
       setIsSearching(false);
     }
-  };
+  }
 
   const handleSearch = (searchText: string) => {
     if (!searchText.trim()) return;
