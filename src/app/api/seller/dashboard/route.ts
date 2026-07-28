@@ -1,34 +1,56 @@
+import { NextResponse } from 'next/server';
+import { requireAuthenticatedUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { checkApiRateLimit, RATE_LIMITS } from '@/lib/security';
 
 export async function GET(request: Request) {
+  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
+  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const storeId = searchParams.get('storeId');
+    const requestedStoreId = searchParams.get('storeId');
+    const requestedUserId = searchParams.get('userId');
 
-    if (!userId && !storeId) {
-      return Response.json(
-        { error: 'Either userId or storeId query parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    // Resolve the store: use storeId directly, or look up by userId
-    let store;
-    if (storeId) {
-      store = await db.store.findUnique({ where: { id: storeId } });
-    } else if (userId) {
-      store = await db.store.findUnique({ where: { ownerId: userId } });
-    }
+    const store =
+      auth.user.role === 'admin'
+        ? await db.store.findFirst({
+            where: requestedStoreId
+              ? { id: requestedStoreId }
+              : requestedUserId
+                ? { ownerId: requestedUserId }
+                : undefined,
+          })
+        : await db.store.findFirst({
+            where: {
+              ...(requestedStoreId ? { id: requestedStoreId } : {}),
+              OR: [
+                { ownerId: auth.user.id },
+                {
+                  staff: {
+                    some: {
+                      userId: auth.user.id,
+                      status: 'active',
+                    },
+                  },
+                },
+              ],
+            },
+          });
 
     if (!store) {
-      return Response.json(
-        { error: 'Store not found' },
-        { status: 404 }
+      return NextResponse.json(
+        { error: 'An accessible seller store was not found.' },
+        { status: auth.user.role === 'admin' ? 404 : 403 },
       );
     }
 
     const storeFilter = { storeId: store.id };
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     const [
       totalProducts,
@@ -36,7 +58,8 @@ export async function GET(request: Request) {
       revenue,
       recentOrders,
       topProducts,
-    ] = await Promise.all([
+      recentSales,
+    ] = await db.$transaction([
       db.product.count({ where: { storeId: store.id } }),
       db.order.count({ where: storeFilter }),
       db.order.aggregate({
@@ -47,63 +70,66 @@ export async function GET(request: Request) {
         where: storeFilter,
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: { user: { select: { name: true } } },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          total: true,
+          createdAt: true,
+          user: { select: { name: true } },
+        },
       }),
       db.product.findMany({
         where: { storeId: store.id },
         take: 5,
         orderBy: { soldCount: 'desc' },
       }),
+      db.order.findMany({
+        where: {
+          storeId: store.id,
+          status: { in: ['delivered', 'shipped', 'processing'] },
+          createdAt: { gte: sixMonthsAgo },
+        },
+        select: { total: true, createdAt: true },
+      }),
     ]);
 
-    // Calculate monthly sales from real order data
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const orders = await db.order.findMany({
-      where: {
-        storeId: store.id,
-        status: { in: ['delivered', 'shipped', 'processing'] },
-        createdAt: { gte: sixMonthsAgo },
-      },
-      select: {
-        total: true,
-        createdAt: true,
-      },
-    });
-
-    // Group by month
     const monthlySalesMap = new Map<string, number>();
-    for (const order of orders) {
-      const monthKey = order.createdAt.toISOString().slice(0, 7); // "2025-01"
-      monthlySalesMap.set(monthKey, (monthlySalesMap.get(monthKey) || 0) + order.total);
+    for (const order of recentSales) {
+      const monthKey = order.createdAt.toISOString().slice(0, 7);
+      monthlySalesMap.set(
+        monthKey,
+        (monthlySalesMap.get(monthKey) || 0) + Number(order.total),
+      );
     }
 
-    const monthlySales = Array.from(monthlySalesMap.entries())
-      .map(([month, revenue]) => ({ month, sales: revenue }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+    const monthlySales = [...monthlySalesMap.entries()]
+      .map(([month, monthlyRevenue]) => ({
+        month,
+        sales: monthlyRevenue,
+      }))
+      .sort((first, second) => first.month.localeCompare(second.month));
 
-    // visitorCount: The Product model does not have a views field,
-    // so we cannot compute total views from products.
-    // This requires an analytics tracking system to be implemented.
-    const visitorCount: number | null = null;
-
-    // conversionRate: Cannot be accurately calculated without a views/visits metric.
-    // Would require analytics tracking to compute (totalOrders / totalViews) * 100.
-    const conversionRate: number | null = null;
-
-    return Response.json({
+    return NextResponse.json({
+      store: {
+        id: store.id,
+        name: store.name,
+        nameAr: store.nameAr,
+      },
       totalProducts,
       totalOrders,
-      revenue: revenue._sum.total || 0,
+      revenue: Number(revenue._sum.total || 0),
       recentOrders,
       topProducts,
-      visitorCount,
-      conversionRate,
+      visitorCount: null,
+      conversionRate: null,
       monthlySales,
     });
   } catch (error) {
     console.error('Seller dashboard error:', error);
-    return Response.json({ error: 'Failed to fetch seller dashboard' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch seller dashboard.' },
+      { status: 500 },
+    );
   }
 }
