@@ -1,98 +1,125 @@
 # NexaMart — AI-Powered Multi-Vendor Commerce Platform
 
-NexaMart is a full-featured, AI-powered e-commerce marketplace built for the MENA region. It supports multi-vendor product listings, auctions, classifieds, cars, properties, jobs, services, and more — all in a modern, responsive web application.
+NexaMart is a multi-vendor marketplace designed for the MENA region. It includes product commerce, auctions, classifieds, cars, properties, jobs, services, seller tooling, administration, Arabic localization, and AI-assisted features.
 
-## Tech Stack
+## Technology
 
 | Layer | Technology |
-|-------|-----------|
-| **Framework** | Next.js 16 (App Router) |
-| **UI** | React 19, Tailwind CSS 4, shadcn/ui |
-| **State** | Zustand (client), React Query (server) |
-| **Database** | SQLite (dev) / Neon PostgreSQL (prod) |
-| **ORM** | Prisma 6 |
-| **Auth** | NextAuth.js 4 |
-| **i18n** | next-intl (EN/AR with RTL support) |
-| **AI** | OpenRouter (Gemini, etc.) |
-| **Animations** | Framer Motion |
+|---|---|
+| Framework | Next.js 16 App Router |
+| UI | React 19, Tailwind CSS 4, shadcn/ui |
+| State | Zustand and React Query |
+| Database | PostgreSQL |
+| ORM | Prisma 6.19.2 |
+| Authentication | Signed HTTP-only sessions with scrypt password hashing |
+| Localization | English and Arabic with RTL support |
+| AI | OpenRouter-compatible API |
 
-## Features
+## Requirements
 
-- **Multi-Vendor Marketplace** — Sellers manage stores, products, orders
-- **Product Catalog** — Categories, variations, tiered pricing, flash sales
-- **Auctions** — Real-time bidding on products
-- **Classifieds, Cars, Properties, Jobs, Services** — Vertical marketplaces
-- **AI-Powered** — Review summaries, price suggestions, smart search
-- **Buyer Features** — Wishlist, cart, checkout, returns, loyalty program, price alerts
-- **Seller Dashboard** — Orders, analytics, AI tools, staff management
-- **Admin Panel** — User/store/product management, banners, coupons, disputes
-- **RTL Support** — Full Arabic localization
+- Node.js 22
+- npm 10 or newer
+- PostgreSQL 15 or newer
 
-## Setup
+SQLite is not supported by the current Prisma schema.
 
-### Prerequisites
-- Node.js 18+
-- npm or bun
+## Local setup
 
-### Install
 ```bash
 git clone <repo-url> nexa-mart
 cd nexa-mart
-npm install
+npm ci
+cp .env.example .env
 ```
 
-### Environment
-Copy `.env.example` to `.env` and configure:
+Create a PostgreSQL database, then update `DATABASE_URL` in `.env`. Generate a strong session secret:
+
+```bash
+openssl rand -base64 48
+```
+
+Place the result in `AUTH_SECRET`, then deploy the checked-in migrations:
+
+```bash
+npm run db:deploy
+npm run db:generate
+npm run dev
+```
+
+The application starts at `http://localhost:3000`.
+
+## Production deployment
+
+Use the same immutable migration history in every environment:
+
+```bash
+npm ci
+npm run db:deploy
+npm run build
+npm start
+```
+
+Do not use `prisma db push` for production deployments. It bypasses the reviewed migration history.
+
+Required production variables:
+
 ```env
-DATABASE_URL="file:./dev.db"         # SQLite for local dev
-NEXTAUTH_SECRET="your-secret-here"    # Generate with: openssl rand -hex 32
-NEXTAUTH_URL="http://localhost:3000"
-OPENROUTER_API_KEY="sk-or-..."        # Optional: for AI features
+DATABASE_URL="postgresql://..."
+AUTH_SECRET="a-long-random-secret-with-at-least-32-characters"
+NEXT_PUBLIC_APP_URL="https://your-domain.example"
+NEXTAUTH_URL="https://your-domain.example"
 ```
 
-### Database
+`ADMIN_SECRET_KEY` is optional and intended only for trusted server-to-server automation. It must never use a `NEXT_PUBLIC_` prefix or be stored in a browser.
+
+## Demo accounts
+
+The seed contains buyer, seller, and administrator records. Demo login is intentionally disabled in production unless this variable is explicitly set:
+
+```env
+ENABLE_DEMO_LOGIN="true"
+```
+
+Use demo login only for isolated development or preview environments. Real accounts must use the registration and login endpoints.
+
+## Verification commands
+
 ```bash
-npx prisma generate      # Generate Prisma client
-npx prisma db push       # Push schema to DB
-npx prisma db seed       # Seed demo data
+npm test
+npm run lint
+npm run typecheck
+npm run build
 ```
 
-### Run
-```bash
-npm run dev              # http://localhost:3000
-npm run build            # Production build
-npm start                # Production server
-```
+The CI workflow also starts a clean PostgreSQL service, applies all migrations, and runs these checks for every pull request.
 
-### Seed Data (Demo Accounts)
-| Email | Role |
-|-------|------|
-| `demo@nexamart.com` | Buyer (Gold tier) |
-| `seller@nexamart.com` | Seller (Platinum) |
-| `admin@nexamart.com` | Admin |
+## Security model
 
-## Project Structure
-```
+- Browser identity is hydrated from a signed HTTP-only cookie; roles and balances are not trusted from local storage.
+- User APIs derive ownership from the authenticated session rather than caller-provided IDs.
+- Administrative writes require an administrator session and same-origin request validation.
+- Checkout recalculates product prices, stock, coupon discounts, tax, shipping, invoices, and wallet deductions inside one serializable database transaction.
+- Payout completion is transactional and idempotent.
+- Unsupported payment methods are not presented as successful payments.
+
+## Project structure
+
+```text
 src/
-├── app/              # Next.js App Router pages & API routes
-│   ├── api/          # REST API endpoints
-│   ├── (buyer)/      # Buyer-facing pages
-│   ├── auth/         # Authentication pages
-│   ├── admin/        # Admin panel pages
-│   └── seller/       # Seller dashboard pages
+├── app/
+│   ├── api/          # Route handlers
+│   ├── (buyer)/      # Buyer routes
+│   ├── auth/         # Authentication routes
+│   ├── admin/        # Administration routes
+│   └── seller/       # Seller routes
 ├── components/
-│   ├── buyer/        # Buyer UI components
-│   ├── seller/       # Seller dashboard components
-│   ├── admin/        # Admin panel components
-│   ├── layout/       # Header, footer, navigation
-│   ├── ui/           # shadcn/ui components
-│   └── common/       # Shared components
-├── lib/              # Utilities, configs, Prisma client
-├── stores/           # Zustand state stores
-└── hooks/            # Custom React hooks
+├── hooks/
+├── lib/
+└── stores/
 prisma/
-├── schema.prisma     # Database schema
-└── seed.ts           # Demo data seeder
+├── migrations/
+├── schema.prisma
+└── seed.ts
 ```
 
 ## License
