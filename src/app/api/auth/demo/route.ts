@@ -1,16 +1,78 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
+import { toAuthenticatedUser } from '@/lib/auth';
+import { checkApiRateLimit, RATE_LIMITS, validateCsrf } from '@/lib/security';
+import {
+  createSessionToken,
+  serializeSessionCookie,
+  type SessionRole,
+} from '@/lib/session';
 
-export async function GET(request: Request) {
+const demoSchema = z.object({
+  role: z.enum(['buyer', 'seller']).default('buyer'),
+});
+
+export async function POST(request: Request) {
+  const enabled =
+    process.env.ENABLE_DEMO_LOGIN === 'true' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.NODE_ENV !== 'production';
+
+  if (!enabled) {
+    return NextResponse.json({ error: 'Demo login is disabled.' }, { status: 404 });
+  }
+
+  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.auth);
+  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+
+  const csrf = validateCsrf(request);
+  if (!csrf.valid) {
+    return NextResponse.json({ error: csrf.error || 'Invalid request origin' }, { status: 403 });
+  }
+
   try {
-    const role = new URL(request.url).searchParams.get('role');
-    const email = role === 'seller' ? 'seller@nexamart.com' : 'demo@nexamart.com';
-    const user = await db.user.findUnique({ where: { email } });
-    if (!user) {
-      return Response.json({ error: 'Demo user not found. Run /api/seed first.' }, { status: 404 });
+    const body = await request.json().catch(() => ({}));
+    const parsed = demoSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid demo role.' }, { status: 400 });
     }
-    return Response.json({ user });
+
+    const email = parsed.data.role === 'seller' ? 'seller@nexamart.com' : 'demo@nexamart.com';
+    const user = await db.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        role: true,
+        loyaltyTier: true,
+        loyaltyPoints: true,
+        walletBalance: true,
+        aiCredits: true,
+        isVerified: true,
+        isBanned: true,
+      },
+    });
+
+    if (!user || user.isBanned) {
+      return NextResponse.json(
+        { error: 'Demo user not found. Seed the database first.' },
+        { status: 404 },
+      );
+    }
+
+    const token = createSessionToken({
+      id: user.id,
+      role: user.role as SessionRole,
+    });
+    const response = NextResponse.json({ user: toAuthenticatedUser(user) });
+    response.headers.set('Set-Cookie', serializeSessionCookie(token));
+    return response;
   } catch (error) {
-    console.error('Auth demo error:', error);
-    return Response.json({ error: 'Failed to get demo user' }, { status: 500 });
+    console.error('Demo login error:', error);
+    return NextResponse.json({ error: 'Demo login failed.' }, { status: 500 });
   }
 }
