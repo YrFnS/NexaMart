@@ -17,15 +17,19 @@ export async function GET(request: Request) {
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
 
   const auth = await requireAuthenticatedUser(request);
-  if (auth.response || !auth.user) return auth.response;
+  if (auth.response) return auth.response;
+  const currentUser = auth.user;
 
   try {
     const { searchParams } = new URL(request.url);
-    const requestedUserId = searchParams.get('userId') || auth.user.id;
+    const requestedUserId = searchParams.get('userId') || currentUser.id;
     const statusRaw = searchParams.get('status');
     const status = statusRaw ? validateEnum(statusRaw, [...VALID_ORDER_STATUSES]) : undefined;
 
-    if (requestedUserId !== auth.user.id && auth.user.role !== 'admin') {
+    if (statusRaw && !status) {
+      return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
+    }
+    if (requestedUserId !== currentUser.id && currentUser.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
