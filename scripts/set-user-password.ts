@@ -1,17 +1,31 @@
+import { readFile } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/lib/password.ts';
 
 const db = new PrismaClient();
 
+async function readBootstrapPassword(): Promise<string | undefined> {
+  if (process.env.AUTH_BOOTSTRAP_PASSWORD) {
+    return process.env.AUTH_BOOTSTRAP_PASSWORD;
+  }
+
+  const passwordFile = process.env.AUTH_BOOTSTRAP_PASSWORD_FILE?.trim();
+  if (!passwordFile) return undefined;
+
+  return (await readFile(passwordFile, 'utf8')).trimEnd();
+}
+
 async function main() {
   const email = process.env.AUTH_BOOTSTRAP_EMAIL?.trim().toLowerCase();
-  const password = process.env.AUTH_BOOTSTRAP_PASSWORD;
+  const password = await readBootstrapPassword();
 
   if (!email) {
     throw new Error('AUTH_BOOTSTRAP_EMAIL is required.');
   }
   if (!password || password.length < 12) {
-    throw new Error('AUTH_BOOTSTRAP_PASSWORD must contain at least 12 characters.');
+    throw new Error(
+      'Provide AUTH_BOOTSTRAP_PASSWORD or AUTH_BOOTSTRAP_PASSWORD_FILE with at least 12 characters.',
+    );
   }
 
   const existing = await db.user.findUnique({
