@@ -1,7 +1,6 @@
 'use client';
 
 import { create } from 'zustand';
-import { LS_KEYS } from '@/lib/config';
 
 export interface User {
   id: string;
@@ -19,41 +18,68 @@ export interface User {
 
 interface UserState {
   user: User | null;
+  hydrated: boolean;
+  isHydrating: boolean;
   setUser: (user: User | null) => void;
+  refreshSession: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-function loadUser(): User | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const saved = localStorage.getItem(LS_KEYS.user);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.id) return parsed;
-    }
-  } catch {
-    // localStorage not available or invalid data
-  }
-  return null;
-}
+let refreshPromise: Promise<void> | null = null;
 
-function saveUser(user: User | null) {
-  if (typeof window === 'undefined') return;
-  try {
-    if (user) {
-      localStorage.setItem(LS_KEYS.user, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(LS_KEYS.user);
-    }
-  } catch {
-    // localStorage not available
-  }
-}
+export const useUserStore = create<UserState>((set, get) => ({
+  user: null,
+  hydrated: false,
+  isHydrating: false,
 
-export const useUserStore = create<UserState>((set) => ({
-  user: loadUser(),
-
+  // Kept for compatibility with existing components, but arbitrary browser data
+  // is never accepted as identity. Non-null values trigger a server session refresh.
   setUser: (user) => {
-    saveUser(user);
-    set({ user });
+    if (user === null) {
+      void get().logout();
+      return;
+    }
+    void get().refreshSession();
+  },
+
+  refreshSession: async () => {
+    if (typeof window === 'undefined') return;
+    if (refreshPromise) return refreshPromise;
+
+    refreshPromise = (async () => {
+      set({ isHydrating: true });
+      try {
+        const response = await fetch('/api/auth/session', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          set({ user: null });
+          return;
+        }
+        const data = (await response.json()) as { user?: User | null };
+        set({ user: data.user || null });
+      } catch {
+        set({ user: null });
+      } finally {
+        set({ hydrated: true, isHydrating: false });
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
+  },
+
+  logout: async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Clear local presentation state even if the network is unavailable.
+    } finally {
+      set({ user: null, hydrated: true, isHydrating: false });
+    }
   },
 }));
