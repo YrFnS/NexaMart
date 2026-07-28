@@ -326,6 +326,8 @@ model ChatMessage {
   message    String
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
+
+  @@index([senderId, receiverId, createdAt])
 }
 
 model PlatformSettings {

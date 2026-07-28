@@ -71,7 +71,7 @@ NEXT_PUBLIC_APP_URL="https://your-domain.example"
 NEXTAUTH_URL="https://your-domain.example"
 ```
 
-`ADMIN_SECRET_KEY` is optional and intended only for trusted server-to-server automation. It must never use a `NEXT_PUBLIC_` prefix or be stored in a browser.
+`ADMIN_SECRET_KEY` is optional and intended only for trusted server-to-server automation. It must never use a `NEXT_PUBLIC_` prefix or be stored in a browser. Audited automation must also set `ADMIN_AUTOMATION_USER_ID` to the ID of an existing administrator account.
 
 
 Existing users created before this authentication migration have no password hash. Initialize each account deliberately after deployment; use a mounted secret file in production so the password is not written into shell history:
