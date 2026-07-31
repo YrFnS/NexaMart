@@ -80,8 +80,8 @@ replace_all(
 # Mini-cart and checkout review keys also need the variation-safe line ID.
 replace_once(
     "src/components/layout/header.tsx",
-    "<div key={item.productId}",
-    "<div key={item.lineId}",
+    "key={`${item.productId}:${item.variation || ''}`}",
+    "key={item.lineId}",
 )
 replace_once(
     "src/components/buyer/checkout/components/checkout-review.tsx",
