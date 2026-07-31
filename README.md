@@ -88,6 +88,23 @@ AUTH_BOOTSTRAP_PASSWORD_FILE="/run/secrets/nexamart-admin-password" \
 npm run auth:set-password
 ```
 
+## Product and SKU model
+
+Simple products keep their price, stock, and optional SKU on the parent `Product` record. Configurable products use first-class `ProductVariant` rows, with one active row for each purchasable option combination.
+
+Each variant owns:
+
+- A globally unique SKU.
+- Canonical option attributes such as `color=Black` and `size=M`.
+- Its own selling price and optional original price.
+- Its own inventory balance and activation state.
+
+The parent product stores the minimum active SKU price and aggregate active SKU stock for catalogue sorting and summaries. Checkout does not trust those summary values for configurable products: it resolves the active SKU from the submitted `variantId` and canonical option snapshot, verifies they match, and reserves that SKU's inventory atomically.
+
+Seller product management is backed by `/api/seller/products`. Seller and administrator sessions can create, edit, archive, and search products and SKUs only in stores they are authorized to manage. Removing a SKU from an edit deactivates it rather than deleting historical order references.
+
+After deploying the product-variant migration, run the normal seed only in isolated development environments. The seed creates deterministic demo SKU combinations and distributes each demo product's aggregate stock across them.
+
 ## Demo accounts
 
 The seed contains buyer, seller, and administrator records. Demo login is intentionally disabled in production unless this variable is explicitly set:
@@ -115,9 +132,11 @@ The CI workflow also starts a clean PostgreSQL service, applies all migrations, 
 - Browser identity is hydrated from a signed HTTP-only cookie; roles and balances are not trusted from local storage.
 - User APIs derive ownership from the authenticated session rather than caller-provided IDs.
 - Administrative writes require an administrator session and same-origin request validation.
+- Seller product and variant writes require an authorized seller-store relationship or an administrator role.
 - API rate limits are enforced through shared Redis counters rather than process-local memory in production.
 - Rate-limit identifiers are SHA-256 hashed before they are used as Redis keys.
-- Checkout recalculates product prices, stock, coupon discounts, tax, shipping, invoices, and wallet deductions inside one serializable database transaction.
+- Checkout recalculates SKU prices, variant inventory, coupon discounts, tax, per-seller shipping, invoices, and wallet deductions inside one serializable database transaction.
+- Order items preserve both an immutable option snapshot and an optional relational SKU reference.
 - Payout completion is transactional and idempotent.
 - Unsupported payment methods are not presented as successful payments.
 
