@@ -1,0 +1,112 @@
+name: Authoritative SKU checkout generator
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+    paths:
+      - scripts/apply-checkout-client-authority.py
+      - .github/workflows/checkout-client-authority.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: authoritative-sku-checkout-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nexamart_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexamart_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexamart_test?schema=public
+      AUTH_SECRET: ci-session-secret-with-at-least-32-characters
+      NEXTAUTH_SECRET: ci-session-secret-with-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      ENABLE_DEMO_LOGIN: "false"
+      SEED_DEMO_PASSWORD: ci-demo-password-with-at-least-12-characters
+      AUTH_BOOTSTRAP_EMAIL: admin@nexamart.com
+      AUTH_BOOTSTRAP_TEST_PASSWORD: ci-admin-password-with-at-least-12-characters
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Apply authoritative checkout patch
+        run: python3 scripts/apply-checkout-client-authority.py
+
+      - name: Regenerate Prisma client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Deploy migrations to a clean database
+        run: npm run db:deploy
+
+      - name: Seed authoritative catalog
+        run: npm run db:seed
+
+      - name: Verify authoritative checkout catalog
+        run: node --experimental-strip-types scripts/verify-authoritative-checkout.ts
+
+      - name: Reject high-severity production advisories
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript
+        run: npm run typecheck
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Remove one-time generator
+        run: rm scripts/apply-checkout-client-authority.py .github/workflows/checkout-client-authority.yml
+
+      - name: Commit generated implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No authoritative checkout changes were required"
+          else
+            git commit -m "feat: add authoritative SKU checkout [checkout-authority-generated]"
+            git push origin HEAD:agent/production-hardening-phase-1
+          fi
