@@ -38,12 +38,13 @@ import {
   Bell,
   Grid3X3,
   LifeBuoy,
+  Loader2,
 } from 'lucide-react';
 import { NotificationPanel } from '@/components/common/notification-panel';
 import { MegaMenu } from '@/components/common/mega-menu';
 import { CountrySelector } from '@/components/common/country-selector';
 import { CurrencySelector } from '@/components/common/currency-selector';
-import { AUTH_CONFIG, APP_SUPPORT_EMAIL } from '@/lib/config';
+import { APP_SUPPORT_EMAIL } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -69,8 +70,13 @@ import { useI18n } from '@/lib/i18n';
 import { useAppStore } from '@/stores/app-store';
 import { useAppNavigation, getViewUrl } from '@/lib/use-app-navigation';
 import { useCartStore } from '@/stores/cart-store';
-import { useUserStore } from '@/stores/user-store';
+import { useUserStore, type User as AuthenticatedUser } from '@/stores/user-store';
 import { formatPrice, CURRENCIES } from '@/lib/currency';
+
+interface DemoLoginResponse {
+  user?: AuthenticatedUser;
+  error?: string;
+}
 
 export function Header() {
   const { t, locale, setLocale, dir } = useI18n();
@@ -79,7 +85,7 @@ export function Header() {
   const pathname = usePathname();
   const nav = useAppNavigation();
   const { getItemCount } = useCartStore();
-  const { user, setUser } = useUserStore();
+  const { user, setUser, logout } = useUserStore();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -88,6 +94,7 @@ export function Header() {
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showMiniCart, setShowMiniCart] = useState(false);
   const [showMegaMenu, setShowMegaMenu] = useState(false);
+  const [isDemoLoggingIn, setIsDemoLoggingIn] = useState(false);
   const headerRef = React.useRef<HTMLElement>(null);
   const megaMenuTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -140,25 +147,36 @@ export function Header() {
     [searchQuery, nav]
   );
 
-  const handleDemoLogin = useCallback(() => {
-    setUser({
-      id: AUTH_CONFIG.demoUser.id,
-      email: AUTH_CONFIG.demoUser.email,
-      name: AUTH_CONFIG.demoUser.name,
-      role: AUTH_CONFIG.demoUser.role,
-      loyaltyTier: AUTH_CONFIG.demoUser.loyaltyTier,
-      loyaltyPoints: AUTH_CONFIG.demoUser.loyaltyPoints,
-      walletBalance: AUTH_CONFIG.demoUser.walletBalance,
-      aiCredits: AUTH_CONFIG.demoUser.aiCredits,
-      isVerified: AUTH_CONFIG.demoUser.isVerified,
-    });
-    nav.setView('home');
-  }, [setUser, nav]);
+  const handleDemoLogin = useCallback(async () => {
+    if (isDemoLoggingIn) return;
+
+    setIsDemoLoggingIn(true);
+    try {
+      const response = await fetch('/api/auth/demo', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'buyer' }),
+      });
+      const data = (await response.json()) as DemoLoginResponse;
+
+      if (!response.ok || !data.user) {
+        window.location.assign('/auth');
+        return;
+      }
+
+      setUser(data.user);
+      nav.setView('home');
+    } catch {
+      window.location.assign('/auth');
+    } finally {
+      setIsDemoLoggingIn(false);
+    }
+  }, [isDemoLoggingIn, nav, setUser]);
 
   const handleLogout = useCallback(() => {
-    setUser(null);
-    nav.setView('home');
-  }, [setUser, nav]);
+    void logout().finally(() => window.location.assign('/'));
+  }, [logout]);
 
   const navLinks = [
     { key: 'home', view: 'home' as const, label: t('home') },
@@ -212,6 +230,7 @@ export function Header() {
               size="icon"
               className="md:hidden"
               onClick={() => setIsMobileMenuOpen(true)}
+              aria-label={t('menu')}
             >
               <Menu className="size-5" />
             </Button>
@@ -406,7 +425,7 @@ export function Header() {
               size="sm"
               className="hidden xl:flex gap-1.5 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 text-xs"
             >
-              <Link href={getViewUrl('seller-dashboard')}>
+              <Link href={getViewUrl(user?.role === 'seller' ? 'seller-dashboard' : 'seller-onboarding')}>
                 <Store className="size-3.5" />
                 {t('sellOnPlatform')}
               </Link>
@@ -430,6 +449,7 @@ export function Header() {
               size="icon"
               className="md:hidden"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
+              aria-label={t('search')}
             >
               <Search className="size-5" />
             </Button>
@@ -443,7 +463,7 @@ export function Header() {
             {/* Language Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="hidden sm:flex">
+                <Button variant="ghost" size="icon" className="hidden sm:flex" aria-label={t('language')}>
                   <Globe className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -469,6 +489,7 @@ export function Header() {
               size="icon"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="hidden sm:flex"
+              aria-label={theme === 'dark' ? t('lightMode') : t('darkMode')}
             >
               <Sun className="size-4 hidden dark:block" />
               <Moon className="size-4 block dark:hidden" />
@@ -476,7 +497,7 @@ export function Header() {
 
             {/* Wishlist */}
             <Button asChild variant="ghost" size="icon" className="hidden sm:flex">
-              <Link href={getViewUrl('wishlist')}>
+              <Link href={getViewUrl('wishlist')} aria-label={t('wishlist')}>
                 <Heart className="size-4" />
               </Link>
             </Button>
@@ -491,7 +512,7 @@ export function Header() {
               onMouseLeave={() => setShowMiniCart(false)}
             >
               <Button asChild variant="ghost" size="icon">
-                <Link href={getViewUrl('cart')}>
+                <Link href={getViewUrl('cart')} aria-label={t('cart')}>
                   <ShoppingCart className="size-4" />
                   {itemCount > 0 && (
                     <Badge className={`absolute -top-1 ${isRTL ? '-left-1' : '-right-1'} size-4 p-0 flex items-center justify-center text-[10px] bg-gradient-to-r from-amber-500 to-yellow-500 text-white border-0 ${cartPulse ? 'animate-badge-pulse' : ''}`}>
@@ -513,7 +534,7 @@ export function Header() {
                       </Button>
                     </div>
                     {useCartStore.getState().items.slice(0, 3).map((item) => (
-                      <div key={item.productId} className="flex items-center gap-2 py-1.5">
+                      <div key={`${item.productId}:${item.variation || ''}`} className="flex items-center gap-2 py-1.5">
                         <div className="w-8 h-8 rounded bg-muted flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs truncate">{item.name}</p>
@@ -535,7 +556,7 @@ export function Header() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
+                  <Button variant="ghost" size="icon" className="relative" aria-label={t('account')}>
                     <Avatar className="size-8">
                       <AvatarImage
                         src={user.avatar}
@@ -548,7 +569,6 @@ export function Header() {
                           .join('')}
                       </AvatarFallback>
                     </Avatar>
-                    {/* Green dot when user is logged in */}
                     <span className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 size-2.5 rounded-full bg-amber-500 border-2 border-background`} />
                   </Button>
                 </DropdownMenuTrigger>
@@ -596,10 +616,9 @@ export function Header() {
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
 
-                  {/* Role switching */}
                   {user.role === 'buyer' && (
                     <DropdownMenuItem asChild>
-                      <Link href={getViewUrl('seller-dashboard')}>
+                      <Link href={getViewUrl('seller-onboarding')}>
                         <Store className="size-4" />
                         {t('switchToSeller')}
                       </Link>
@@ -607,13 +626,13 @@ export function Header() {
                   )}
                   {user.role === 'seller' && (
                     <DropdownMenuItem asChild>
-                      <Link href={getViewUrl('home')}>
-                        <ShoppingCart className="size-4" />
-                        {t('switchToShopping')}
+                      <Link href={getViewUrl('seller-dashboard')}>
+                        <Store className="size-4" />
+                        {t('footerSellerDashboard')}
                       </Link>
                     </DropdownMenuItem>
                   )}
-                  {(user.role === 'seller' || user.role === 'admin') && (
+                  {user.role === 'admin' && (
                     <DropdownMenuItem asChild>
                       <Link href={getViewUrl('admin')}>
                         <ShieldCheck className="size-4" />
@@ -647,9 +666,11 @@ export function Header() {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={handleDemoLogin}
+                  onClick={() => void handleDemoLogin()}
+                  disabled={isDemoLoggingIn}
                   className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white shadow-md shadow-amber-500/20"
                 >
+                  {isDemoLoggingIn && <Loader2 className="size-4 me-1.5 animate-spin" />}
                   {t('quickDemoLogin')}
                 </Button>
               </div>
@@ -676,6 +697,7 @@ export function Header() {
                 size="icon"
                 className={`absolute top-1/2 -translate-y-1/2 size-7 ${isRTL ? 'left-1' : 'right-1'}`}
                 onClick={() => setIsSearchOpen(false)}
+                aria-label={t('close')}
               >
                 <X className="size-3.5" />
               </Button>
@@ -716,7 +738,6 @@ export function Header() {
                         .join('')}
                     </AvatarFallback>
                   </Avatar>
-                  {/* Green dot for logged in user */}
                   <span className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 size-2.5 rounded-full bg-amber-500 border-2 border-background`} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -921,7 +942,10 @@ export function Header() {
 
               {/* Sell on NexaMart - mobile */}
               <Button asChild variant="ghost" className="w-full justify-start gap-3 text-amber-600 dark:text-amber-400">
-                <Link href={getViewUrl('seller-dashboard')} onClick={() => setIsMobileMenuOpen(false)}>
+                <Link
+                  href={getViewUrl(user?.role === 'seller' ? 'seller-dashboard' : 'seller-onboarding')}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
                   <Store className="size-4" />
                   {t('sellOnPlatform')}
                 </Link>
@@ -938,20 +962,70 @@ export function Header() {
               {user && (
                 <>
                   <Separator className="my-2" />
-                  <Button asChild variant="ghost" className="w-full justify-start gap-3">
-                    <Link href={getViewUrl('seller-dashboard')} onClick={() => setIsMobileMenuOpen(false)}>
-                      <Store className="size-4" />
-                      {t('switchToSeller')}
-                    </Link>
-                  </Button>
-                  <Button asChild variant="ghost" className="w-full justify-start gap-3">
-                    <Link href={getViewUrl('admin')} onClick={() => setIsMobileMenuOpen(false)}>
-                      <ShieldCheck className="size-4" />
-                      {t('switchToAdmin')}
-                    </Link>
+                  {user.role === 'buyer' && (
+                    <Button asChild variant="ghost" className="w-full justify-start gap-3">
+                      <Link href={getViewUrl('seller-onboarding')} onClick={() => setIsMobileMenuOpen(false)}>
+                        <Store className="size-4" />
+                        {t('switchToSeller')}
+                      </Link>
+                    </Button>
+                  )}
+                  {user.role === 'seller' && (
+                    <Button asChild variant="ghost" className="w-full justify-start gap-3">
+                      <Link href={getViewUrl('seller-dashboard')} onClick={() => setIsMobileMenuOpen(false)}>
+                        <Store className="size-4" />
+                        {t('footerSellerDashboard')}
+                      </Link>
+                    </Button>
+                  )}
+                  {user.role === 'admin' && (
+                    <Button asChild variant="ghost" className="w-full justify-start gap-3">
+                      <Link href={getViewUrl('admin')} onClick={() => setIsMobileMenuOpen(false)}>
+                        <ShieldCheck className="size-4" />
+                        {t('switchToAdmin')}
+                      </Link>
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-red-600"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="size-4" />
+                    {t('logout')}
                   </Button>
                 </>
               )}
+
+              {!user && (
+                <div className="pt-2 space-y-2">
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={getViewUrl('auth')} onClick={() => setIsMobileMenuOpen(false)}>
+                      {t('login')}
+                    </Link>
+                  </Button>
+                  <Button
+                    className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 text-white"
+                    onClick={() => void handleDemoLogin()}
+                    disabled={isDemoLoggingIn}
+                  >
+                    {isDemoLoggingIn && <Loader2 className="size-4 me-1.5 animate-spin" />}
+                    {t('quickDemoLogin')}
+                  </Button>
+                </div>
+              )}
+
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">
+                  {t('needHelp')}
+                </p>
+                <a
+                  href={`mailto:${APP_SUPPORT_EMAIL}`}
+                  className="text-xs font-medium text-amber-600 hover:underline"
+                >
+                  {APP_SUPPORT_EMAIL}
+                </a>
+              </div>
             </div>
           </ScrollArea>
 
@@ -969,6 +1043,7 @@ export function Header() {
                 variant="outline"
                 size="sm"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                aria-label={theme === 'dark' ? t('lightMode') : t('darkMode')}
               >
                 <Sun className="size-4 hidden dark:block" />
                 <Moon className="size-4 block dark:hidden" />
