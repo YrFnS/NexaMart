@@ -1,9 +1,13 @@
 name: SKU-aware returns generation
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/production-hardening-phase-1
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
     paths:
       - scripts/apply-sku-aware-returns.py
       - .github/workflows/sku-aware-returns.yml
@@ -12,11 +16,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: sku-aware-returns-${{ github.ref }}
-  cancel-in-progress: false
+  group: sku-aware-returns-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
 
 jobs:
   generate-and-verify:
+    if: ${{ github.event.pull_request.head.ref == 'agent/production-hardening-phase-1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
