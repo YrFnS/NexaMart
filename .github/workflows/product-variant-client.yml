@@ -1,0 +1,82 @@
+name: Product variant client integration
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - scripts/apply-product-variant-client.py
+      - .github/workflows/product-variant-client.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: product-variant-client-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: ${{ github.event.pull_request.head.ref == 'agent/production-hardening-phase-1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexamart_variant_client?schema=public
+      AUTH_SECRET: variant-client-secret-with-at-least-32-characters
+      NEXTAUTH_SECRET: variant-client-secret-with-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Apply checked storefront and seller changes
+        run: python3 scripts/apply-product-variant-client.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript
+        run: npm run typecheck
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Commit validated storefront and seller integration
+        run: |
+          rm -f scripts/apply-product-variant-client.py
+          rm -f .github/workflows/product-variant-client.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No product variant client changes were required"
+          else
+            git commit -m "feat: connect storefront and seller UI to variant SKUs [variant-client-generated]"
+            git push origin HEAD:agent/production-hardening-phase-1
+          fi
