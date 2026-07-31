@@ -1,79 +1,78 @@
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+
+const LOOKBACK_DAYS = 30;
+const MINIMUM_AGGREGATE_ORDERS = 3;
+const MAX_PROOFS = 6;
 
 export async function GET() {
   try {
-    // Fetch recent completed orders with user and product info to generate social proof
+    const cutoff = new Date(
+      Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1_000,
+    );
     const recentOrders = await db.order.findMany({
-      where: { status: 'delivered' },
+      where: {
+        status: 'delivered',
+        createdAt: { gte: cutoff },
+      },
       orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: {
+      take: 250,
+      select: {
         items: {
-          take: 1,
-          include: {
+          select: {
             product: {
-              select: { name: true, nameAr: true },
+              select: { id: true, name: true, nameAr: true },
             },
           },
-        },
-        user: {
-          select: { name: true },
         },
       },
     });
 
-    const proofs = recentOrders
-      .filter(order => order.items.length > 0 && order.user)
-      .map(order => {
-        const item = order.items[0];
-        const user = order.user;
-        const product = item.product;
-        const orderDate = new Date(order.createdAt);
-        const now = new Date();
-        const diffMs = now.getTime() - orderDate.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
+    const aggregates = new Map<
+      string,
+      { name: string; nameAr: string | null; orderCount: number }
+    >();
 
-        let timeAgo = 'Just now';
-        let timeAgoAr = 'الآن';
-        if (diffDays > 0) {
-          timeAgo = `${diffDays}d ago`;
-          timeAgoAr = `منذ ${diffDays} أيام`;
-        } else if (diffHours > 0) {
-          timeAgo = `${diffHours}h ago`;
-          timeAgoAr = `منذ ${diffHours} ساعات`;
-        } else if (diffMins > 0) {
-          timeAgo = `${diffMins}m ago`;
-          timeAgoAr = `منذ ${diffMins} دقيقة`;
-        }
+    for (const order of recentOrders) {
+      const productsInOrder = new Set<string>();
+      for (const item of order.items) {
+        if (productsInOrder.has(item.product.id)) continue;
+        productsInOrder.add(item.product.id);
 
-        // Derive city from shipping address JSON
-        let city = '';
-        let cityAr = '';
-        try {
-          const addr = JSON.parse(order.shippingAddress || '{}');
-          city = addr.city || '';
-          cityAr = addr.city || '';
-        } catch {
-          // ignore parse errors
-        }
+        const current = aggregates.get(item.product.id);
+        aggregates.set(item.product.id, {
+          name: item.product.name,
+          nameAr: item.product.nameAr,
+          orderCount: (current?.orderCount || 0) + 1,
+        });
+      }
+    }
 
-        return {
-          name: user.name?.split(' ')[0] || 'Someone',
-          nameAr: user.name?.split(' ')[0] || 'شخص',
-          city,
-          cityAr,
-          product: product.name || 'a product',
-          productAr: product.nameAr || product.name || 'منتج',
-          timeAgo,
-          timeAgoAr,
-        };
-      });
+    const proofs = [...aggregates.values()]
+      .filter((item) => item.orderCount >= MINIMUM_AGGREGATE_ORDERS)
+      .sort((a, b) => b.orderCount - a.orderCount)
+      .slice(0, MAX_PROOFS)
+      .map((item) => ({
+        name: `${item.orderCount} customers`,
+        nameAr: `${item.orderCount} عملاء`,
+        city: 'NexaMart community',
+        cityAr: 'مجتمع نكسا مارت',
+        product: item.name,
+        productAr: item.nameAr || item.name,
+        timeAgo: 'Recently',
+        timeAgoAr: 'مؤخراً',
+        purchaseCount: item.orderCount,
+        aggregate: true,
+      }));
 
-    return Response.json({ proofs });
+    const response = NextResponse.json({ proofs });
+    response.headers.set(
+      'Cache-Control',
+      'public, s-maxage=300, stale-while-revalidate=600',
+    );
+    return response;
   } catch (error) {
     console.error('Social proof API error:', error);
-    return Response.json({ proofs: [] }, { status: 200 });
+    return NextResponse.json({ proofs: [] });
   }
 }
