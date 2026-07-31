@@ -2,8 +2,11 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { validateAdminRequest, validatePagination } from '@/lib/security';
-import { getSessionClaims } from '@/lib/session';
+import {
+  getAdminActorId,
+  validateAdminRequest,
+  validatePagination,
+} from '@/lib/security';
 
 const couponFields = z.object({
   code: z.string().trim().min(2).max(50).transform((value) => value.toUpperCase()),
@@ -21,8 +24,13 @@ const updateSchema = couponFields.partial().omit({ code: true }).extend({
   couponId: z.string().min(1).max(64),
 });
 
-function adminId(request: Request) {
-  return getSessionClaims(request)?.sub || null;
+class CouponError extends Error {
+  constructor(
+    message: string,
+    readonly status = 400,
+  ) {
+    super(message);
+  }
 }
 
 async function audit(
@@ -41,6 +49,16 @@ async function audit(
       details: JSON.stringify(details),
     },
   });
+}
+
+function requireActor(request: Request): string | NextResponse {
+  const actorId = getAdminActorId(request);
+  if (actorId) return actorId;
+
+  return NextResponse.json(
+    { error: 'An administrator identity is required for audit logging.' },
+    { status: 401 },
+  );
 }
 
 export async function GET(request: Request) {
@@ -72,26 +90,29 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const denied = validateAdminRequest(request);
   if (denied) return denied;
-  const actorId = adminId(request);
-  if (!actorId) {
-    return NextResponse.json({ error: 'Administrator session required.' }, { status: 401 });
-  }
+
+  const actor = requireActor(request);
+  if (actor instanceof NextResponse) return actor;
 
   const parsed = couponFields.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid coupon details.' }, { status: 400 });
   }
   if (parsed.data.type === 'percentage' && parsed.data.discount > 100) {
-    return NextResponse.json({ error: 'Percentage discount cannot exceed 100.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Percentage discount cannot exceed 100.' },
+      { status: 400 },
+    );
   }
 
   try {
     const coupon = await db.$transaction(async (tx) => {
       const created = await tx.coupon.create({ data: parsed.data });
-      await audit(tx, actorId, 'coupon_created', created.id, {
+      await audit(tx, actor, 'coupon_created', created.id, {
         code: created.code,
         discount: Number(created.discount),
         type: created.type,
+        storeId: created.storeId,
       });
       return created;
     });
@@ -108,17 +129,13 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const denied = validateAdminRequest(request);
   if (denied) return denied;
-  const actorId = adminId(request);
-  if (!actorId) {
-    return NextResponse.json({ error: 'Administrator session required.' }, { status: 401 });
-  }
+
+  const actor = requireActor(request);
+  if (actor instanceof NextResponse) return actor;
 
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid coupon update.' }, { status: 400 });
-  }
-  if (parsed.data.type === 'percentage' && (parsed.data.discount || 0) > 100) {
-    return NextResponse.json({ error: 'Percentage discount cannot exceed 100.' }, { status: 400 });
   }
 
   try {
@@ -126,16 +143,36 @@ export async function PUT(request: Request) {
     const coupon = await db.$transaction(async (tx) => {
       const existing = await tx.coupon.findUnique({ where: { id: couponId } });
       if (!existing) return null;
-      const updated = await tx.coupon.update({ where: { id: couponId }, data: changes });
-      await audit(tx, actorId, 'coupon_updated', couponId, {
+
+      const nextType = changes.type ?? existing.type;
+      const nextDiscount = changes.discount ?? Number(existing.discount);
+      if (nextType === 'percentage' && nextDiscount > 100) {
+        throw new CouponError('Percentage discount cannot exceed 100.');
+      }
+
+      const updated = await tx.coupon.update({
+        where: { id: couponId },
+        data: changes,
+      });
+      await audit(tx, actor, 'coupon_updated', couponId, {
         code: existing.code,
+        previousType: existing.type,
+        previousDiscount: Number(existing.discount),
+        nextType: updated.type,
+        nextDiscount: Number(updated.discount),
         fields: Object.keys(changes),
       });
       return updated;
     });
-    if (!coupon) return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
+
+    if (!coupon) {
+      return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
+    }
     return NextResponse.json({ success: true, coupon });
   } catch (error) {
+    if (error instanceof CouponError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Admin coupons PUT error:', error);
     return NextResponse.json({ error: 'Failed to update coupon.' }, { status: 500 });
   }
@@ -144,10 +181,9 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const denied = validateAdminRequest(request);
   if (denied) return denied;
-  const actorId = adminId(request);
-  if (!actorId) {
-    return NextResponse.json({ error: 'Administrator session required.' }, { status: 401 });
-  }
+
+  const actor = requireActor(request);
+  if (actor instanceof NextResponse) return actor;
 
   const couponId = new URL(request.url).searchParams.get('id');
   if (!couponId) {
@@ -159,10 +195,17 @@ export async function DELETE(request: Request) {
       const coupon = await tx.coupon.findUnique({ where: { id: couponId } });
       if (!coupon) return null;
       await tx.coupon.delete({ where: { id: couponId } });
-      await audit(tx, actorId, 'coupon_deleted', couponId, { code: coupon.code });
+      await audit(tx, actor, 'coupon_deleted', couponId, {
+        code: coupon.code,
+        type: coupon.type,
+        discount: Number(coupon.discount),
+      });
       return coupon;
     });
-    if (!deleted) return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
+    }
     return NextResponse.json({ success: true, couponId });
   } catch (error) {
     console.error('Admin coupons DELETE error:', error);
