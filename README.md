@@ -115,6 +115,12 @@ ENABLE_DEMO_LOGIN="true"
 
 Use demo login only for isolated development or preview environments. Real accounts must use the registration and login endpoints.
 
+## Paymentless order model
+
+This release does not process cards, wallets, transfers, seller payouts, or online refunds. Checkout creates cash-on-delivery orders only. Each seller must explicitly confirm, prepare, ship, and deliver their own marketplace order. Buyer cancellation is allowed only before seller confirmation. Cancellation and rejection restore the exact product and SKU inventory once.
+
+Pending orders receive a confirmation deadline controlled by `ORDER_CONFIRMATION_TTL_HOURS`. A trusted administrator or scheduled server job can call `POST /api/admin/orders/expire` using the server-only administrator bearer token to cancel expired unconfirmed orders and restore inventory.
+
 ## Verification commands
 
 ```bash

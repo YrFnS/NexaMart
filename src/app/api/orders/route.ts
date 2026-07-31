@@ -1,16 +1,12 @@
+import { Prisma } from '@prisma/client';
 import { requireAuthenticatedUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { validateEnum, validatePagination } from '@/lib/security';
-
-const VALID_ORDER_STATUSES = [
-  'pending',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'disputed',
-  'refunded',
-] as const;
+import { normalizeOrderStatus } from '@/lib/order-lifecycle';
+import {
+  lifecycleOrderInclude,
+  serializeLifecycleOrder,
+} from '@/lib/order-lifecycle-server';
+import { validatePagination } from '@/lib/security';
 
 export async function GET(request: Request) {
   const auth = await requireAuthenticatedUser(request);
@@ -20,9 +16,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const requestedUserId = searchParams.get('userId');
     const statusRaw = searchParams.get('status');
-    const status = statusRaw
-      ? validateEnum(statusRaw, VALID_ORDER_STATUSES)
-      : undefined;
+    const status = statusRaw ? normalizeOrderStatus(statusRaw) : null;
     const { page, limit } = validatePagination(
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -37,35 +31,15 @@ export async function GET(request: Request) {
       auth.user.role === 'admin' && requestedUserId
         ? requestedUserId
         : auth.user.id;
-    const where = { userId, ...(status ? { status } : {}) };
+    const where: Prisma.OrderWhereInput = {
+      userId,
+      ...(status ? { status } : {}),
+    };
 
     const [orders, total] = await db.$transaction([
       db.order.findMany({
         where,
-        include: {
-          items: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  nameAr: true,
-                  images: true,
-                },
-              },
-              variant: {
-                select: {
-                  id: true,
-                  sku: true,
-                  attributes: true,
-                },
-              },
-            },
-          },
-          store: {
-            select: { id: true, name: true, nameAr: true, logo: true },
-          },
-        },
+        include: lifecycleOrderInclude,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -73,7 +47,17 @@ export async function GET(request: Request) {
       db.order.count({ where }),
     ]);
 
-    return Response.json({ orders, total, page, limit });
+    return Response.json({
+      orders: orders.map((order) =>
+        serializeLifecycleOrder(
+          order,
+          auth.user.role === 'admin' ? 'admin' : 'buyer',
+        ),
+      ),
+      total,
+      page,
+      limit,
+    });
   } catch (error) {
     console.error('Orders API error:', error);
     return Response.json({ error: 'Failed to fetch orders.' }, { status: 500 });

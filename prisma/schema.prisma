@@ -179,21 +179,33 @@ model Order {
   paymentMethod   String?
   paymentStatus   String   @default("pending") // pending, paid, refunded
   shippingAddress String?
-  trackingNumber  String?
-  carrier         String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  trackingNumber       String?
+  carrier              String?
+  notes                String?
+  confirmationExpiresAt DateTime?
+  confirmedAt          DateTime?
+  preparingAt          DateTime?
+  shippedAt            DateTime?
+  deliveredAt          DateTime?
+  cancelledAt          DateTime?
+  rejectedAt           DateTime?
+  cancelledBy          String?
+  cancellationReason   String?
+  inventoryRestoredAt  DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   user     User        @relation(fields: [userId], references: [id])
   store    Store?      @relation(fields: [storeId], references: [id])
-  items    OrderItem[]
-  returns  Return[]
-  invoices Invoice[]
-  disputes Dispute[]
+  items        OrderItem[]
+  returns      Return[]
+  invoices     Invoice[]
+  disputes     Dispute[]
+  statusEvents OrderStatusEvent[]
 
   @@unique([idempotencyKey, storeId])
   @@index([userId, createdAt])
+  @@index([status, confirmationExpiresAt])
 }
 
 model OrderItem {
@@ -211,6 +223,21 @@ model OrderItem {
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([variantId])
+}
+
+model OrderStatusEvent {
+  id         String   @id @default(cuid())
+  orderId    String
+  fromStatus String?
+  toStatus   String
+  actorId    String
+  actorRole  String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
 }
 
 model Review {

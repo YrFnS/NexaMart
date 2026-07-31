@@ -188,7 +188,6 @@ export function Header() {
 
   // More links shown in dropdown on desktop
   const moreLinks = [
-    { key: 'installments', view: 'installments' as const, label: isRTL ? 'أقساط' : 'Installments', icon: '💳' },
     { key: 'reels', view: 'reels' as const, label: isRTL ? 'ريلز' : 'Reels', icon: '🎬' },
     { key: 'properties', view: 'properties' as const, label: isRTL ? 'عقارات' : 'Properties', icon: '🏠' },
     { key: 'jobs', view: 'jobs' as const, label: isRTL ? 'وظائف' : 'Jobs', icon: '💼' },

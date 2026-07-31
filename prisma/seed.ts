@@ -712,8 +712,8 @@ async function main() {
 				discount: 10,
 				tax: 6.3,
 				total: 86.29,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "123 Main St",
@@ -731,8 +731,8 @@ async function main() {
 				discount: 0,
 				tax: 14.0,
 				total: 213.99,
-				paymentMethod: "wallet",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "123 Main St",
@@ -746,14 +746,14 @@ async function main() {
 				orderNumber: "ORD-003",
 				userId: user.id,
 				storeId: stores[0].id,
-				status: "processing",
+				status: "preparing",
 				subtotal: 249.99,
 				shippingCost: 0,
 				discount: 25,
 				tax: 15.75,
 				total: 240.74,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "456 Oak Ave",
@@ -766,13 +766,14 @@ async function main() {
 				userId: user.id,
 				storeId: stores[3].id,
 				status: "pending",
+				confirmationExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
 				subtotal: 79.99,
 				shippingCost: 5.99,
 				discount: 0,
 				tax: 5.6,
 				total: 91.58,
-				paymentMethod: "zain_cash",
-				paymentStatus: "pending",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "789 Pine Rd",
@@ -790,8 +791,8 @@ async function main() {
 				discount: 15,
 				tax: 9.45,
 				total: 144.44,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Ahmed Al-Rashid",
 					address1: "King Fahd Road",
@@ -809,8 +810,8 @@ async function main() {
 				discount: 0,
 				tax: 12.6,
 				total: 192.59,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Ahmed Al-Rashid",
 					address1: "Olaya District",
@@ -830,8 +831,8 @@ async function main() {
 				discount: 0,
 				tax: 9.1,
 				total: 139.09,
-				paymentMethod: "apple_pay",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Fatima Al-Zahra",
 					address1: "Dubai Marina Walk",
@@ -843,6 +844,18 @@ async function main() {
 	});
 
 	const orders = await db.order.findMany({ orderBy: { createdAt: "asc" } });
+
+	await db.orderStatusEvent.createMany({
+		data: orders.map((order) => ({
+			orderId: order.id,
+			fromStatus: null,
+			toStatus: order.status,
+			actorId: order.userId,
+			actorRole: "buyer",
+			note: "Seeded order state",
+			createdAt: order.createdAt,
+		})),
+	});
 
 	// ─── ORDER ITEMS ──────────────────────────────────────────────────────────────
 	if (allProducts.length >= 11 && orders.length >= 7) {

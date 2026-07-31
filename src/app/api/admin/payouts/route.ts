@@ -1,9 +1,6 @@
-import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { db } from '@/lib/db';
 import {
-  getAdminActorId,
   validateAdminRequest,
   validateEnum,
   validatePagination,
@@ -16,21 +13,6 @@ const PAYOUT_STATUSES = [
   'rejected',
 ] as const;
 
-const updateSchema = z.object({
-  payoutId: z.string().min(1).max(64),
-  action: z.enum(['process', 'reject']),
-  notes: z.string().trim().max(500).optional(),
-});
-
-class PayoutError extends Error {
-  constructor(
-    message: string,
-    readonly status = 400,
-  ) {
-    super(message);
-  }
-}
-
 export async function GET(request: Request) {
   const denied = validateAdminRequest(request);
   if (denied) return denied;
@@ -38,18 +20,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const statusRaw = searchParams.get('status');
-    const status = statusRaw ? validateEnum(statusRaw, PAYOUT_STATUSES) : null;
+    const status = statusRaw
+      ? validateEnum(statusRaw, PAYOUT_STATUSES)
+      : null;
     if (statusRaw && !status) {
       return NextResponse.json({ error: 'Invalid payout status.' }, { status: 400 });
     }
-
     const { page, limit } = validatePagination(
       searchParams.get('page'),
       searchParams.get('limit'),
       100,
     );
     const where = status ? { status } : {};
-
     const [payouts, total] = await db.$transaction([
       db.payout.findMany({
         where,
@@ -63,20 +45,17 @@ export async function GET(request: Request) {
       }),
       db.payout.count({ where }),
     ]);
-
     return NextResponse.json({
+      enabled: false,
+      message: 'Payout processing is disabled because NexaMart does not process payments in this release.',
       payouts: payouts.map((payout) => ({
         id: payout.id,
         store: payout.store.name,
-        storeId: payout.storeId,
-        sellerId: payout.sellerId,
         sellerName: payout.seller.name || payout.seller.email,
         amount: Number(payout.amount),
         method: payout.method,
         status: payout.status,
         requestedDate: payout.requestedAt.toISOString().slice(0, 10),
-        processedAt: payout.processedAt?.toISOString().slice(0, 10) || null,
-        notes: payout.notes,
       })),
       total,
       page,
@@ -84,109 +63,18 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Admin payouts GET error:', error);
-    return NextResponse.json({ error: 'Failed to fetch payouts.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch payout history.' }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
   const denied = validateAdminRequest(request);
   if (denied) return denied;
-
-  const adminId = getAdminActorId(request);
-  if (!adminId) {
-    return NextResponse.json(
-      { error: 'An administrator identity is required for audit logging.' },
-      { status: 401 },
-    );
-  }
-
-  const parsed = updateSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid payout action.' }, { status: 400 });
-  }
-
-  try {
-    const result = await db.$transaction(
-      async (tx) => {
-        const payout = await tx.payout.findUnique({
-          where: { id: parsed.data.payoutId },
-        });
-        if (!payout) throw new PayoutError('Payout not found.', 404);
-
-        const targetStatus = parsed.data.action === 'process' ? 'completed' : 'rejected';
-        if (payout.status === targetStatus) {
-          return { payoutId: payout.id, status: payout.status, idempotentReplay: true };
-        }
-        if (payout.status === 'completed' || payout.status === 'rejected') {
-          throw new PayoutError(
-            `A ${payout.status} payout cannot be changed.`,
-            409,
-          );
-        }
-
-        if (targetStatus === 'completed') {
-          const wallet = await tx.user.updateMany({
-            where: {
-              id: payout.sellerId,
-              walletBalance: { gte: payout.amount },
-            },
-            data: { walletBalance: { decrement: payout.amount } },
-          });
-          if (wallet.count !== 1) {
-            throw new PayoutError('Seller wallet balance is insufficient.', 409);
-          }
-        }
-
-        const updated = await tx.payout.updateMany({
-          where: {
-            id: payout.id,
-            status: { in: ['pending', 'processing'] },
-          },
-          data: {
-            status: targetStatus,
-            processedAt: new Date(),
-            notes: parsed.data.notes || null,
-          },
-        });
-        if (updated.count !== 1) {
-          throw new PayoutError('Payout status changed during processing.', 409);
-        }
-
-        await tx.auditLog.create({
-          data: {
-            adminId,
-            action: targetStatus === 'completed' ? 'process' : 'reject',
-            targetType: 'payout',
-            targetId: payout.id,
-            details: JSON.stringify({
-              amount: Number(payout.amount),
-              sellerId: payout.sellerId,
-              previousStatus: payout.status,
-              newStatus: targetStatus,
-              notes: parsed.data.notes || null,
-            }),
-          },
-        });
-
-        return {
-          payoutId: payout.id,
-          status: targetStatus,
-          idempotentReplay: false,
-        };
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        maxWait: 5_000,
-        timeout: 10_000,
-      },
-    );
-
-    return NextResponse.json({ success: true, ...result });
-  } catch (error) {
-    if (error instanceof PayoutError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error('Admin payouts PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update payout.' }, { status: 500 });
-  }
+  return NextResponse.json(
+    {
+      error: 'Payout processing is disabled in the paymentless release.',
+      code: 'PAYMENTS_DISABLED',
+    },
+    { status: 410 },
+  );
 }

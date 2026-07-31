@@ -7,11 +7,9 @@ import {
   Banknote,
   Check,
   ClipboardCheck,
-  CreditCard,
   Loader2,
   PartyPopper,
   Truck,
-  Wallet,
   Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,26 +39,17 @@ import {
   CheckoutShipping,
   DEFAULT_NEW_ADDRESS,
 } from './checkout/components/checkout-shipping';
-import { CheckoutPayment } from './checkout/components/checkout-payment';
 import { CheckoutReview } from './checkout/components/checkout-review';
 import { CheckoutConfirmation } from './checkout/components/checkout-confirmation';
 
 const LS_ADDRESS_KEY = LS_KEYS.checkoutAddress;
 
-const PAYMENT_METHODS: PaymentMethod[] = [
-  {
-    id: 'cash_on_delivery',
-    name: 'Cash on Delivery',
-    nameAr: 'الدفع عند الاستلام',
-    icon: Banknote,
-  },
-  {
-    id: 'wallet',
-    name: 'NexaMart Wallet',
-    nameAr: 'محفظة نكسا مارت',
-    icon: Wallet,
-  },
-];
+const ORDER_METHOD: PaymentMethod = {
+  id: 'cash_on_delivery',
+  name: 'Cash on delivery',
+  nameAr: 'الدفع عند الاستلام',
+  icon: Banknote,
+};
 
 const SHIPPING_METHODS: ShippingMethod[] = [
   {
@@ -93,10 +82,9 @@ const SHIPPING_METHODS: ShippingMethod[] = [
 ];
 
 const STEPS: CheckoutStepInfo[] = [
-  { key: 'shipping', label: 'Shipping', labelAr: 'الشحن', icon: Truck },
-  { key: 'payment', label: 'Payment', labelAr: 'الدفع', icon: CreditCard },
+  { key: 'shipping', label: 'Delivery', labelAr: 'التوصيل', icon: Truck },
   { key: 'review', label: 'Review', labelAr: 'مراجعة', icon: ClipboardCheck },
-  { key: 'confirmation', label: 'Confirmation', labelAr: 'تأكيد', icon: PartyPopper },
+  { key: 'confirmation', label: 'Placed', labelAr: 'تم الطلب', icon: PartyPopper },
 ];
 
 interface CheckoutResponse {
@@ -116,7 +104,6 @@ export function CheckoutPage() {
 
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
   const [selectedAddressId, setSelectedAddressId] = useState('');
-  const [selectedPaymentId, setSelectedPaymentId] = useState('cash_on_delivery');
   const [selectedShippingId, setSelectedShippingId] = useState('standard');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -145,41 +132,47 @@ export function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    async function loadAddresses() {
-      if (user) {
-        try {
-          const response = await fetch('/api/addresses', {
-            credentials: 'same-origin',
-            cache: 'no-store',
-          });
-          if (response.ok) {
-            const data = (await response.json()) as { addresses?: Address[] };
-            const addresses = data.addresses || [];
-            setSavedAddresses(addresses);
-            const defaultAddress = addresses.find((address) => address.isDefault);
-            if (defaultAddress) setSelectedAddressId(defaultAddress.id);
-            if (addresses.length > 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (user) {
+          try {
+            const response = await fetch('/api/addresses', {
+              credentials: 'same-origin',
+              cache: 'no-store',
+            });
+            if (response.ok) {
+              const data = (await response.json()) as { addresses?: Address[] };
+              const addresses = data.addresses || [];
+              if (!cancelled) {
+                setSavedAddresses(addresses);
+                const defaultAddress = addresses.find((address) => address.isDefault);
+                if (defaultAddress) setSelectedAddressId(defaultAddress.id);
+              }
+              if (addresses.length > 0) return;
+            }
+          } catch {
+            // Fall through to local guest addresses.
           }
-        } catch {
-          // Fall through to local guest addresses.
         }
-      }
 
-      try {
-        const stored = localStorage.getItem(LS_ADDRESS_KEY);
-        if (!stored) return;
-        const addresses = JSON.parse(stored) as Address[];
-        setSavedAddresses(addresses);
-        const defaultAddress = addresses.find((address) => address.isDefault);
-        if (defaultAddress) setSelectedAddressId(defaultAddress.id);
-      } catch {
-        // Storage may be unavailable.
-      }
-    }
-
-    void loadAddresses();
+        try {
+          const stored = localStorage.getItem(LS_ADDRESS_KEY);
+          if (!stored || cancelled) return;
+          const addresses = JSON.parse(stored) as Address[];
+          setSavedAddresses(addresses);
+          const defaultAddress = addresses.find((address) => address.isDefault);
+          if (defaultAddress) setSelectedAddressId(defaultAddress.id);
+        } catch {
+          // Storage may be unavailable.
+        }
+      })();
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [user]);
-
 
   const itemCount = getItemCount();
   const subtotal = getTotal();
@@ -206,14 +199,17 @@ export function CheckoutPage() {
           storeSum + toCents(item.price) * item.quantity,
         0,
       );
-      const storeShippingCents = calculateStoreShippingCents(
-        selectedShippingId as 'standard' | 'express' | 'next_day',
-        storeSubtotalCents,
-        storeItems.map((item) => ({
-          hasFreeShipping: Boolean(item.hasFreeShipping),
-        })),
+      return (
+        sum +
+        calculateStoreShippingCents(
+          selectedShippingId as 'standard' | 'express' | 'next_day',
+          storeSubtotalCents,
+          storeItems.map((item) => ({
+            hasFreeShipping: Boolean(item.hasFreeShipping),
+          })),
+        ) /
+          100
       );
-      return sum + storeShippingCents / 100;
     },
     0,
   );
@@ -224,10 +220,7 @@ export function CheckoutPage() {
   const taxLabel = isRTL ? taxResult.taxLabelAr : taxResult.taxLabel;
   const isTaxExempt = taxResult.isTaxExempt;
   const total = taxableSubtotal + shippingCost + tax;
-
-  const selectedPayment = PAYMENT_METHODS.find(
-    (method) => method.id === selectedPaymentId,
-  );
+  const selectedPayment = ORDER_METHOD;
   const stepIndex = STEPS.findIndex((step) => step.key === currentStep);
 
   function saveGuestAddresses(addresses: Address[]) {
@@ -328,7 +321,10 @@ export function CheckoutPage() {
           isDefault: address.isDefault,
         }),
       });
-      const data = (await response.json()) as { address?: Address; error?: string };
+      const data = (await response.json()) as {
+        address?: Address;
+        error?: string;
+      };
       if (!response.ok || !data.address) {
         throw new Error(data.error || 'Failed to save the shipping address.');
       }
@@ -351,13 +347,13 @@ export function CheckoutPage() {
           setShowNewAddress(false);
         } catch (error) {
           setCheckoutError(
-            error instanceof Error ? error.message : 'Failed to save the address.',
+            error instanceof Error
+              ? error.message
+              : 'Failed to save the address.',
           );
           return;
         }
       }
-      setCurrentStep('payment');
-    } else if (currentStep === 'payment') {
       setCurrentStep('review');
     } else if (currentStep === 'review') {
       await handlePlaceOrder();
@@ -365,8 +361,7 @@ export function CheckoutPage() {
   }
 
   function handlePrevStep() {
-    if (currentStep === 'payment') setCurrentStep('shipping');
-    else if (currentStep === 'review') setCurrentStep('payment');
+    if (currentStep === 'review') setCurrentStep('shipping');
   }
 
   async function handlePlaceOrder() {
@@ -399,7 +394,7 @@ export function CheckoutPage() {
             variation: item.variation,
           })),
           shippingMethod: selectedShippingId,
-          paymentMethod: selectedPaymentId,
+          paymentMethod: 'cash_on_delivery',
           couponCode: appliedCoupon?.code,
           addressId: selectedAddress?.id.startsWith('addr_')
             ? undefined
@@ -427,7 +422,9 @@ export function CheckoutPage() {
       setCurrentStep('confirmation');
     } catch (error) {
       setCheckoutError(
-        error instanceof Error ? error.message : 'The order could not be completed.',
+        error instanceof Error
+          ? error.message
+          : 'The order could not be completed.',
       );
     } finally {
       setIsPlacingOrder(false);
@@ -459,20 +456,24 @@ export function CheckoutPage() {
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                   completed
-                    ? 'bg-emerald-500 text-white'
+                    ? 'bg-amber-500 text-white'
                     : active
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/30'
                       : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {completed ? <Check className="size-5" /> : <StepIcon className="size-5" />}
+                {completed ? (
+                  <Check className="size-5" />
+                ) : (
+                  <StepIcon className="size-5" />
+                )}
               </div>
               <span
                 className={`text-[10px] md:text-xs font-medium ${
                   active
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-amber-600 dark:text-amber-400'
                     : completed
-                      ? 'text-emerald-500'
+                      ? 'text-amber-500'
                       : 'text-muted-foreground'
                 }`}
               >
@@ -481,8 +482,8 @@ export function CheckoutPage() {
             </div>
             {index < STEPS.length - 1 && (
               <div
-                className={`h-0.5 w-8 md:w-16 mx-1 mb-5 ${
-                  index < stepIndex ? 'bg-emerald-500' : 'bg-muted'
+                className={`h-0.5 w-12 md:w-24 mx-1 mb-5 ${
+                  index < stepIndex ? 'bg-amber-500' : 'bg-muted'
                 }`}
               />
             )}
@@ -497,7 +498,7 @@ export function CheckoutPage() {
       <div className="container mx-auto px-4 py-12 text-center">
         <h2 className="text-xl font-bold mb-4">{t('emptyCart')}</h2>
         <Button
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-amber-600 hover:bg-amber-700 text-white"
           onClick={() => nav.setView('shop')}
         >
           {t('continueShopping')}
@@ -525,13 +526,6 @@ export function CheckoutPage() {
             setNewAddress={setNewAddress}
             validationErrors={validationErrors}
             SHIPPING_METHODS={SHIPPING_METHODS}
-          />
-        )}
-        {currentStep === 'payment' && (
-          <CheckoutPayment
-            selectedPaymentId={selectedPaymentId}
-            setSelectedPaymentId={setSelectedPaymentId}
-            PAYMENT_METHODS={PAYMENT_METHODS}
           />
         )}
         {currentStep === 'review' && (
@@ -585,7 +579,7 @@ export function CheckoutPage() {
 
         {currentStep !== 'confirmation' && (
           <div className="flex items-center justify-between mt-8 pt-4 border-t">
-            {currentStep !== 'shipping' ? (
+            {currentStep === 'review' ? (
               <Button variant="outline" onClick={handlePrevStep}>
                 {isRTL ? (
                   <ArrowRight className="size-4 me-1" />
@@ -605,7 +599,7 @@ export function CheckoutPage() {
               </Button>
             )}
             <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold min-w-[140px]"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold min-w-[150px]"
               onClick={() => void handleNextStep()}
               disabled={isPlacingOrder || isSavingAddress}
             >
@@ -616,8 +610,8 @@ export function CheckoutPage() {
                 </>
               ) : currentStep === 'review' ? (
                 <>
-                  <ArrowRight className="size-4 me-2" />
-                  {t('placeOrder')}
+                  {isRTL ? 'إرسال الطلب' : 'Place order'}
+                  <ArrowRight className="size-4 ms-2" />
                 </>
               ) : (
                 <>

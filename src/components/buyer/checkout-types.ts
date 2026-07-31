@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type CheckoutStep = 'shipping' | 'payment' | 'review' | 'confirmation';
+export type CheckoutStep = 'shipping' | 'review' | 'confirmation';
 
 export interface AppliedCoupon {
   id: string;

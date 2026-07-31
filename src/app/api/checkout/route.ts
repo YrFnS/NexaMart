@@ -13,6 +13,7 @@ import {
   VariationValidationError,
 } from '@/lib/checkout-authority';
 import { db } from '@/lib/db';
+import { confirmationDeadline } from '@/lib/order-lifecycle';
 import {
   checkApiRateLimit,
   RATE_LIMITS,
@@ -35,7 +36,7 @@ const checkoutSchema = z.object({
     .min(1)
     .max(100),
   shippingMethod: z.enum(['standard', 'express', 'next_day']),
-  paymentMethod: z.enum(['cash_on_delivery', 'wallet']),
+  paymentMethod: z.literal('cash_on_delivery').default('cash_on_delivery'),
   couponCode: z.string().trim().max(50).optional(),
   addressId: z.string().min(1).max(64).optional(),
   address: z
@@ -75,7 +76,7 @@ function makeInvoiceNumber(index: number): string {
 async function existingCheckout(userId: string, idempotencyKey: string) {
   const orders = await db.order.findMany({
     where: { userId, idempotencyKey },
-    select: { orderNumber: true, total: true, paymentStatus: true },
+    select: { orderNumber: true, total: true },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -85,9 +86,8 @@ async function existingCheckout(userId: string, idempotencyKey: string) {
     idempotentReplay: true,
     orderNumbers: orders.map((order) => order.orderNumber),
     total: orders.reduce((sum, order) => sum + Number(order.total), 0),
-    paymentStatus: orders.every((order) => order.paymentStatus === 'paid')
-      ? 'paid'
-      : 'pending',
+    paymentStatus: 'not_applicable' as const,
+    orderMethod: 'cash_on_delivery' as const,
   };
 }
 
@@ -363,18 +363,6 @@ export async function POST(request: Request) {
         );
         const checkoutTotal = totals.reduce((sum, value) => sum + value, 0);
 
-        if (input.paymentMethod === 'wallet') {
-          const walletUpdate = await tx.user.updateMany({
-            where: {
-              id: auth.user.id,
-              walletBalance: { gte: fromCents(checkoutTotal) },
-            },
-            data: { walletBalance: { decrement: fromCents(checkoutTotal) } },
-          });
-          if (walletUpdate.count !== 1) {
-            throw new CheckoutError('Your wallet balance is insufficient.', 409);
-          }
-        }
 
         for (const [variantId, reservation] of quantitiesByVariant) {
           const updated = await tx.productVariant.updateMany({
@@ -414,7 +402,7 @@ export async function POST(request: Request) {
           const [storeId, items] = stores[index];
           const orderNumber = makeOrderNumber(index);
           const invoiceNumber = makeInvoiceNumber(index);
-          const paymentStatus = input.paymentMethod === 'wallet' ? 'paid' : 'pending';
+          const paymentStatus = 'not_applicable';
           const order = await tx.order.create({
             data: {
               orderNumber,
@@ -422,12 +410,13 @@ export async function POST(request: Request) {
               userId: auth.user.id,
               storeId,
               status: 'pending',
+              confirmationExpiresAt: confirmationDeadline(),
               subtotal: fromCents(subtotals[index]),
               shippingCost: fromCents(shippingAllocations[index]),
               discount: fromCents(discounts[index]),
               tax: fromCents(taxes[index]),
               total: fromCents(totals[index]),
-              paymentMethod: input.paymentMethod,
+              paymentMethod: 'cash_on_delivery',
               paymentStatus,
               shippingAddress: JSON.stringify(shippingAddress),
               notes: input.notes || null,
@@ -440,6 +429,15 @@ export async function POST(request: Request) {
                   total: fromCents(item.lineTotal),
                   variation: item.variation,
                 })),
+              },
+              statusEvents: {
+                create: {
+                  fromStatus: null,
+                  toStatus: 'pending',
+                  actorId: auth.user.id,
+                  actorRole: 'buyer',
+                  note: 'Order placed and waiting for seller confirmation',
+                },
               },
             },
           });
@@ -454,8 +452,8 @@ export async function POST(request: Request) {
               discount: fromCents(discounts[index]),
               tax: fromCents(taxes[index]),
               total: fromCents(totals[index]),
-              paymentMethod: input.paymentMethod,
-              status: paymentStatus === 'paid' ? 'paid' : 'unpaid',
+              paymentMethod: 'cash_on_delivery',
+              status: 'issued',
             },
           });
           orderNumbers.push(orderNumber);
@@ -466,8 +464,8 @@ export async function POST(request: Request) {
             userId: auth.user.id,
             title: 'Order placed',
             titleAr: 'تم إنشاء الطلب',
-            message: `Your order ${orderNumbers.join(', ')} was placed successfully.`,
-            messageAr: `تم إنشاء طلبك ${orderNumbers.join('، ')} بنجاح.`,
+            message: `Your order ${orderNumbers.join(', ')} is waiting for seller confirmation.`,
+            messageAr: `طلبك ${orderNumbers.join('، ')} بانتظار تأكيد البائع.`,
             type: 'order',
           },
         });
@@ -490,7 +488,8 @@ export async function POST(request: Request) {
             tax: fromCents(taxes[index]),
             total: fromCents(totals[index]),
           })),
-          paymentStatus: input.paymentMethod === 'wallet' ? 'paid' as const : 'pending' as const,
+          paymentStatus: 'not_applicable' as const,
+          orderMethod: 'cash_on_delivery' as const,
         };
       },
       {

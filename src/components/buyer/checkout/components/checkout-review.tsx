@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import {
   Check,
-  CreditCard,
+  Banknote,
   Truck,
   ClipboardCheck,
   MapPin,
@@ -165,26 +165,28 @@ export function CheckoutReview({
         </CardContent>
       </Card>
 
-      {/* Payment Method Summary */}
+      {/* Paymentless order method */}
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <CreditCard className="size-4 text-emerald-600" />
-              {t('paymentMethod')}
-            </CardTitle>
-            <Button variant="ghost" size="sm" className="text-xs text-emerald-600" onClick={() => setCurrentStep('payment')}>
-              {t('edit')}
-            </Button>
-          </div>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Banknote className="size-4 text-amber-600" />
+            {isRTL ? 'طريقة الطلب' : 'Order method'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {selectedPayment && (
             <div className="flex items-center gap-2 text-sm">
-              <selectedPayment.icon className="size-4 text-emerald-600 dark:text-emerald-400" />
-              <span className="font-medium">{isRTL ? selectedPayment.nameAr : selectedPayment.name}</span>
+              <selectedPayment.icon className="size-4 text-amber-600 dark:text-amber-400" />
+              <span className="font-medium">
+                {isRTL ? selectedPayment.nameAr : selectedPayment.name}
+              </span>
             </div>
           )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            {isRTL
+              ? 'لا يعالج NexaMart أي دفعة. يتم الدفع للبائع عند الاستلام.'
+              : 'NexaMart does not process payments. Pay the seller when the order is delivered.'}
+          </p>
         </CardContent>
       </Card>
 
