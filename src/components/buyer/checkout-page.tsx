@@ -19,6 +19,11 @@ import { useI18n } from '@/lib/i18n';
 import { getLocale } from '@/lib/utils';
 import { LS_KEYS, SHIPPING_CONFIG } from '@/lib/config';
 import { calculateTax } from '@/lib/tax';
+import {
+  calculateStoreShippingCents,
+  resolveTaxCountryCode,
+  toCents,
+} from '@/lib/checkout-authority';
 import { useAppStore } from '@/stores/app-store';
 import { useAppNavigation } from '@/lib/use-app-navigation';
 import { useCartStore } from '@/stores/cart-store';
@@ -131,7 +136,6 @@ export function CheckoutPage() {
 
   const [newAddress, setNewAddress] = useState(DEFAULT_NEW_ADDRESS);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-  const [countryCode, setCountryCode] = useState('iq');
 
   useEffect(() => {
     void fetch('/api/coupons?action=available')
@@ -176,43 +180,51 @@ export function CheckoutPage() {
     void loadAddresses();
   }, [user]);
 
-  useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      try {
-        const saved = localStorage.getItem(LS_KEYS.country);
-        if (saved) setCountryCode(saved.toLowerCase());
-      } catch {
-        // Storage may be unavailable.
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const itemCount = getItemCount();
   const subtotal = getTotal();
+  const selectedAddress = savedAddresses.find(
+    (address) => address.id === selectedAddressId,
+  );
   const selectedShipping =
     SHIPPING_METHODS.find((method) => method.id === selectedShippingId) ||
     SHIPPING_METHODS[0];
-  const shippingCost =
-    selectedShipping.price === 0 && selectedShippingId === 'standard'
-      ? subtotal >= SHIPPING_CONFIG.freeShippingThreshold
-        ? 0
-        : 9.99
-      : selectedShipping.price;
-  const taxResult = calculateTax(subtotal, countryCode, undefined, currency);
+  const addressForTotals =
+    selectedAddress || (showNewAddress ? newAddress : undefined);
+  const taxCountryCode =
+    resolveTaxCountryCode(addressForTotals?.country || '') || 'iq';
+  const itemsByStore = new Map<string, typeof items>();
+  for (const item of items) {
+    const storeItems = itemsByStore.get(item.storeId) || [];
+    storeItems.push(item);
+    itemsByStore.set(item.storeId, storeItems);
+  }
+  const shippingCost = [...itemsByStore.values()].reduce(
+    (sum, storeItems) => {
+      const storeSubtotalCents = storeItems.reduce(
+        (storeSum, item) =>
+          storeSum + toCents(item.price) * item.quantity,
+        0,
+      );
+      const storeShippingCents = calculateStoreShippingCents(
+        selectedShippingId as 'standard' | 'express' | 'next_day',
+        storeSubtotalCents,
+        storeItems.map((item) => ({
+          hasFreeShipping: Boolean(item.hasFreeShipping),
+        })),
+      );
+      return sum + storeShippingCents / 100;
+    },
+    0,
+  );
+  const taxableSubtotal = Math.max(0, subtotal - couponDiscount);
+  const taxResult = calculateTax(taxableSubtotal, taxCountryCode);
   const tax = taxResult.taxAmount;
   const taxRate = taxResult.taxRate;
   const taxLabel = isRTL ? taxResult.taxLabelAr : taxResult.taxLabel;
   const isTaxExempt = taxResult.isTaxExempt;
-  const total = taxResult.total + shippingCost - couponDiscount;
+  const total = taxableSubtotal + shippingCost + tax;
 
-  const selectedAddress = savedAddresses.find(
-    (address) => address.id === selectedAddressId,
-  );
   const selectedPayment = PAYMENT_METHODS.find(
     (method) => method.id === selectedPaymentId,
   );
@@ -387,7 +399,6 @@ export function CheckoutPage() {
           })),
           shippingMethod: selectedShippingId,
           paymentMethod: selectedPaymentId,
-          countryCode,
           couponCode: appliedCoupon?.code,
           addressId: selectedAddress?.id.startsWith('addr_')
             ? undefined

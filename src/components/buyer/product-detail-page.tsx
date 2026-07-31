@@ -153,6 +153,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       quantity,
       storeId: product.storeId,
       storeName: product.store?.name || '',
+      hasFreeShipping: product.hasFreeShipping,
       variation: JSON.stringify(selectedVariations),
     });
   };

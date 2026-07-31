@@ -534,7 +534,7 @@ export function Header() {
                       </Button>
                     </div>
                     {useCartStore.getState().items.slice(0, 3).map((item) => (
-                      <div key={`${item.productId}:${item.variation || ''}`} className="flex items-center gap-2 py-1.5">
+                      <div key={item.lineId} className="flex items-center gap-2 py-1.5">
                         <div className="w-8 h-8 rounded bg-muted flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs truncate">{item.name}</p>

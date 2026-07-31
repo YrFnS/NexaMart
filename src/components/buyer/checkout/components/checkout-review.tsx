@@ -29,6 +29,7 @@ import type { Address, ShippingMethod, PaymentMethod, AppliedCoupon, AvailableCo
 import { getPlaceholderImage } from '@/lib/placeholder-image';
 
 interface CartItem {
+  lineId: string;
   productId: string;
   name: string;
   image: string;
@@ -196,7 +197,7 @@ export function CheckoutReview({
         </CardHeader>
         <CardContent className="space-y-3">
           {items.map((item) => (
-            <div key={item.productId} className="flex items-center gap-3">
+            <div key={item.lineId} className="flex items-center gap-3">
               <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                 <Image
                   src={item.image}

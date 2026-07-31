@@ -25,6 +25,7 @@ import { useI18n } from "@/lib/i18n";
 import { useAppStore } from "@/stores/app-store";
 import { useAppNavigation } from "@/lib/use-app-navigation";
 import { useCartStore } from "@/stores/cart-store";
+import { parseVariationOptions } from "@/lib/checkout-authority";
 import { useUserStore } from "@/stores/user-store";
 import { useRecentlyViewedStore } from "@/stores/recently-viewed-store";
 
@@ -162,6 +163,10 @@ export function ProductCard({
 	const handleAddToCart = (e: React.MouseEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
+		if (Object.keys(parseVariationOptions(product.variations)).length > 0) {
+			nav.selectProduct(product.id);
+			return;
+		}
 		setCartBounce(true);
 		setTimeout(() => setCartBounce(false), 400);
 		addItem({
@@ -173,6 +178,7 @@ export function ProductCard({
 			quantity: 1,
 			storeId: product.storeId,
 			storeName: product.store?.name || "",
+			hasFreeShipping: product.hasFreeShipping,
 		});
 	};
 

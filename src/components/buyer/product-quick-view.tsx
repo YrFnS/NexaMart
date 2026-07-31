@@ -58,6 +58,12 @@ export function ProductQuickView({ product, open, onClose }: ProductQuickViewPro
     : 0;
 
   const handleAddToCart = () => {
+    if (variationKeys.length > 0) {
+      nav.selectProduct(product.id);
+      onClose();
+      return;
+    }
+
     for (let i = 0; i < quantity; i++) {
       addItem({
         productId: product.id,
@@ -68,6 +74,7 @@ export function ProductQuickView({ product, open, onClose }: ProductQuickViewPro
         quantity: 1,
         storeId: product.storeId,
         storeName: product.store?.name || '',
+        hasFreeShipping: product.hasFreeShipping,
       });
     }
     onClose();
