@@ -53,6 +53,13 @@ export async function GET(request: Request) {
                   images: true,
                 },
               },
+              variant: {
+                select: {
+                  id: true,
+                  sku: true,
+                  attributes: true,
+                },
+              },
             },
           },
           store: {

@@ -3,6 +3,59 @@ import { hashPassword } from "../src/lib/password.ts";
 
 const db = new PrismaClient();
 
+function canonicalSeedAttributes(attributes: Record<string, string>): string {
+	return JSON.stringify(
+		Object.fromEntries(
+			Object.entries(attributes).sort(([left], [right]) =>
+				left.localeCompare(right),
+			),
+		),
+	);
+}
+
+function expandSeedOptions(raw: string): Record<string, string>[] {
+	let parsed: Record<string, string[]> = {};
+	try {
+		const value = JSON.parse(raw) as unknown;
+		if (value && typeof value === "object" && !Array.isArray(value)) {
+			parsed = Object.fromEntries(
+				Object.entries(value)
+					.filter(([, options]) => Array.isArray(options))
+					.map(([key, options]) => [
+						key,
+						(options as unknown[])
+							.filter((option): option is string => typeof option === "string")
+							.map((option) => option.trim())
+							.filter(Boolean),
+					]),
+			);
+		}
+	} catch {
+		return [];
+	}
+
+	const entries = Object.entries(parsed)
+		.filter(([, options]) => options.length > 0)
+		.sort(([left], [right]) => left.localeCompare(right));
+	if (entries.length === 0) return [];
+
+	return entries.reduce<Record<string, string>[]>(
+		(combinations, [key, options]) =>
+			combinations.flatMap((combination) =>
+				options.map((option) => ({ ...combination, [key]: option })),
+			),
+		[{}],
+	);
+}
+
+function seedSkuPart(value: string): string {
+	return value
+		.toUpperCase()
+		.replace(/[^A-Z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 16) || "OPTION";
+}
+
 async function main() {
 	const now = new Date();
 	const seedPassword = process.env.SEED_DEMO_PASSWORD;
@@ -25,6 +78,7 @@ async function main() {
 	await db.priceAlert.deleteMany({});
 	await db.return.deleteMany({});
 	await db.orderItem.deleteMany({});
+	await db.productVariant.deleteMany({});
 	await db.order.deleteMany({});
 	await db.chatMessage.deleteMany({});
 	await db.wishlist.deleteMany({});
@@ -618,6 +672,32 @@ async function main() {
 	const allProducts = await db.product.findMany({
 		orderBy: { createdAt: "asc" },
 	});
+
+	// ─── PRODUCT VARIANTS / SKUS ─────────────────────────────────────────────────
+	const variantRows = allProducts.flatMap((product) => {
+		const combinations = expandSeedOptions(product.variations);
+		if (combinations.length === 0) return [];
+
+		const evenStock = Math.floor(product.stock / combinations.length);
+		const remainder = product.stock % combinations.length;
+		return combinations.map((attributes, index) => {
+			const optionKey = canonicalSeedAttributes(attributes);
+			const suffix = Object.values(attributes).map(seedSkuPart).join("-");
+			return {
+				productId: product.id,
+				sku: `${product.sku || product.id}-${suffix}`.slice(0, 96),
+				attributes: optionKey,
+				optionKey,
+				price: product.price,
+				originalPrice: product.originalPrice,
+				stock: evenStock + (index < remainder ? 1 : 0),
+				isActive: true,
+			};
+		});
+	});
+	if (variantRows.length > 0) {
+		await db.productVariant.createMany({ data: variantRows });
+	}
 
 	// ─── ORDERS ───────────────────────────────────────────────────────────────────
 	await db.order.createMany({
@@ -1516,6 +1596,7 @@ async function main() {
 		stores: await db.store.count(),
 		categories: await db.category.count(),
 		products: await db.product.count(),
+		productVariants: await db.productVariant.count(),
 		orders: await db.order.count(),
 		reviews: await db.review.count(),
 		cars: await db.car.count(),

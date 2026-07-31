@@ -21,6 +21,62 @@ function parsePrice(value: string | null, max: number): number | undefined {
   return Math.min(max, Math.max(0, parsed));
 }
 
+const publicProductSelect = {
+  id: true,
+  name: true,
+  nameAr: true,
+  description: true,
+  descriptionAr: true,
+  price: true,
+  originalPrice: true,
+  images: true,
+  categoryId: true,
+  storeId: true,
+  sku: true,
+  stock: true,
+  rating: true,
+  reviewCount: true,
+  soldCount: true,
+  views: true,
+  isFeatured: true,
+  isNew: true,
+  isSale: true,
+  isB2b: true,
+  hasFreeShipping: true,
+  variations: true,
+  tieredPricing: true,
+  tags: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  category: {
+    select: { id: true, name: true, nameAr: true, slug: true },
+  },
+  store: {
+    select: {
+      id: true,
+      name: true,
+      nameAr: true,
+      rating: true,
+      isVerified: true,
+      location: true,
+      productCount: true,
+    },
+  },
+  _count: { select: { variantSkus: { where: { isActive: true } } } },
+} satisfies Prisma.ProductSelect;
+
+function publicProduct(product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>) {
+  return {
+    ...product,
+    price: Number(product.price),
+    originalPrice:
+      product.originalPrice === null ? null : Number(product.originalPrice),
+    hasVariants: product._count.variantSkus > 0,
+    _count: undefined,
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -50,8 +106,6 @@ export async function GET(request: Request) {
     }
 
     const where: Prisma.ProductWhereInput = {
-      // Public catalog access must never expose seller drafts or archived items,
-      // including explicit `ids` lookups used by compare and recommendation UIs.
       status: 'active',
       ...(ids.length > 0 ? { id: { in: ids } } : {}),
       ...(category ? { categoryId: category } : {}),
@@ -77,6 +131,12 @@ export async function GET(request: Request) {
               { nameAr: { contains: search, mode: 'insensitive' } },
               { description: { contains: search, mode: 'insensitive' } },
               { tags: { contains: search, mode: 'insensitive' } },
+              { sku: { contains: search, mode: 'insensitive' } },
+              {
+                variantSkus: {
+                  some: { sku: { contains: search, mode: 'insensitive' } },
+                },
+              },
             ],
           }
         : {}),
@@ -99,16 +159,13 @@ export async function GET(request: Request) {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          category: true,
-          store: true,
-        },
+        select: publicProductSelect,
       }),
       db.product.count({ where }),
     ]);
 
     return Response.json({
-      products,
+      products: products.map(publicProduct),
       total,
       page,
       pages: Math.ceil(total / limit),

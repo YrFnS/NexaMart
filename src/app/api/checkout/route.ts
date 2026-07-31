@@ -25,6 +25,7 @@ const checkoutSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1).max(64),
+        variantId: z.string().min(1).max(64).optional(),
         quantity: z.number().int().min(1).max(100),
         variation: z
           .union([z.string(), z.record(z.string(), z.string())])
@@ -156,14 +157,9 @@ export async function POST(request: Request) {
             400,
           );
         }
-        shippingAddress = {
-          ...shippingAddress,
-          countryCode: taxCountryCode,
-        };
+        shippingAddress = { ...shippingAddress, countryCode: taxCountryCode };
 
-        const productIds = [
-          ...new Set(input.items.map((item) => item.productId)),
-        ];
+        const productIds = [...new Set(input.items.map((item) => item.productId))];
         const products = await tx.product.findMany({
           where: { id: { in: productIds }, status: 'active' },
           select: {
@@ -176,31 +172,38 @@ export async function POST(request: Request) {
             hasFreeShipping: true,
             category: { select: { id: true, slug: true, name: true } },
             store: { select: { ownerId: true, name: true } },
+            variantSkus: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                sku: true,
+                attributes: true,
+                optionKey: true,
+                price: true,
+                stock: true,
+              },
+            },
           },
         });
-        const productsById = new Map(
-          products.map((product) => [product.id, product]),
-        );
-
+        const productsById = new Map(products.map((product) => [product.id, product]));
         if (products.length !== productIds.length) {
-          throw new CheckoutError(
-            'One or more products are no longer available.',
-            409,
-          );
+          throw new CheckoutError('One or more products are no longer available.', 409);
         }
 
-        const requested = new Map<
-          string,
-          { productId: string; quantity: number; variation: string | null }
-        >();
+        const requested = new Map<string, {
+          productId: string;
+          variantId: string | null;
+          quantity: number;
+          variation: string | null;
+        }>();
 
         for (const item of input.items) {
           const product = productsById.get(item.productId);
           if (!product) throw new CheckoutError('Product not found.', 404);
 
-          let variation: string | null;
+          let canonicalSelection: string | null = null;
           try {
-            variation = validateVariationSelection(
+            canonicalSelection = validateVariationSelection(
               product.variations,
               item.variation,
             ).canonical;
@@ -211,44 +214,72 @@ export async function POST(request: Request) {
             throw error;
           }
 
-          const key = `${item.productId}:${variation || ''}`;
-          const existing = requested.get(key);
+          let variant: (typeof product.variantSkus)[number] | null = null;
+          if (product.variantSkus.length > 0) {
+            variant = item.variantId
+              ? product.variantSkus.find((candidate) => candidate.id === item.variantId) || null
+              : product.variantSkus.find((candidate) => candidate.optionKey === canonicalSelection) || null;
+            if (!variant) {
+              throw new CheckoutError(
+                `${product.name}: the selected SKU is no longer available.`,
+                409,
+              );
+            }
+            if (canonicalSelection && variant.optionKey !== canonicalSelection) {
+              throw new CheckoutError(
+                `${product.name}: the submitted SKU does not match the selected options.`,
+                409,
+              );
+            }
+            canonicalSelection = variant.attributes;
+          } else if (item.variantId) {
+            throw new CheckoutError(`${product.name}: invalid SKU selection.`, 409);
+          }
+
+          const key = variant?.id || `${item.productId}:base`;
+          const current = requested.get(key);
           requested.set(key, {
             productId: item.productId,
-            variation,
-            quantity: (existing?.quantity || 0) + item.quantity,
+            variantId: variant?.id || null,
+            variation: canonicalSelection,
+            quantity: (current?.quantity || 0) + item.quantity,
           });
         }
 
-        const normalizedItems = [...requested.values()];
-        const prepared = normalizedItems.map((item) => {
+        const prepared = [...requested.values()].map((item) => {
           const product = productsById.get(item.productId);
           if (!product) throw new CheckoutError('Product not found.', 404);
-
-          const unitPrice = toCents(Number(product.price));
+          const variant = item.variantId
+            ? product.variantSkus.find((candidate) => candidate.id === item.variantId) || null
+            : null;
+          const unitPrice = toCents(Number(variant?.price ?? product.price));
           return {
             ...item,
             product,
+            variant,
             unitPrice,
+            availableStock: variant?.stock ?? product.stock,
             lineTotal: unitPrice * item.quantity,
           };
         });
 
-        const quantitiesByProduct = new Map<
-          string,
-          { product: (typeof prepared)[number]['product']; quantity: number }
-        >();
+        const quantitiesByProduct = new Map<string, number>();
+        const quantitiesByVariant = new Map<string, { quantity: number; name: string }>();
         for (const item of prepared) {
-          const existing = quantitiesByProduct.get(item.product.id);
-          quantitiesByProduct.set(item.product.id, {
-            product: item.product,
-            quantity: (existing?.quantity || 0) + item.quantity,
-          });
-        }
-        for (const { product, quantity } of quantitiesByProduct.values()) {
-          if (product.stock < quantity) {
+          quantitiesByProduct.set(
+            item.product.id,
+            (quantitiesByProduct.get(item.product.id) || 0) + item.quantity,
+          );
+          if (item.variant) {
+            const current = quantitiesByVariant.get(item.variant.id);
+            quantitiesByVariant.set(item.variant.id, {
+              quantity: (current?.quantity || 0) + item.quantity,
+              name: `${item.product.name} (${item.variant.sku})`,
+            });
+          }
+          if (item.availableStock < item.quantity) {
             throw new CheckoutError(
-              `${product.name} does not have enough stock for this order.`,
+              `${item.product.name} does not have enough stock for this SKU.`,
               409,
             );
           }
@@ -264,10 +295,7 @@ export async function POST(request: Request) {
         const subtotals = stores.map(([, items]) =>
           items.reduce((sum, item) => sum + item.lineTotal, 0),
         );
-        const checkoutSubtotal = subtotals.reduce(
-          (sum, value) => sum + value,
-          0,
-        );
+        const checkoutSubtotal = subtotals.reduce((sum, value) => sum + value, 0);
 
         let couponDiscount = 0;
         let couponId: string | null = null;
@@ -281,63 +309,41 @@ export async function POST(request: Request) {
             !coupon ||
             !coupon.isActive ||
             (coupon.expiresAt && coupon.expiresAt <= now) ||
-            (coupon.usageLimit !== null &&
-              coupon.usedCount >= coupon.usageLimit)
+            (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit)
           ) {
             throw new CheckoutError('This coupon is invalid or has expired.');
           }
-
           eligibleStoreId = coupon.storeId;
           const eligibleSubtotal = coupon.storeId
             ? stores.reduce(
                 (sum, [storeId], index) =>
-                  storeId === coupon.storeId
-                    ? sum + subtotals[index]
-                    : sum,
+                  storeId === coupon.storeId ? sum + subtotals[index] : sum,
                 0,
               )
             : checkoutSubtotal;
-
           if (eligibleSubtotal < toCents(Number(coupon.minOrder))) {
-            throw new CheckoutError(
-              'The order does not meet this coupon minimum.',
-            );
+            throw new CheckoutError('The order does not meet this coupon minimum.');
           }
-
-          couponDiscount =
-            coupon.type === 'fixed'
-              ? toCents(Number(coupon.discount))
-              : Math.round(
-                  (eligibleSubtotal * Number(coupon.discount)) / 100,
-                );
+          couponDiscount = coupon.type === 'fixed'
+            ? toCents(Number(coupon.discount))
+            : Math.round((eligibleSubtotal * Number(coupon.discount)) / 100);
           if (coupon.maxDiscount !== null) {
-            couponDiscount = Math.min(
-              couponDiscount,
-              toCents(Number(coupon.maxDiscount)),
-            );
+            couponDiscount = Math.min(couponDiscount, toCents(Number(coupon.maxDiscount)));
           }
           couponDiscount = Math.min(couponDiscount, eligibleSubtotal);
           couponId = coupon.id;
         }
 
         const eligibleWeights = stores.map(([storeId], index) =>
-          !eligibleStoreId || storeId === eligibleStoreId
-            ? subtotals[index]
-            : 0,
+          !eligibleStoreId || storeId === eligibleStoreId ? subtotals[index] : 0,
         );
         const discounts = allocateCents(couponDiscount, eligibleWeights);
         const shippingAllocations = stores.map(([, items], index) =>
           calculateStoreShippingCents(
             input.shippingMethod,
             subtotals[index],
-            items.map((item) => ({
-              hasFreeShipping: item.product.hasFreeShipping,
-            })),
+            items.map((item) => ({ hasFreeShipping: item.product.hasFreeShipping })),
           ),
-        );
-        const shippingTotal = shippingAllocations.reduce(
-          (sum, value) => sum + value,
-          0,
         );
         const taxes = stores.map(([, items], index) =>
           calculateStoreTaxCents(
@@ -353,15 +359,9 @@ export async function POST(request: Request) {
         );
         const totals = subtotals.map(
           (subtotal, index) =>
-            subtotal +
-            shippingAllocations[index] -
-            discounts[index] +
-            taxes[index],
+            subtotal + shippingAllocations[index] - discounts[index] + taxes[index],
         );
-        const checkoutTotal = totals.reduce(
-          (sum, value) => sum + value,
-          0,
-        );
+        const checkoutTotal = totals.reduce((sum, value) => sum + value, 0);
 
         if (input.paymentMethod === 'wallet') {
           const walletUpdate = await tx.user.updateMany({
@@ -369,33 +369,34 @@ export async function POST(request: Request) {
               id: auth.user.id,
               walletBalance: { gte: fromCents(checkoutTotal) },
             },
-            data: {
-              walletBalance: { decrement: fromCents(checkoutTotal) },
-            },
+            data: { walletBalance: { decrement: fromCents(checkoutTotal) } },
           });
           if (walletUpdate.count !== 1) {
-            throw new CheckoutError(
-              'Your wallet balance is insufficient.',
-              409,
-            );
+            throw new CheckoutError('Your wallet balance is insufficient.', 409);
           }
         }
 
-        for (const { product, quantity } of quantitiesByProduct.values()) {
-          const stockUpdate = await tx.product.updateMany({
-            where: {
-              id: product.id,
-              status: 'active',
-              stock: { gte: quantity },
-            },
+        for (const [variantId, reservation] of quantitiesByVariant) {
+          const updated = await tx.productVariant.updateMany({
+            where: { id: variantId, isActive: true, stock: { gte: reservation.quantity } },
+            data: { stock: { decrement: reservation.quantity } },
+          });
+          if (updated.count !== 1) {
+            throw new CheckoutError(`${reservation.name} changed while ordering.`, 409);
+          }
+        }
+        for (const [productId, quantity] of quantitiesByProduct) {
+          const product = productsById.get(productId);
+          const updated = await tx.product.updateMany({
+            where: { id: productId, status: 'active', stock: { gte: quantity } },
             data: {
               stock: { decrement: quantity },
               soldCount: { increment: quantity },
             },
           });
-          if (stockUpdate.count !== 1) {
+          if (updated.count !== 1) {
             throw new CheckoutError(
-              `${product.name} changed while the order was being placed.`,
+              `${product?.name || 'Product'} changed while the order was being placed.`,
               409,
             );
           }
@@ -413,8 +414,7 @@ export async function POST(request: Request) {
           const [storeId, items] = stores[index];
           const orderNumber = makeOrderNumber(index);
           const invoiceNumber = makeInvoiceNumber(index);
-          const paymentStatus =
-            input.paymentMethod === 'wallet' ? 'paid' : 'pending';
+          const paymentStatus = input.paymentMethod === 'wallet' ? 'paid' : 'pending';
           const order = await tx.order.create({
             data: {
               orderNumber,
@@ -434,6 +434,7 @@ export async function POST(request: Request) {
               items: {
                 create: items.map((item) => ({
                   productId: item.product.id,
+                  variantId: item.variant?.id || null,
                   quantity: item.quantity,
                   price: fromCents(item.unitPrice),
                   total: fromCents(item.lineTotal),
@@ -442,7 +443,6 @@ export async function POST(request: Request) {
               },
             },
           });
-
           await tx.invoice.create({
             data: {
               orderId: order.id,
@@ -478,7 +478,7 @@ export async function POST(request: Request) {
           orderNumbers,
           total: fromCents(checkoutTotal),
           subtotal: fromCents(checkoutSubtotal),
-          shipping: fromCents(shippingTotal),
+          shipping: fromCents(shippingAllocations.reduce((sum, value) => sum + value, 0)),
           discount: fromCents(couponDiscount),
           tax: fromCents(taxes.reduce((sum, value) => sum + value, 0)),
           taxCountryCode,
@@ -490,10 +490,7 @@ export async function POST(request: Request) {
             tax: fromCents(taxes[index]),
             total: fromCents(totals[index]),
           })),
-          paymentStatus:
-            input.paymentMethod === 'wallet'
-              ? ('paid' as const)
-              : ('pending' as const),
+          paymentStatus: input.paymentMethod === 'wallet' ? 'paid' as const : 'pending' as const,
         };
       },
       {
@@ -506,29 +503,15 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof CheckoutError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status },
-      );
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
-
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
-      const replayAfterRace = await existingCheckout(
-        auth.user.id,
-        input.idempotencyKey,
-      );
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const replayAfterRace = await existingCheckout(auth.user.id, input.idempotencyKey);
       if (replayAfterRace) return NextResponse.json(replayAfterRace);
     }
-
     console.error('Checkout error:', error);
     return NextResponse.json(
-      {
-        error:
-          'The order could not be completed. No partial order was saved.',
-      },
+      { error: 'The order could not be completed. No partial order was saved.' },
       { status: 500 },
     );
   }
