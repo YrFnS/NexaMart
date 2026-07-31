@@ -43,6 +43,7 @@ jobs:
       SEED_DEMO_PASSWORD: ci-demo-password-with-at-least-12-characters
       AUTH_BOOTSTRAP_EMAIL: admin@nexamart.com
       AUTH_BOOTSTRAP_TEST_PASSWORD: ci-admin-password-with-at-least-12-characters
+      ORDER_CONFIRMATION_TTL_HOURS: "24"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
@@ -67,8 +68,8 @@ jobs:
       - name: Seed authenticated demo data
         run: npm run db:seed
 
-      - name: Verify authoritative checkout catalog
-        run: node --experimental-strip-types scripts/verify-authoritative-checkout.ts
+      - name: Verify paymentless order lifecycle
+        run: node --experimental-strip-types scripts/verify-order-lifecycle.ts
 
       - name: Exercise existing-user password bootstrap
         run: |
