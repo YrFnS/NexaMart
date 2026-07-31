@@ -1,7 +1,9 @@
-import { db } from '@/lib/db';
+import { NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/auth';
 import { LOYALTY_TIER_COLORS } from '@/lib/theme';
 
-// ─── Tier definitions — CONFIG/REFERENCE DATA (not mock) ────────────────────────
+// Public loyalty-program reference data. Account balances are resolved only
+// from the signed session below and never from caller-supplied user IDs.
 const tiers = [
   {
     id: 'bronze',
@@ -137,73 +139,67 @@ const tiers = [
       'دعوة لفعاليات VIP',
     ],
   },
-];
+] as const;
 
-// ─── Reward definitions — CONFIG/REFERENCE DATA (not mock) ─────────────────────
 const availableRewards = [
   { id: 'r-1', name: '$2 Discount', nameAr: 'خصم ٢$', pointsCost: 200 },
   { id: 'r-2', name: '$5 Discount', nameAr: 'خصم ٥$', pointsCost: 450 },
   { id: 'r-3', name: 'Free Shipping', nameAr: 'شحن مجاني', pointsCost: 150 },
   { id: 'r-4', name: '$10 Discount', nameAr: 'خصم ١٠$', pointsCost: 850 },
   { id: 'r-5', name: 'Mystery Box', nameAr: 'صندوق غامض', pointsCost: 1200 },
-];
+] as const;
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
+    const user = await getAuthenticatedUser(request);
     let userData: {
       userId: string;
-      userName: string | null;
+      userName: string;
       currentTier: string;
       points: number;
       pointsToNextTier: number;
       nextTier: string | null;
       pointMultiplier: number;
       recentPointsHistory: never[];
-      availableRewards: { id: string; name: string; nameAr: string; pointsCost: number }[];
+      availableRewards: typeof availableRewards;
     } | null = null;
-    if (userId) {
-      try {
-        const user = await db.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            name: true,
-            loyaltyTier: true,
-            loyaltyPoints: true,
-          },
-        });
 
-        if (user) {
-          const currentTier = tiers.find(t => t.id === user.loyaltyTier) || tiers[0];
-          const currentTierIndex = tiers.findIndex(t => t.id === user.loyaltyTier);
-          const nextTier = currentTierIndex < tiers.length - 1 ? tiers[currentTierIndex + 1] : null;
+    if (user) {
+      const currentTierIndex = Math.max(
+        0,
+        tiers.findIndex((tier) => tier.id === user.loyaltyTier),
+      );
+      const currentTier = tiers[currentTierIndex];
+      const nextTier = tiers[currentTierIndex + 1] || null;
 
-          userData = {
-            userId: user.id,
-            userName: user.name,
-            currentTier: user.loyaltyTier,
-            points: user.loyaltyPoints,
-            pointsToNextTier: nextTier ? Math.max(0, nextTier.minPoints - user.loyaltyPoints) : 0,
-            nextTier: nextTier?.id || null,
-            pointMultiplier: currentTier.pointMultiplier,
-            recentPointsHistory: [],
-            availableRewards,
-          };
-        }
-      } catch {
-        // DB query failed, return no user data
-      }
+      userData = {
+        userId: user.id,
+        userName: user.name,
+        currentTier: currentTier.id,
+        points: user.loyaltyPoints,
+        pointsToNextTier: nextTier
+          ? Math.max(0, nextTier.minPoints - user.loyaltyPoints)
+          : 0,
+        nextTier: nextTier?.id || null,
+        pointMultiplier: currentTier.pointMultiplier,
+        recentPointsHistory: [],
+        availableRewards,
+      };
     }
 
-    return Response.json({
+    const response = NextResponse.json({
       tiers,
+      rewards: availableRewards,
+      pointsHistory: userData?.recentPointsHistory || [],
       user: userData,
     });
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   } catch (error) {
     console.error('Loyalty API error:', error);
-    return Response.json({ error: 'Failed to fetch loyalty data' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch loyalty data.' },
+      { status: 500 },
+    );
   }
 }
