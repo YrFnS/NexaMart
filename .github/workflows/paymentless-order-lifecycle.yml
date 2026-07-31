@@ -1,9 +1,13 @@
 name: Paymentless order lifecycle generation
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/production-hardening-phase-1
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
     paths:
       - scripts/apply-paymentless-order-lifecycle.py
       - .github/workflows/paymentless-order-lifecycle.yml
@@ -12,11 +16,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: paymentless-order-lifecycle-${{ github.ref }}
+  group: paymentless-order-lifecycle-${{ github.event.pull_request.head.ref }}
   cancel-in-progress: true
 
 jobs:
   generate-and-verify:
+    if: ${{ github.event.pull_request.head.ref == 'agent/production-hardening-phase-1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -117,5 +122,3 @@ jobs:
             git commit -m "feat: add paymentless order lifecycle [paymentless-generated]"
             git push origin HEAD:agent/production-hardening-phase-1
           fi
-
-# Explicit follow-up trigger after the workflow became available on the branch.
