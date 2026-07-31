@@ -109,10 +109,12 @@ jobs:
       - name: Build production application
         run: npm run build
 
-      - name: Commit verified implementation
+      - name: Commit verified application implementation
         run: |
-          rm -f scripts/apply-paymentless-order-lifecycle.py
-          rm -f .github/workflows/paymentless-order-lifecycle.yml
+          # The GitHub App token may publish application code, but it may not
+          # create or update workflow files. Keep workflow cleanup separate.
+          git checkout -- .github/workflows/ci.yml
+          git checkout -- .github/workflows/paymentless-order-lifecycle.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
