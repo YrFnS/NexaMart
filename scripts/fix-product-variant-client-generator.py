@@ -45,5 +45,43 @@ replace_once(
     "      .join(String.fromCharCode(10));",
 )
 
+replace_once(
+    "import React, { useEffect, useMemo, useState } from 'react';",
+    "import React, { useCallback, useEffect, useMemo, useState } from 'react';",
+)
+
+replace_once(
+    """  async function loadProducts() {
+    setLoading(true);
+""",
+    """  const loadProducts = useCallback(async () => {
+    setLoading(true);
+""",
+)
+
+replace_once(
+    """    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadProducts();
+  }, []);
+""",
+    """    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadProducts();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadProducts]);
+""",
+)
+
 path.write_text(content, encoding="utf-8")
 print("Product variant client generator fixes applied successfully.")
