@@ -146,6 +146,17 @@ function supportRewriteUrl(request: NextRequest): URL {
   return url;
 }
 
+function requestBodyLimit(request: NextRequest): number | null {
+  if (!['POST', 'PUT', 'PATCH'].includes(request.method)) return null;
+
+  const pathname = request.nextUrl.pathname;
+  if (pathname.startsWith('/api/ai/')) return 256_000;
+  if (pathname.startsWith('/api/support/') || pathname === '/api/help') {
+    return 64_000;
+  }
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -156,6 +167,20 @@ export async function middleware(request: NextRequest) {
       404,
       'Not found',
       'HTTP database seeding is disabled. Use the trusted deployment CLI.',
+    );
+  }
+
+  const bodyLimit = requestBodyLimit(request);
+  const declaredLength = Number(request.headers.get('content-length') || 0);
+  if (
+    bodyLimit !== null &&
+    Number.isFinite(declaredLength) &&
+    declaredLength > bodyLimit
+  ) {
+    return jsonError(
+      413,
+      'Request too large',
+      `Request bodies for this endpoint must be ${bodyLimit} bytes or fewer.`,
     );
   }
 
