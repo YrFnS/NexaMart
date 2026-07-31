@@ -117,3 +117,5 @@ jobs:
             git commit -m "feat: add paymentless order lifecycle [paymentless-generated]"
             git push origin HEAD:agent/production-hardening-phase-1
           fi
+
+# Explicit follow-up trigger after the workflow became available on the branch.
