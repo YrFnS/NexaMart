@@ -2,14 +2,22 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuthenticatedUser } from '@/lib/auth';
-import { SHIPPING_CONFIG } from '@/lib/config';
+import {
+  allocateCents,
+  calculateStoreShippingCents,
+  calculateStoreTaxCents,
+  fromCents,
+  resolveTaxCountryCode,
+  toCents,
+  validateVariationSelection,
+  VariationValidationError,
+} from '@/lib/checkout-authority';
 import { db } from '@/lib/db';
 import {
   checkApiRateLimit,
   RATE_LIMITS,
   validateCsrf,
 } from '@/lib/security';
-import { getTaxRate } from '@/lib/tax';
 
 const checkoutSchema = z.object({
   idempotencyKey: z.string().uuid(),
@@ -18,14 +26,15 @@ const checkoutSchema = z.object({
       z.object({
         productId: z.string().min(1).max(64),
         quantity: z.number().int().min(1).max(100),
-        variation: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
+        variation: z
+          .union([z.string(), z.record(z.string(), z.string())])
+          .optional(),
       }),
     )
     .min(1)
     .max(100),
   shippingMethod: z.enum(['standard', 'express', 'next_day']),
   paymentMethod: z.enum(['cash_on_delivery', 'wallet']),
-  countryCode: z.string().trim().min(2).max(3).default('iq'),
   couponCode: z.string().trim().max(50).optional(),
   addressId: z.string().min(1).max(64).optional(),
   address: z
@@ -50,31 +59,6 @@ class CheckoutError extends Error {
   ) {
     super(message);
   }
-}
-
-const toCents = (value: number) => Math.round((value + Number.EPSILON) * 100);
-const fromCents = (value: number) => value / 100;
-
-function allocateCents(total: number, weights: number[]): number[] {
-  if (weights.length === 0) return [];
-  const weightTotal = weights.reduce((sum, value) => sum + value, 0);
-  if (weightTotal <= 0) return weights.map(() => 0);
-
-  const allocations = weights.map((weight) => Math.floor((total * weight) / weightTotal));
-  let remainder = total - allocations.reduce((sum, value) => sum + value, 0);
-
-  for (let index = 0; remainder > 0; index = (index + 1) % allocations.length) {
-    allocations[index] += 1;
-    remainder -= 1;
-  }
-
-  return allocations;
-}
-
-function shippingCents(method: 'standard' | 'express' | 'next_day', subtotal: number) {
-  if (method === 'express') return toCents(SHIPPING_CONFIG.methods.express.price);
-  if (method === 'next_day') return toCents(SHIPPING_CONFIG.methods.nextDay.price);
-  return subtotal >= toCents(SHIPPING_CONFIG.freeShippingThreshold) ? 0 : 999;
 }
 
 function makeOrderNumber(index: number): string {
@@ -136,18 +120,97 @@ export async function POST(request: Request) {
   try {
     const result = await db.$transaction(
       async (tx) => {
+        let shippingAddress: Record<string, unknown>;
+        let shippingCountry: string;
+
+        if (input.addressId) {
+          const address = await tx.address.findFirst({
+            where: { id: input.addressId, userId: auth.user.id },
+          });
+          if (!address) {
+            throw new CheckoutError('Shipping address was not found.', 404);
+          }
+          shippingCountry = address.country;
+          shippingAddress = {
+            id: address.id,
+            name: address.fullName,
+            phone: address.phone,
+            address1: address.address1,
+            address2: address.address2,
+            city: address.city,
+            state: address.state,
+            postalCode: address.postalCode,
+            country: address.country,
+          };
+        } else if (input.address) {
+          shippingCountry = input.address.country;
+          shippingAddress = input.address;
+        } else {
+          throw new CheckoutError('A shipping address is required.');
+        }
+
+        const taxCountryCode = resolveTaxCountryCode(shippingCountry);
+        if (!taxCountryCode) {
+          throw new CheckoutError(
+            'The selected shipping country is not supported for checkout.',
+            400,
+          );
+        }
+        shippingAddress = {
+          ...shippingAddress,
+          countryCode: taxCountryCode,
+        };
+
+        const productIds = [
+          ...new Set(input.items.map((item) => item.productId)),
+        ];
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds }, status: 'active' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            stock: true,
+            storeId: true,
+            variations: true,
+            hasFreeShipping: true,
+            category: { select: { id: true, slug: true, name: true } },
+            store: { select: { ownerId: true, name: true } },
+          },
+        });
+        const productsById = new Map(
+          products.map((product) => [product.id, product]),
+        );
+
+        if (products.length !== productIds.length) {
+          throw new CheckoutError(
+            'One or more products are no longer available.',
+            409,
+          );
+        }
+
         const requested = new Map<
           string,
-          { productId: string; quantity: number; variation?: string }
+          { productId: string; quantity: number; variation: string | null }
         >();
 
         for (const item of input.items) {
-          const variation =
-            typeof item.variation === 'string'
-              ? item.variation
-              : item.variation
-                ? JSON.stringify(item.variation)
-                : undefined;
+          const product = productsById.get(item.productId);
+          if (!product) throw new CheckoutError('Product not found.', 404);
+
+          let variation: string | null;
+          try {
+            variation = validateVariationSelection(
+              product.variations,
+              item.variation,
+            ).canonical;
+          } catch (error) {
+            if (error instanceof VariationValidationError) {
+              throw new CheckoutError(`${product.name}: ${error.message}`, 409);
+            }
+            throw error;
+          }
+
           const key = `${item.productId}:${variation || ''}`;
           const existing = requested.get(key);
           requested.set(key, {
@@ -158,33 +221,9 @@ export async function POST(request: Request) {
         }
 
         const normalizedItems = [...requested.values()];
-        const productIds = [...new Set(normalizedItems.map((item) => item.productId))];
-        const products = await tx.product.findMany({
-          where: { id: { in: productIds }, status: 'active' },
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            stock: true,
-            storeId: true,
-            store: { select: { ownerId: true, name: true } },
-          },
-        });
-        const productsById = new Map(products.map((product) => [product.id, product]));
-
-        if (products.length !== productIds.length) {
-          throw new CheckoutError('One or more products are no longer available.', 409);
-        }
-
         const prepared = normalizedItems.map((item) => {
           const product = productsById.get(item.productId);
           if (!product) throw new CheckoutError('Product not found.', 404);
-          if (product.stock < item.quantity) {
-            throw new CheckoutError(
-              `${product.name} does not have enough stock for this order.`,
-              409,
-            );
-          }
 
           const unitPrice = toCents(Number(product.price));
           return {
@@ -194,6 +233,26 @@ export async function POST(request: Request) {
             lineTotal: unitPrice * item.quantity,
           };
         });
+
+        const quantitiesByProduct = new Map<
+          string,
+          { product: (typeof prepared)[number]['product']; quantity: number }
+        >();
+        for (const item of prepared) {
+          const existing = quantitiesByProduct.get(item.product.id);
+          quantitiesByProduct.set(item.product.id, {
+            product: item.product,
+            quantity: (existing?.quantity || 0) + item.quantity,
+          });
+        }
+        for (const { product, quantity } of quantitiesByProduct.values()) {
+          if (product.stock < quantity) {
+            throw new CheckoutError(
+              `${product.name} does not have enough stock for this order.`,
+              409,
+            );
+          }
+        }
 
         const groups = new Map<string, typeof prepared>();
         for (const item of prepared) {
@@ -205,7 +264,10 @@ export async function POST(request: Request) {
         const subtotals = stores.map(([, items]) =>
           items.reduce((sum, item) => sum + item.lineTotal, 0),
         );
-        const checkoutSubtotal = subtotals.reduce((sum, value) => sum + value, 0);
+        const checkoutSubtotal = subtotals.reduce(
+          (sum, value) => sum + value,
+          0,
+        );
 
         let couponDiscount = 0;
         let couponId: string | null = null;
@@ -219,7 +281,8 @@ export async function POST(request: Request) {
             !coupon ||
             !coupon.isActive ||
             (coupon.expiresAt && coupon.expiresAt <= now) ||
-            (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit)
+            (coupon.usageLimit !== null &&
+              coupon.usedCount >= coupon.usageLimit)
           ) {
             throw new CheckoutError('This coupon is invalid or has expired.');
           }
@@ -228,19 +291,25 @@ export async function POST(request: Request) {
           const eligibleSubtotal = coupon.storeId
             ? stores.reduce(
                 (sum, [storeId], index) =>
-                  storeId === coupon.storeId ? sum + subtotals[index] : sum,
+                  storeId === coupon.storeId
+                    ? sum + subtotals[index]
+                    : sum,
                 0,
               )
             : checkoutSubtotal;
 
           if (eligibleSubtotal < toCents(Number(coupon.minOrder))) {
-            throw new CheckoutError('The order does not meet this coupon minimum.');
+            throw new CheckoutError(
+              'The order does not meet this coupon minimum.',
+            );
           }
 
           couponDiscount =
             coupon.type === 'fixed'
               ? toCents(Number(coupon.discount))
-              : Math.round((eligibleSubtotal * Number(coupon.discount)) / 100);
+              : Math.round(
+                  (eligibleSubtotal * Number(coupon.discount)) / 100,
+                );
           if (coupon.maxDiscount !== null) {
             couponDiscount = Math.min(
               couponDiscount,
@@ -252,43 +321,47 @@ export async function POST(request: Request) {
         }
 
         const eligibleWeights = stores.map(([storeId], index) =>
-          !eligibleStoreId || storeId === eligibleStoreId ? subtotals[index] : 0,
+          !eligibleStoreId || storeId === eligibleStoreId
+            ? subtotals[index]
+            : 0,
         );
         const discounts = allocateCents(couponDiscount, eligibleWeights);
-        const shippingTotal = shippingCents(input.shippingMethod, checkoutSubtotal);
-        const shippingAllocations = allocateCents(shippingTotal, subtotals);
-        const taxRate = Math.max(0, getTaxRate(input.countryCode));
-        const taxes = subtotals.map((subtotal, index) =>
-          Math.round(((subtotal - discounts[index]) * taxRate) / 100),
+        const shippingAllocations = stores.map(([, items], index) =>
+          calculateStoreShippingCents(
+            input.shippingMethod,
+            subtotals[index],
+            items.map((item) => ({
+              hasFreeShipping: item.product.hasFreeShipping,
+            })),
+          ),
+        );
+        const shippingTotal = shippingAllocations.reduce(
+          (sum, value) => sum + value,
+          0,
+        );
+        const taxes = stores.map(([, items], index) =>
+          calculateStoreTaxCents(
+            taxCountryCode,
+            items.map((item) => ({
+              lineTotalCents: item.lineTotal,
+              categoryId: item.product.category.id,
+              categorySlug: item.product.category.slug,
+              categoryName: item.product.category.name,
+            })),
+            discounts[index],
+          ),
         );
         const totals = subtotals.map(
           (subtotal, index) =>
-            subtotal + shippingAllocations[index] - discounts[index] + taxes[index],
+            subtotal +
+            shippingAllocations[index] -
+            discounts[index] +
+            taxes[index],
         );
-        const checkoutTotal = totals.reduce((sum, value) => sum + value, 0);
-
-        let shippingAddress: Record<string, unknown>;
-        if (input.addressId) {
-          const address = await tx.address.findFirst({
-            where: { id: input.addressId, userId: auth.user.id },
-          });
-          if (!address) throw new CheckoutError('Shipping address was not found.', 404);
-          shippingAddress = {
-            id: address.id,
-            name: address.fullName,
-            phone: address.phone,
-            address1: address.address1,
-            address2: address.address2,
-            city: address.city,
-            state: address.state,
-            postalCode: address.postalCode,
-            country: address.country,
-          };
-        } else if (input.address) {
-          shippingAddress = input.address;
-        } else {
-          throw new CheckoutError('A shipping address is required.');
-        }
+        const checkoutTotal = totals.reduce(
+          (sum, value) => sum + value,
+          0,
+        );
 
         if (input.paymentMethod === 'wallet') {
           const walletUpdate = await tx.user.updateMany({
@@ -296,28 +369,33 @@ export async function POST(request: Request) {
               id: auth.user.id,
               walletBalance: { gte: fromCents(checkoutTotal) },
             },
-            data: { walletBalance: { decrement: fromCents(checkoutTotal) } },
+            data: {
+              walletBalance: { decrement: fromCents(checkoutTotal) },
+            },
           });
           if (walletUpdate.count !== 1) {
-            throw new CheckoutError('Your wallet balance is insufficient.', 409);
+            throw new CheckoutError(
+              'Your wallet balance is insufficient.',
+              409,
+            );
           }
         }
 
-        for (const item of prepared) {
+        for (const { product, quantity } of quantitiesByProduct.values()) {
           const stockUpdate = await tx.product.updateMany({
             where: {
-              id: item.product.id,
+              id: product.id,
               status: 'active',
-              stock: { gte: item.quantity },
+              stock: { gte: quantity },
             },
             data: {
-              stock: { decrement: item.quantity },
-              soldCount: { increment: item.quantity },
+              stock: { decrement: quantity },
+              soldCount: { increment: quantity },
             },
           });
           if (stockUpdate.count !== 1) {
             throw new CheckoutError(
-              `${item.product.name} changed while the order was being placed.`,
+              `${product.name} changed while the order was being placed.`,
               409,
             );
           }
@@ -335,7 +413,8 @@ export async function POST(request: Request) {
           const [storeId, items] = stores[index];
           const orderNumber = makeOrderNumber(index);
           const invoiceNumber = makeInvoiceNumber(index);
-          const paymentStatus = input.paymentMethod === 'wallet' ? 'paid' : 'pending';
+          const paymentStatus =
+            input.paymentMethod === 'wallet' ? 'paid' : 'pending';
           const order = await tx.order.create({
             data: {
               orderNumber,
@@ -358,7 +437,7 @@ export async function POST(request: Request) {
                   quantity: item.quantity,
                   price: fromCents(item.unitPrice),
                   total: fromCents(item.lineTotal),
-                  variation: item.variation || null,
+                  variation: item.variation,
                 })),
               },
             },
@@ -402,8 +481,19 @@ export async function POST(request: Request) {
           shipping: fromCents(shippingTotal),
           discount: fromCents(couponDiscount),
           tax: fromCents(taxes.reduce((sum, value) => sum + value, 0)),
+          taxCountryCode,
+          shipments: stores.map(([storeId], index) => ({
+            storeId,
+            subtotal: fromCents(subtotals[index]),
+            shipping: fromCents(shippingAllocations[index]),
+            discount: fromCents(discounts[index]),
+            tax: fromCents(taxes[index]),
+            total: fromCents(totals[index]),
+          })),
           paymentStatus:
-            input.paymentMethod === 'wallet' ? ('paid' as const) : ('pending' as const),
+            input.paymentMethod === 'wallet'
+              ? ('paid' as const)
+              : ('pending' as const),
         };
       },
       {
@@ -416,17 +506,29 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof CheckoutError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
     }
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const replayAfterRace = await existingCheckout(auth.user.id, input.idempotencyKey);
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const replayAfterRace = await existingCheckout(
+        auth.user.id,
+        input.idempotencyKey,
+      );
       if (replayAfterRace) return NextResponse.json(replayAfterRace);
     }
 
     console.error('Checkout error:', error);
     return NextResponse.json(
-      { error: 'The order could not be completed. No partial order was saved.' },
+      {
+        error:
+          'The order could not be completed. No partial order was saved.',
+      },
       { status: 500 },
     );
   }
