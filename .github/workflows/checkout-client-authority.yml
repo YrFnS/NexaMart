@@ -110,3 +110,5 @@ jobs:
             git commit -m "feat: add authoritative SKU checkout [checkout-authority-generated]"
             git push origin HEAD:agent/production-hardening-phase-1
           fi
+
+# Triggered after the option-only P0D generator settled on the branch.
