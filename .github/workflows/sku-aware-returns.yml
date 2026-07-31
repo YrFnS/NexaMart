@@ -10,6 +10,7 @@ on:
       - reopened
     paths:
       - scripts/apply-sku-aware-returns.py
+      - scripts/fix-sku-aware-returns-generator.py
       - .github/workflows/sku-aware-returns.yml
 
 permissions:
@@ -59,6 +60,9 @@ jobs:
         with:
           ref: agent/production-hardening-phase-1
           fetch-depth: 0
+
+      - name: Repair generator output
+        run: python3 scripts/fix-sku-aware-returns-generator.py
 
       - name: Apply SKU-aware return changes
         run: python3 scripts/apply-sku-aware-returns.py
@@ -112,6 +116,7 @@ jobs:
       - name: Commit verified implementation
         run: |
           rm -f scripts/apply-sku-aware-returns.py
+          rm -f scripts/fix-sku-aware-returns-generator.py
           rm -f .github/workflows/sku-aware-returns.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
