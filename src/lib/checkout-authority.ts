@@ -1,5 +1,5 @@
-import { SHIPPING_CONFIG } from './config';
-import { COUNTRY_TAX_RATES, isTaxExempt } from './tax';
+import { SHIPPING_CONFIG } from './config.ts';
+import { COUNTRY_TAX_RATES, isTaxExempt } from './tax.ts';
 
 export type ShippingMethod = 'standard' | 'express' | 'next_day';
 export type VariationSelection = string | Record<string, string> | null | undefined;
