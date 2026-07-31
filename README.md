@@ -10,8 +10,9 @@ NexaMart is a multi-vendor marketplace designed for the MENA region. It includes
 | UI | React 19, Tailwind CSS 4, shadcn/ui |
 | State | Zustand and React Query |
 | Database | PostgreSQL |
-| ORM | Prisma 6.19.2 |
+| ORM | Prisma 6.19.3 |
 | Authentication | Signed HTTP-only sessions with scrypt password hashing |
+| Rate limiting | Upstash Redis REST with atomic fixed-window counters |
 | Localization | English and Arabic with RTL support |
 | AI | OpenRouter-compatible API |
 
@@ -20,6 +21,7 @@ NexaMart is a multi-vendor marketplace designed for the MENA region. It includes
 - Node.js 22
 - npm 10 or newer
 - PostgreSQL 15 or newer
+- Upstash Redis REST credentials for production API traffic
 
 SQLite is not supported by the current Prisma schema.
 
@@ -47,7 +49,7 @@ SEED_DEMO_PASSWORD='choose-a-development-password' npm run db:seed
 npm run dev
 ```
 
-The application starts at `http://localhost:3000`.
+The application starts at `http://localhost:3000`. Development uses a per-process rate-limit fallback when Redis credentials are absent. This fallback is not suitable for production or horizontally scaled previews.
 
 ## Production deployment
 
@@ -69,10 +71,14 @@ DATABASE_URL="postgresql://..."
 AUTH_SECRET="a-long-random-secret-with-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="https://your-domain.example"
 NEXTAUTH_URL="https://your-domain.example"
+UPSTASH_REDIS_REST_URL="https://your-database.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="your-server-only-rest-token"
+RATE_LIMIT_ALLOW_MEMORY_FALLBACK="false"
 ```
 
-`ADMIN_SECRET_KEY` is optional and intended only for trusted server-to-server automation. It must never use a `NEXT_PUBLIC_` prefix or be stored in a browser. Audited automation must also set `ADMIN_AUTOMATION_USER_ID` to the ID of an existing administrator account.
+The API limiter uses an atomic Redis script so all application instances share the same counters. Production requests fail closed with `503` if the distributed limiter is missing or unavailable. `RATE_LIMIT_ALLOW_MEMORY_FALLBACK=true` is intended only for isolated development or preview environments.
 
+`ADMIN_SECRET_KEY` is optional and intended only for trusted server-to-server automation. It must never use a `NEXT_PUBLIC_` prefix or be stored in a browser. Audited automation must also set `ADMIN_AUTOMATION_USER_ID` to the ID of an existing administrator account.
 
 Existing users created before this authentication migration have no password hash. Initialize each account deliberately after deployment; use a mounted secret file in production so the password is not written into shell history:
 
@@ -95,6 +101,7 @@ Use demo login only for isolated development or preview environments. Real accou
 ## Verification commands
 
 ```bash
+npm audit --omit=dev --audit-level=high
 npm test
 npm run lint
 npm run typecheck
@@ -108,6 +115,8 @@ The CI workflow also starts a clean PostgreSQL service, applies all migrations, 
 - Browser identity is hydrated from a signed HTTP-only cookie; roles and balances are not trusted from local storage.
 - User APIs derive ownership from the authenticated session rather than caller-provided IDs.
 - Administrative writes require an administrator session and same-origin request validation.
+- API rate limits are enforced through shared Redis counters rather than process-local memory in production.
+- Rate-limit identifiers are SHA-256 hashed before they are used as Redis keys.
 - Checkout recalculates product prices, stock, coupon discounts, tax, shipping, invoices, and wallet deductions inside one serializable database transaction.
 - Payout completion is transactional and idempotent.
 - Unsupported payment methods are not presented as successful payments.
