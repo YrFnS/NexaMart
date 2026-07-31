@@ -15,12 +15,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const requestedUserId = searchParams.get('userId');
+    const requestedOrderId = searchParams.get('id');
     const statusRaw = searchParams.get('status');
     const status = statusRaw ? normalizeOrderStatus(statusRaw) : null;
     const { page, limit } = validatePagination(
       searchParams.get('page'),
       searchParams.get('limit'),
-      50,
+      100,
     );
 
     if (statusRaw && !status) {
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
         : auth.user.id;
     const where: Prisma.OrderWhereInput = {
       userId,
+      ...(requestedOrderId ? { id: requestedOrderId } : {}),
       ...(status ? { status } : {}),
     };
 
@@ -42,7 +44,7 @@ export async function GET(request: Request) {
         include: lifecycleOrderInclude,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
-        take: limit,
+        take: requestedOrderId ? 1 : limit,
       }),
       db.order.count({ where }),
     ]);
