@@ -1,0 +1,13 @@
+name: Checkout authority generator (paused)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paused:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Checkout authority generator is paused while the P0D patch is updated."
