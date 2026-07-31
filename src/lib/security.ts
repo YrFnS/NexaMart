@@ -77,6 +77,17 @@ function hasValidServerBearer(request: Request): boolean {
   return authorization === `Bearer ${configuredSecret}`;
 }
 
+export function getAdminActorId(request: Request): string | null {
+  const session = getSessionClaims(request);
+  if (session?.role === 'admin') return session.sub;
+
+  if (hasValidServerBearer(request)) {
+    return process.env.ADMIN_AUTOMATION_USER_ID?.trim() || null;
+  }
+
+  return null;
+}
+
 export function validateAdminAuth(request: Request): {
   authorized: boolean;
   error?: string;
@@ -96,12 +107,22 @@ export function validateAdminAuth(request: Request): {
 
 export function requireAdminAuth(request: Request): NextResponse | null {
   const auth = validateAdminAuth(request);
-  if (auth.authorized) return null;
+  if (!auth.authorized) {
+    return NextResponse.json(
+      { error: 'Unauthorized', message: auth.error },
+      { status: 401 },
+    );
+  }
 
-  return NextResponse.json(
-    { error: 'Unauthorized', message: auth.error },
-    { status: 401 },
-  );
+  const csrf = validateCsrf(request);
+  if (!csrf.valid) {
+    return NextResponse.json(
+      { error: csrf.error || 'Invalid request origin.' },
+      { status: 403 },
+    );
+  }
+
+  return null;
 }
 
 export function sanitizeString(input: string): string {
@@ -208,12 +229,14 @@ export function secureJsonResponse(
 }
 
 export function rateLimitResponse(resetAt: number): NextResponse {
-  const response = NextResponse.json(
-    {
-      error: 'Too many requests',
-      message: 'Rate limit exceeded. Please try again later.',
-    },
-    { status: 429 },
+  const response = withSecurityHeaders(
+    NextResponse.json(
+      {
+        error: 'Too many requests',
+        message: 'Rate limit exceeded. Please try again later.',
+      },
+      { status: 429 },
+    ),
   );
   response.headers.set(
     'Retry-After',
@@ -249,18 +272,7 @@ export function validateAdminRequest(
   const rateResult = checkApiRateLimit(request, config);
   if (!rateResult.allowed && rateResult.response) return rateResult.response;
 
-  const authResponse = requireAdminAuth(request);
-  if (authResponse) return authResponse;
-
-  const csrf = validateCsrf(request);
-  if (!csrf.valid) {
-    return NextResponse.json(
-      { error: csrf.error || 'Invalid request origin' },
-      { status: 403 },
-    );
-  }
-
-  return null;
+  return requireAdminAuth(request);
 }
 
 function normalizeOrigin(value: string): string | null {
