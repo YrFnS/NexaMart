@@ -1,5 +1,5 @@
 export type CurrencyCode = 'USD' | 'EUR' | 'AED' | 'SAR' | 'KWD' | 'IQD' | 'JOD' | 'QAR' | 'OMR' | 'EGP';
-import { LS_KEYS } from '@/lib/config';
+import { LS_KEYS } from './config.ts';
 
 export interface CurrencyInfo {
   code: CurrencyCode;
