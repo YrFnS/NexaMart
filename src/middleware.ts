@@ -36,9 +36,11 @@ function hasValidAdminBearer(request: NextRequest): boolean {
   return request.headers.get('authorization') === `Bearer ${configuredSecret}`;
 }
 
-async function hasCurrentAdminSession(request: NextRequest): Promise<boolean> {
+async function getCurrentSessionUser(
+  request: NextRequest,
+): Promise<{ id?: string; role?: string } | null> {
   const cookie = request.headers.get('cookie');
-  if (!cookie) return false;
+  if (!cookie) return null;
 
   try {
     const sessionUrl = new URL('/api/auth/session', request.url);
@@ -51,15 +53,14 @@ async function hasCurrentAdminSession(request: NextRequest): Promise<boolean> {
       },
     });
 
-    if (!response.ok) return false;
+    if (!response.ok) return null;
 
     const payload = (await response.json()) as {
-      user?: { role?: string } | null;
+      user?: { id?: string; role?: string } | null;
     };
-    return payload.user?.role === 'admin';
+    return payload.user || null;
   } catch {
-    // Fail closed when the current database-backed session cannot be checked.
-    return false;
+    return null;
   }
 }
 
@@ -88,6 +89,63 @@ function jsonError(
   );
 }
 
+function forwardedHeaders(request: NextRequest): Headers {
+  const headers = new Headers();
+  const cookie = request.headers.get('cookie');
+  if (cookie) headers.set('cookie', cookie);
+  headers.set('x-forwarded-for', getClientIp(request));
+  return headers;
+}
+
+async function buildHelpCompatibilityResponse(
+  request: NextRequest,
+): Promise<NextResponse> {
+  try {
+    const faqUrl = new URL('/api/help', request.url);
+    faqUrl.searchParams.set('action', 'faq');
+    const ticketsUrl = new URL('/api/support/tickets', request.url);
+
+    const headers = forwardedHeaders(request);
+    const [faqResponse, ticketsResponse] = await Promise.all([
+      fetch(faqUrl, { cache: 'no-store', headers }),
+      fetch(ticketsUrl, { cache: 'no-store', headers }),
+    ]);
+
+    if (!faqResponse.ok) {
+      return jsonError(502, 'Help unavailable', 'Failed to load help content.');
+    }
+
+    const faqPayload = (await faqResponse.json()) as {
+      categories?: unknown[];
+    };
+    let ticketPayload: { tickets?: unknown[]; total?: number } = {};
+    if (ticketsResponse.ok) {
+      ticketPayload = (await ticketsResponse.json()) as {
+        tickets?: unknown[];
+        total?: number;
+      };
+    }
+
+    const response = NextResponse.json({
+      faqCategories: faqPayload.categories || [],
+      tickets: ticketPayload.tickets || [],
+      ticketTotal: ticketPayload.total || 0,
+    });
+    response.headers.set('Cache-Control', 'no-store');
+    return applySecurityHeaders(response);
+  } catch {
+    return jsonError(502, 'Help unavailable', 'Failed to load help content.');
+  }
+}
+
+function supportRewriteUrl(request: NextRequest): URL {
+  const url = new URL('/api/support/tickets', request.url);
+  for (const [key, value] of request.nextUrl.searchParams.entries()) {
+    if (key !== 'action') url.searchParams.append(key, value);
+  }
+  return url;
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -103,10 +161,14 @@ export async function middleware(request: NextRequest) {
 
   const key = getRateLimitKey(request);
   let maxRequests = 60;
-  let windowMs = 60 * 1000;
+  const windowMs = 60 * 1000;
 
   if (pathname.startsWith('/api/admin/')) {
     maxRequests = 30;
+  } else if (pathname.startsWith('/api/ai/')) {
+    maxRequests = 8;
+  } else if (pathname.startsWith('/api/support/')) {
+    maxRequests = 20;
   } else if (
     pathname.startsWith('/api/auth/') &&
     pathname !== '/api/auth/session'
@@ -124,9 +186,34 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  // Preserve the existing public FAQ payload while routing every private ticket
+  // read and write through the session-scoped support endpoint.
+  if (pathname === '/api/help') {
+    const action = request.nextUrl.searchParams.get('action');
+
+    if (request.method === 'GET' && action === 'faq') {
+      // Static FAQ content is public.
+    } else if (request.method === 'GET' && action === 'tickets') {
+      return applySecurityHeaders(
+        NextResponse.rewrite(supportRewriteUrl(request)),
+      );
+    } else if (request.method === 'GET' && !action) {
+      return buildHelpCompatibilityResponse(request);
+    } else if (request.method === 'POST') {
+      return applySecurityHeaders(
+        NextResponse.rewrite(supportRewriteUrl(request)),
+      );
+    } else {
+      return jsonError(405, 'Method not allowed', 'Unsupported help operation.');
+    }
+  }
+
   if (pathname.startsWith('/api/admin/')) {
+    const sessionUser = hasValidAdminBearer(request)
+      ? null
+      : await getCurrentSessionUser(request);
     const authorized =
-      hasValidAdminBearer(request) || (await hasCurrentAdminSession(request));
+      hasValidAdminBearer(request) || sessionUser?.role === 'admin';
 
     if (!authorized) {
       return jsonError(
