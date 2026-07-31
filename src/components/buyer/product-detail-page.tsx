@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   ChevronRight,
@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 import { APP_NAME } from '@/lib/config';
+import { canonicalizeVariation } from '@/lib/checkout-authority';
 import { ReportListingDialog } from '@/components/common/report-listing-dialog';
 
 import { useAppStore } from '@/stores/app-store';
@@ -58,6 +59,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const [shippingExpanded, setShippingExpanded] = useState(false);
   const [returnsExpanded, setReturnsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('description');
+  const [variantError, setVariantError] = useState('');
   const similarScrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch product data using the individual product API
@@ -80,18 +82,28 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
           setProduct(found);
           addRecentlyViewed(found.id);
 
-          // Parse variations and set defaults
-          try {
-            const vars = JSON.parse(found.variations || '{}');
-            const defaults: Record<string, string> = {};
-            Object.entries(vars).forEach(([key, values]) => {
-              if (Array.isArray(values) && values.length > 0) {
-                defaults[key] = String(values[0]);
-              }
-            });
-            setSelectedVariations(defaults);
-          } catch {
-            setSelectedVariations({});
+          // Prefer a real active SKU so the initial option combination is valid.
+          const firstVariant = found.variantSkus?.find((variant) => variant.isActive);
+          if (firstVariant) {
+            try {
+              const attributes = JSON.parse(firstVariant.attributes) as Record<string, string>;
+              setSelectedVariations(attributes);
+            } catch {
+              setSelectedVariations({});
+            }
+          } else {
+            try {
+              const vars = JSON.parse(found.variations || '{}');
+              const defaults: Record<string, string> = {};
+              Object.entries(vars).forEach(([key, values]) => {
+                if (Array.isArray(values) && values.length > 0) {
+                  defaults[key] = String(values[0]);
+                }
+              });
+              setSelectedVariations(defaults);
+            } catch {
+              setSelectedVariations({});
+            }
           }
 
           // Similar products from API response
@@ -130,13 +142,40 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       .catch(() => {});
   }, [selectedProductId]);
 
+  const activeVariantSkus = useMemo(
+    () => product?.variantSkus?.filter((variant) => variant.isActive) || [],
+    [product],
+  );
+  const selectedVariant = useMemo(() => {
+    if (activeVariantSkus.length === 0) return null;
+    const optionKey = canonicalizeVariation(selectedVariations);
+    return (
+      activeVariantSkus.find((variant) => variant.optionKey === optionKey) || null
+    );
+  }, [activeVariantSkus, selectedVariations]);
+
   // Scroll to top on product change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [selectedProductId]);
 
-  const handleAddToCart = () => {
-    if (!product) return;
+  const handleAddToCart = (): boolean => {
+    if (!product) return false;
+    if (activeVariantSkus.length > 0 && !selectedVariant) {
+      setVariantError(
+        isRTL
+          ? 'تركيبة الخيارات المحددة غير متوفرة. اختر تركيبة أخرى.'
+          : 'This option combination is unavailable. Choose another combination.',
+      );
+      return false;
+    }
+    const availableStock = selectedVariant?.stock ?? product.stock;
+    if (availableStock < quantity) {
+      setVariantError(
+        isRTL ? 'الكمية المطلوبة غير متوفرة.' : 'The requested quantity is unavailable.',
+      );
+      return false;
+    }
     const images: string[] = (() => {
       try {
         return JSON.parse(product.images);
@@ -146,9 +185,11 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
     })();
     addItem({
       productId: product.id,
+      variantId: selectedVariant?.id,
       name: product.name,
-      price: product.price,
-      originalPrice: product.originalPrice ?? undefined,
+      price: selectedVariant?.price ?? product.price,
+      originalPrice:
+        selectedVariant?.originalPrice ?? product.originalPrice ?? undefined,
       image: images[0] || '/placeholder-product.svg',
       quantity,
       storeId: product.storeId,
@@ -156,11 +197,12 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       hasFreeShipping: product.hasFreeShipping,
       variation: JSON.stringify(selectedVariations),
     });
+    setVariantError('');
+    return true;
   };
 
   const handleBuyNow = () => {
-    handleAddToCart();
-    nav.setView('checkout');
+    if (handleAddToCart()) nav.setView('checkout');
   };
 
   const handleShare = async (platform: string) => {
@@ -250,8 +292,21 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
     }
   })();
 
-  const discount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const displayProduct: Product = {
+    ...product,
+    price: selectedVariant?.price ?? product.price,
+    originalPrice:
+      selectedVariant?.originalPrice ?? product.originalPrice ?? undefined,
+    stock: selectedVariant?.stock ?? product.stock,
+    sku: selectedVariant?.sku ?? product.sku,
+  };
+
+  const discount = displayProduct.originalPrice
+    ? Math.round(
+        ((displayProduct.originalPrice - displayProduct.price) /
+          displayProduct.originalPrice) *
+          100,
+      )
     : 0;
 
   const displayName = isRTL && product.nameAr ? product.nameAr : product.name;
@@ -259,15 +314,16 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const isComparing = compareIds.includes(product.id);
 
   const effectivePrice = (() => {
+    if (selectedVariant) return selectedVariant.price;
     for (const tier of [...tieredPricing].sort((a, b) => a.minQty - b.minQty)) {
       if (quantity >= tier.minQty) return tier.price;
     }
-    return product.price;
+    return displayProduct.price;
   })();
 
   const stockStatus = (() => {
-    if (product.stock === 0) return 'outOfStock';
-    if (product.stock <= 10) return 'lowStock';
+    if (displayProduct.stock === 0) return 'outOfStock';
+    if (displayProduct.stock <= 10) return 'lowStock';
     return 'inStock';
   })();
 
@@ -315,7 +371,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
         {/* Product Info */}
         <div className="space-y-5">
           <ProductInfoSection
-            product={product}
+            product={displayProduct}
             quantity={quantity}
             setQuantity={setQuantity}
             selectedVariations={selectedVariations}
@@ -334,12 +390,18 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
 
           <ReportListingDialog listingTitle={displayName} />
 
+          {variantError && (
+            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              {variantError}
+            </p>
+          )}
+
           <ProductActions
             t={t}
             productId={product.id}
             productName={product.name}
             displayName={displayName}
-            stock={product.stock}
+            stock={displayProduct.stock}
             isWishlisted={isWishlisted}
             setIsWishlisted={setIsWishlisted}
             shareOpen={shareOpen}

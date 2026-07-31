@@ -29,6 +29,17 @@ import { parseVariationOptions } from "@/lib/checkout-authority";
 import { useUserStore } from "@/stores/user-store";
 import { useRecentlyViewedStore } from "@/stores/recently-viewed-store";
 
+export interface ProductVariantSku {
+	id: string;
+	sku: string;
+	attributes: string;
+	optionKey: string;
+	price: number;
+	originalPrice?: number | null;
+	stock: number;
+	isActive: boolean;
+}
+
 export interface Product {
 	id: string;
 	name: string;
@@ -52,6 +63,8 @@ export interface Product {
 	isB2b: boolean;
 	hasFreeShipping: boolean;
 	variations: string;
+	hasVariants?: boolean;
+	variantSkus?: ProductVariantSku[];
 	tieredPricing: string;
 	tags: string;
 	category?: { id: string; name: string; nameAr?: string };

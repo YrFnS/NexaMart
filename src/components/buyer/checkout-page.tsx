@@ -394,6 +394,7 @@ export function CheckoutPage() {
           idempotencyKey,
           items: items.map((item) => ({
             productId: item.productId,
+            variantId: item.variantId,
             quantity: item.quantity,
             variation: item.variation,
           })),

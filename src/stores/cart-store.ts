@@ -7,6 +7,7 @@ import { LS_KEYS } from '@/lib/config';
 export interface CartItem {
   lineId: string;
   productId: string;
+  variantId?: string;
   name: string;
   price: number;
   originalPrice?: number;
@@ -63,7 +64,9 @@ function serializeVariation(
 export function createCartLineId(
   productId: string,
   variation?: string | Record<string, string>,
+  variantId?: string,
 ): string {
+  if (variantId) return `${productId}:sku:${variantId}`;
   const serializedVariation = serializeVariation(variation) || 'base';
   return `${productId}:${encodeURIComponent(serializedVariation)}`;
 }
@@ -73,7 +76,9 @@ function normalizeCartItem(item: NewCartItem): CartItem {
   return {
     ...item,
     variation,
-    lineId: item.lineId || createCartLineId(item.productId, variation),
+    lineId:
+      item.lineId ||
+      createCartLineId(item.productId, variation, item.variantId),
   };
 }
 
