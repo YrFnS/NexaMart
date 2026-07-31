@@ -2,8 +2,19 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { validateAdminRequest, validatePagination } from '@/lib/security';
-import { getSessionClaims } from '@/lib/session';
+import {
+  getAdminActorId,
+  validateAdminRequest,
+  validateEnum,
+  validatePagination,
+} from '@/lib/security';
+
+const PAYOUT_STATUSES = [
+  'pending',
+  'processing',
+  'completed',
+  'rejected',
+] as const;
 
 const updateSchema = z.object({
   payoutId: z.string().min(1).max(64),
@@ -26,7 +37,12 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || undefined;
+    const statusRaw = searchParams.get('status');
+    const status = statusRaw ? validateEnum(statusRaw, PAYOUT_STATUSES) : null;
+    if (statusRaw && !status) {
+      return NextResponse.json({ error: 'Invalid payout status.' }, { status: 400 });
+    }
+
     const { page, limit } = validatePagination(
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -76,12 +92,18 @@ export async function PUT(request: Request) {
   const denied = validateAdminRequest(request);
   if (denied) return denied;
 
+  const adminId = getAdminActorId(request);
+  if (!adminId) {
+    return NextResponse.json(
+      { error: 'An administrator identity is required for audit logging.' },
+      { status: 401 },
+    );
+  }
+
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid payout action.' }, { status: 400 });
   }
-
-  const adminId = getSessionClaims(request)?.sub;
 
   try {
     const result = await db.$transaction(
@@ -130,21 +152,21 @@ export async function PUT(request: Request) {
           throw new PayoutError('Payout status changed during processing.', 409);
         }
 
-        if (adminId) {
-          await tx.auditLog.create({
-            data: {
-              adminId,
-              action: targetStatus === 'completed' ? 'process' : 'reject',
-              targetType: 'payout',
-              targetId: payout.id,
-              details: JSON.stringify({
-                amount: Number(payout.amount),
-                sellerId: payout.sellerId,
-                notes: parsed.data.notes || null,
-              }),
-            },
-          });
-        }
+        await tx.auditLog.create({
+          data: {
+            adminId,
+            action: targetStatus === 'completed' ? 'process' : 'reject',
+            targetType: 'payout',
+            targetId: payout.id,
+            details: JSON.stringify({
+              amount: Number(payout.amount),
+              sellerId: payout.sellerId,
+              previousStatus: payout.status,
+              newStatus: targetStatus,
+              notes: parsed.data.notes || null,
+            }),
+          },
+        });
 
         return {
           payoutId: payout.id,
