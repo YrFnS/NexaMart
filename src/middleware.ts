@@ -1,33 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// Best-effort per-instance throttling. Authoritative distributed rate limiting
-// remains a deployment concern; route handlers also apply endpoint limits.
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+import {
+  checkDistributedRateLimit,
+  type DistributedRateLimitResult,
+} from './lib/distributed-rate-limit';
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) return forwarded.split(',')[0].trim();
   return request.headers.get('x-real-ip')?.trim() || 'unknown';
-}
-
-function getRateLimitKey(request: NextRequest): string {
-  return `${getClientIp(request)}:${request.nextUrl.pathname}`;
-}
-
-function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-
-  if (!entry || now > entry.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs });
-    return true;
-  }
-
-  if (entry.count >= maxRequests) return false;
-
-  entry.count += 1;
-  return true;
 }
 
 function hasValidAdminBearer(request: NextRequest): boolean {
@@ -87,6 +68,43 @@ function jsonError(
   return applySecurityHeaders(
     NextResponse.json({ error, message }, { status }),
   );
+}
+
+function applyRateLimitHeaders(
+  response: NextResponse,
+  rateLimit: DistributedRateLimitResult,
+): NextResponse {
+  response.headers.set('X-RateLimit-Remaining', String(rateLimit.remaining));
+  response.headers.set(
+    'X-RateLimit-Reset',
+    String(Math.ceil(rateLimit.resetAt / 1_000)),
+  );
+  return response;
+}
+
+function rateLimitDenied(rateLimit: DistributedRateLimitResult): NextResponse {
+  const response = jsonError(
+    429,
+    'Too many requests',
+    'Rate limit exceeded. Please try again later.',
+  );
+  response.headers.set(
+    'Retry-After',
+    String(Math.max(1, Math.ceil((rateLimit.resetAt - Date.now()) / 1_000))),
+  );
+  return applyRateLimitHeaders(response, rateLimit);
+}
+
+function rateLimiterUnavailable(
+  rateLimit: DistributedRateLimitResult,
+): NextResponse {
+  const response = jsonError(
+    503,
+    'Rate limiter unavailable',
+    'Request protection is temporarily unavailable. Please try again shortly.',
+  );
+  response.headers.set('Retry-After', '5');
+  return applyRateLimitHeaders(response, rateLimit);
 }
 
 function forwardedHeaders(request: NextRequest): Headers {
@@ -157,6 +175,31 @@ function requestBodyLimit(request: NextRequest): number | null {
   return null;
 }
 
+function rateLimitPolicy(pathname: string): {
+  maxRequests: number;
+  windowSeconds: number;
+} {
+  if (pathname.startsWith('/api/admin/')) {
+    return { maxRequests: 30, windowSeconds: 60 };
+  }
+  if (pathname.startsWith('/api/ai/')) {
+    return { maxRequests: 8, windowSeconds: 60 };
+  }
+  if (pathname.startsWith('/api/support/')) {
+    return { maxRequests: 20, windowSeconds: 60 };
+  }
+  if (
+    pathname.startsWith('/api/auth/') &&
+    pathname !== '/api/auth/session'
+  ) {
+    return { maxRequests: 5, windowSeconds: 60 };
+  }
+  if (pathname === '/api/products' || pathname === '/api/search') {
+    return { maxRequests: 30, windowSeconds: 60 };
+  }
+  return { maxRequests: 60, windowSeconds: 60 };
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -184,32 +227,16 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  const key = getRateLimitKey(request);
-  let maxRequests = 60;
-  const windowMs = 60 * 1000;
+  const policy = rateLimitPolicy(pathname);
+  const rateLimit = await checkDistributedRateLimit({
+    namespace: `${request.method}:${pathname}`,
+    identifier: getClientIp(request),
+    maxRequests: policy.maxRequests,
+    windowSeconds: policy.windowSeconds,
+  });
 
-  if (pathname.startsWith('/api/admin/')) {
-    maxRequests = 30;
-  } else if (pathname.startsWith('/api/ai/')) {
-    maxRequests = 8;
-  } else if (pathname.startsWith('/api/support/')) {
-    maxRequests = 20;
-  } else if (
-    pathname.startsWith('/api/auth/') &&
-    pathname !== '/api/auth/session'
-  ) {
-    maxRequests = 5;
-  } else if (pathname === '/api/products' || pathname === '/api/search') {
-    maxRequests = 30;
-  }
-
-  if (!checkRateLimit(key, maxRequests, windowMs)) {
-    return jsonError(
-      429,
-      'Too many requests',
-      'Rate limit exceeded. Please try again later.',
-    );
-  }
+  if (rateLimit.unavailable) return rateLimiterUnavailable(rateLimit);
+  if (!rateLimit.allowed) return rateLimitDenied(rateLimit);
 
   // Preserve the existing public FAQ payload while routing every private ticket
   // read and write through the session-scoped support endpoint.
@@ -219,17 +246,25 @@ export async function middleware(request: NextRequest) {
     if (request.method === 'GET' && action === 'faq') {
       // Static FAQ content is public.
     } else if (request.method === 'GET' && action === 'tickets') {
-      return applySecurityHeaders(
-        NextResponse.rewrite(supportRewriteUrl(request)),
+      return applyRateLimitHeaders(
+        applySecurityHeaders(NextResponse.rewrite(supportRewriteUrl(request))),
+        rateLimit,
       );
     } else if (request.method === 'GET' && !action) {
-      return buildHelpCompatibilityResponse(request);
+      return applyRateLimitHeaders(
+        await buildHelpCompatibilityResponse(request),
+        rateLimit,
+      );
     } else if (request.method === 'POST') {
-      return applySecurityHeaders(
-        NextResponse.rewrite(supportRewriteUrl(request)),
+      return applyRateLimitHeaders(
+        applySecurityHeaders(NextResponse.rewrite(supportRewriteUrl(request))),
+        rateLimit,
       );
     } else {
-      return jsonError(405, 'Method not allowed', 'Unsupported help operation.');
+      return applyRateLimitHeaders(
+        jsonError(405, 'Method not allowed', 'Unsupported help operation.'),
+        rateLimit,
+      );
     }
   }
 
@@ -241,26 +276,21 @@ export async function middleware(request: NextRequest) {
       hasValidAdminBearer(request) || sessionUser?.role === 'admin';
 
     if (!authorized) {
-      return jsonError(
-        401,
-        'Unauthorized',
-        'A current administrator session or trusted server bearer token is required.',
+      return applyRateLimitHeaders(
+        jsonError(
+          401,
+          'Unauthorized',
+          'A current administrator session or trusted server bearer token is required.',
+        ),
+        rateLimit,
       );
     }
   }
 
-  const response = applySecurityHeaders(NextResponse.next());
-  const entry = rateLimitMap.get(key);
-  if (entry) {
-    response.headers.set(
-      'X-RateLimit-Remaining',
-      String(Math.max(0, maxRequests - entry.count)),
-    );
-    response.headers.set(
-      'X-RateLimit-Reset',
-      String(Math.ceil(entry.resetTime / 1000)),
-    );
-  }
+  const response = applyRateLimitHeaders(
+    applySecurityHeaders(NextResponse.next()),
+    rateLimit,
+  );
 
   if (pathname.startsWith('/api/')) {
     response.headers.set('Content-Security-Policy', "default-src 'none'");
