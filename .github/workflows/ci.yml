@@ -74,8 +74,8 @@ jobs:
           AUTH_BOOTSTRAP_PASSWORD_FILE="$password_file" npm run auth:set-password
           rm -f "$password_file"
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Reject high-severity production advisories
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Run unit tests
         run: npm test
