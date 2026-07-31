@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import {
+  getAdminActorId,
   validateAdminRequest,
   validateEnum,
   validatePagination,
   validateSearchParam,
 } from '@/lib/security';
-import { getSessionClaims } from '@/lib/session';
 
 const VALID_PRODUCT_STATUSES = ['active', 'draft', 'archived'] as const;
 const moderationSchema = z.object({
@@ -111,8 +111,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Invalid moderation request.' }, { status: 400 });
   }
 
-  const adminId =
-    getSessionClaims(request)?.sub || process.env.ADMIN_AUTOMATION_USER_ID;
+  const adminId = getAdminActorId(request);
   if (!adminId) {
     return NextResponse.json(
       { error: 'An administrator identity is required for audit logging.' },
