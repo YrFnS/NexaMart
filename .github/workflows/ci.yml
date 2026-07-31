@@ -71,6 +71,9 @@ jobs:
       - name: Verify paymentless order lifecycle
         run: node --experimental-strip-types scripts/verify-order-lifecycle.ts
 
+      - name: Verify exact order-item return lifecycle
+        run: node --experimental-strip-types scripts/verify-return-lifecycle.ts
+
       - name: Exercise existing-user password bootstrap
         run: |
           password_file="$RUNNER_TEMP/nexamart-admin-password"
