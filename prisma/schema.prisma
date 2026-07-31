@@ -221,6 +221,7 @@ model OrderItem {
   order   Order           @relation(fields: [orderId], references: [id])
   product Product         @relation(fields: [productId], references: [id])
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  returns Return[]
 
   @@index([variantId])
 }
@@ -538,30 +539,39 @@ model Service {
 }
 
 model Return {
-  id             String   @id @default(cuid())
-  orderId        String
-  productId      String
-  buyerId        String
-  sellerId       String
-  quantity       Int
-  refundAmount   Float
-  reason         String   @default("other") // wrong_item, defective, not_as_described, changed_mind, damaged_shipping, other
-  details        String?
-  resolution     String   @default("refund") // refund, exchange, store_credit
-  status         String   @default("pending") // pending, approved, rejected, processing, completed
-  sellerNote     String?
-  evidencePhotos String   @default("[]") // JSON array
-  timeline       String   @default("[]") // JSON array of {status, date, note}
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                       String    @id @default(cuid())
+  orderId                  String
+  orderItemId              String?
+  productId                String
+  variantId                String?
+  sku                      String?
+  buyerId                  String
+  sellerId                 String
+  quantity                 Int
+  unitPrice                Float?
+  refundAmount             Float
+  reason                   String    @default("other") // wrong_item, defective, not_as_described, changed_mind, damaged_shipping, other
+  details                  String?
+  resolution               String    @default("return_only") // return_only, exchange, offline_refund
+  status                   String    @default("pending") // pending, approved, rejected, processing, completed
+  offlineRefundStatus      String    @default("not_required") // not_required, required, confirmed
+  offlineRefundConfirmedAt DateTime?
+  offlineRefundConfirmedBy String?
+  sellerNote               String?
+  evidencePhotos           String    @default("[]") // JSON array
+  timeline                 String    @default("[]") // JSON array of {status, date, note}
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  order   Order   @relation(fields: [orderId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-  buyer   User    @relation("ReturnBuyer", fields: [buyerId], references: [id])
-  seller  User    @relation("ReturnSeller", fields: [sellerId], references: [id])
+  order     Order      @relation(fields: [orderId], references: [id])
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  product   Product    @relation(fields: [productId], references: [id])
+  buyer     User       @relation("ReturnBuyer", fields: [buyerId], references: [id])
+  seller    User       @relation("ReturnSeller", fields: [sellerId], references: [id])
 
   @@index([buyerId, status])
   @@index([sellerId, status])
+  @@index([orderItemId, status])
 }
 
 model PriceAlert {

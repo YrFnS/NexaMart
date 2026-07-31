@@ -1,600 +1,365 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  RotateCcw,
-  Clock,
+  Banknote,
   CheckCircle2,
-  XCircle,
+  Clock,
   Loader2,
-  AlertTriangle,
+  Package,
+  RotateCcw,
   Search,
-  Eye,
-  ChevronDown,
-  ChevronUp,
-  MessageCircle,
-  CreditCard,
-  RefreshCcw,
-  ShoppingBag,
+  XCircle,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { formatPrice } from '@/lib/currency';
 import { useI18n } from '@/lib/i18n';
 import { getLocale } from '@/lib/utils';
-import { formatPrice } from '@/lib/currency';
-import { toast } from 'sonner';
 
 type ReturnStatus = 'pending' | 'approved' | 'rejected' | 'processing' | 'completed';
 
-interface ReturnEntry {
+type TimelineEntry = { status: string; date: string; note?: string };
+
+interface ReturnRecord {
   id: string;
-  orderId: string;
   orderNumber: string;
-  productId: string;
   productName: string;
-  productImage: string;
+  productNameAr?: string | null;
+  sku: string | null;
+  attributes: Record<string, string>;
   quantity: number;
-  refundAmount: number;
-  reason: string;
+  referenceAmount: number;
   reasonLabel: string;
   details: string;
   status: ReturnStatus;
-  resolution: 'refund' | 'exchange' | 'store_credit';
+  resolution: 'return_only' | 'exchange' | 'offline_refund';
   resolutionLabel: string;
-  createdAt: string;
-  updatedAt: string;
-  sellerName: string;
-  sellerId: string;
+  offlineRefundStatus: 'not_required' | 'required' | 'confirmed';
   buyerName: string;
-  buyerId: string;
   sellerNote?: string;
-  timeline: { status: string; date: string; note?: string }[];
-  evidencePhotos: string[];
+  createdAt: string;
+  timeline: TimelineEntry[];
 }
 
-const STATUS_CONFIG: Record<ReturnStatus, { color: string; bgColor: string; icon: React.ElementType }> = {
-  pending: { color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900/40', icon: Clock },
-  approved: { color: 'text-emerald-700 dark:text-emerald-300', bgColor: 'bg-emerald-100 dark:bg-emerald-900/40', icon: CheckCircle2 },
-  rejected: { color: 'text-red-700 dark:text-red-300', bgColor: 'bg-red-100 dark:bg-red-900/40', icon: XCircle },
-  processing: { color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-100 dark:bg-blue-900/40', icon: Loader2 },
-  completed: { color: 'text-green-700 dark:text-green-300', bgColor: 'bg-green-100 dark:bg-green-900/40', icon: CheckCircle2 },
+const STATUS_STYLE: Record<ReturnStatus, string> = {
+  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+  approved: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
+  rejected: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+  processing: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300',
+  completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
 };
 
-export function SellerReturns() {
-  const { t, locale } = useI18n();
-  const isRTL = locale === 'ar';
+function Attributes({ values }: { values: Record<string, string> }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {Object.entries(values).map(([key, value]) => (
+        <Badge key={key} variant="outline" className="text-[10px]">
+          {key}: {value}
+        </Badge>
+      ))}
+    </div>
+  );
+}
 
-  const [returns, setReturns] = useState<ReturnEntry[]>([]);
+export function SellerReturns() {
+  const { locale } = useI18n();
+  const isRTL = locale === 'ar';
+  const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [selectedReturn, setSelectedReturn] = useState<ReturnEntry | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sellerNote, setSellerNote] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const loadReturns = useCallback(async () => {
+    setLoading(true);
+    try {
+      const query = statusFilter === 'all' ? '' : `?status=${statusFilter}`;
+      const response = await fetch(`/api/returns${query}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Failed to load returns.');
+      setReturns(payload.returns || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load returns.');
+      setReturns([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
 
   useEffect(() => {
-    const fetchReturns = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/returns?sellerId=store1${activeTab !== 'all' ? `&status=${activeTab}` : ''}`);
-        if (res.ok) {
-          const data = await res.json();
-          setReturns(data.returns || []);
-        } else {
-          setReturns([]);
-        }
-      } catch {
-        setReturns([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchReturns();
-  }, [activeTab]);
+    const timer = window.setTimeout(() => void loadReturns(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadReturns]);
 
-  const filtered = returns.filter((r) => {
-    const matchesSearch =
-      r.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-      r.productName.toLowerCase().includes(search.toLowerCase()) ||
-      r.buyerName.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
-  });
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return returns;
+    return returns.filter((record) =>
+      [record.orderNumber, record.productName, record.buyerName, record.sku || '']
+        .some((value) => value.toLowerCase().includes(query)),
+    );
+  }, [returns, search]);
 
-  const pendingCount = returns.filter((r) => r.status === 'pending').length;
-
-  const handleApprove = (ret: ReturnEntry) => {
-    setActionLoading(true);
-    setTimeout(() => {
-      setReturns(returns.map((r) =>
-        r.id === ret.id
-          ? {
-              ...r,
-              status: 'approved' as ReturnStatus,
-              sellerNote: sellerNote || undefined,
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...r.timeline,
-                { status: 'Approved', date: new Date().toISOString(), note: sellerNote || 'Seller approved the return' },
-              ],
-            }
-          : r
-      ));
-      if (selectedReturn?.id === ret.id) {
-        setSelectedReturn({
-          ...ret,
-          status: 'approved',
+  async function updateReturn(
+    record: ReturnRecord,
+    update: {
+      targetStatus?: 'approved' | 'rejected' | 'processing' | 'completed';
+      offlineRefundStatus?: 'confirmed';
+    },
+  ) {
+    setSavingId(record.id);
+    try {
+      const response = await fetch('/api/returns', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnId: record.id,
+          ...update,
           sellerNote: sellerNote || undefined,
-          updatedAt: new Date().toISOString(),
-          timeline: [
-            ...ret.timeline,
-            { status: 'Approved', date: new Date().toISOString(), note: sellerNote || 'Seller approved the return' },
-          ],
-        });
-      }
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Failed to update return.');
+      setReturns((current) =>
+        current.map((item) => (item.id === record.id ? payload.return : item)),
+      );
       setSellerNote('');
-      setActionLoading(false);
-      toast.success(isRTL ? 'تم قبول طلب الإرجاع' : 'Return request approved');
-    }, 800);
-  };
+      toast.success(isRTL ? 'تم تحديث طلب الإرجاع.' : 'Return request updated.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update return.');
+    } finally {
+      setSavingId(null);
+    }
+  }
 
-  const handleReject = (ret: ReturnEntry) => {
-    setActionLoading(true);
-    setTimeout(() => {
-      setReturns(returns.map((r) =>
-        r.id === ret.id
-          ? {
-              ...r,
-              status: 'rejected' as ReturnStatus,
-              sellerNote: sellerNote || undefined,
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...r.timeline,
-                { status: 'Rejected', date: new Date().toISOString(), note: sellerNote || 'Seller rejected the return' },
-              ],
-            }
-          : r
-      ));
-      if (selectedReturn?.id === ret.id) {
-        setSelectedReturn({
-          ...ret,
-          status: 'rejected',
-          sellerNote: sellerNote || undefined,
-          updatedAt: new Date().toISOString(),
-          timeline: [
-            ...ret.timeline,
-            { status: 'Rejected', date: new Date().toISOString(), note: sellerNote || 'Seller rejected the return' },
-          ],
-        });
-      }
-      setSellerNote('');
-      setActionLoading(false);
-      toast.success(isRTL ? 'تم رفض طلب الإرجاع' : 'Return request rejected');
-    }, 800);
-  };
-
-  const openDetail = (ret: ReturnEntry) => {
-    setSelectedReturn(ret);
-    setSellerNote(ret.sellerNote || '');
-    setShowDetail(true);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString(getLocale(isRTL), {
+  const date = (value: string) =>
+    new Date(value).toLocaleDateString(getLocale(isRTL), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-      </div>
-    );
-  }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <RotateCcw className="size-5 text-emerald-600" />
-            {isRTL ? 'إدارة الإرجاعات' : 'Returns Management'}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {returns.length} {isRTL ? 'طلب إرجاع' : 'return requests'} · {pendingCount} {isRTL ? 'قيد الانتظار' : 'pending'}
-          </p>
-        </div>
+    <div className="space-y-5 p-4 md:p-6" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div>
+        <h2 className="flex items-center gap-2 text-xl font-bold">
+          <RotateCcw className="size-5 text-amber-600" />
+          {isRTL ? 'إدارة الإرجاعات والاستبدالات' : 'Returns & exchanges'}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {isRTL
+            ? 'طلبات حقيقية مرتبطة بعنصر الطلب وSKU المحدد.'
+            : 'Real requests tied to the exact purchased order item and SKU.'}
+        </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-3 text-center">
-            <Clock className="size-5 mx-auto text-amber-500 mb-1" />
-            <p className="text-lg font-bold">{returns.filter((r) => r.status === 'pending').length}</p>
-            <p className="text-[10px] text-muted-foreground">{isRTL ? 'قيد الانتظار' : 'Pending'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <CheckCircle2 className="size-5 mx-auto text-emerald-500 mb-1" />
-            <p className="text-lg font-bold">{returns.filter((r) => r.status === 'approved').length}</p>
-            <p className="text-[10px] text-muted-foreground">{isRTL ? 'تم القبول' : 'Approved'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <Loader2 className="size-5 mx-auto text-blue-500 mb-1" />
-            <p className="text-lg font-bold">{returns.filter((r) => r.status === 'processing').length}</p>
-            <p className="text-[10px] text-muted-foreground">{isRTL ? 'قيد المعالجة' : 'Processing'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <CheckCircle2 className="size-5 mx-auto text-green-500 mb-1" />
-            <p className="text-lg font-bold">{returns.filter((r) => r.status === 'completed').length}</p>
-            <p className="text-[10px] text-muted-foreground">{isRTL ? 'مكتمل' : 'Completed'}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs & Search */}
       <Card>
-        <CardContent className="p-3 space-y-3">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="h-9 bg-muted/50 flex-wrap">
-              <TabsTrigger value="all" className="text-xs h-7">All ({returns.length})</TabsTrigger>
-              <TabsTrigger value="pending" className="text-xs h-7">Pending ({returns.filter((r) => r.status === 'pending').length})</TabsTrigger>
-              <TabsTrigger value="approved" className="text-xs h-7">Approved ({returns.filter((r) => r.status === 'approved').length})</TabsTrigger>
-              <TabsTrigger value="processing" className="text-xs h-7">Processing ({returns.filter((r) => r.status === 'processing').length})</TabsTrigger>
-              <TabsTrigger value="completed" className="text-xs h-7">Completed ({returns.filter((r) => r.status === 'completed').length})</TabsTrigger>
-              <TabsTrigger value="rejected" className="text-xs h-7">Rejected ({returns.filter((r) => r.status === 'rejected').length})</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="relative">
-            <Search className="absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground start-3" />
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={isRTL ? 'بحث برقم الطلب، المنتج، المشتري...' : 'Search by order #, product, buyer...'}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="ps-9 h-9 text-sm"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={isRTL ? 'بحث بالطلب أو المشتري أو SKU' : 'Search order, buyer, or SKU'}
+              className="ps-9"
             />
           </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{isRTL ? 'كل الحالات' : 'All statuses'}</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
-      {/* Returns List */}
-      <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <RotateCcw className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
-              <p className="text-sm text-muted-foreground">{isRTL ? 'لا توجد طلبات إرجاع' : 'No return requests found'}</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filtered.map((ret) => {
-            const config = STATUS_CONFIG[ret.status];
-            const StatusIcon = config.icon;
+      {loading ? (
+        <div className="flex h-56 items-center justify-center">
+          <Loader2 className="size-8 animate-spin text-amber-600" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card><CardContent className="py-16 text-center text-muted-foreground">
+          <Package className="mx-auto mb-3 size-10 opacity-40" />
+          {isRTL ? 'لا توجد طلبات إرجاع.' : 'No return requests found.'}
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((record) => {
+            const expanded = expandedId === record.id;
+            const busy = savingId === record.id;
+            const needsRefundConfirmation =
+              record.resolution === 'offline_refund' &&
+              record.offlineRefundStatus !== 'confirmed';
             return (
-              <Card key={ret.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    {/* Product Icon */}
-                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                      <ShoppingBag className="size-5 text-muted-foreground" />
-                    </div>
-
-                    {/* Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <Badge className={`${config.bgColor} ${config.color} text-[10px] font-medium border-0`}>
-                          <StatusIcon className={`size-3 me-1 ${ret.status === 'processing' ? 'animate-spin' : ''}`} />
-                          {ret.status}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          {ret.resolutionLabel}
-                        </Badge>
-                      </div>
-                      <p className="text-sm font-medium truncate">{ret.productName}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span className="font-mono">{ret.orderNumber}</span>
-                        <span>·</span>
-                        <span>{isRTL ? 'المشتري' : 'Buyer'}: {ret.buyerName}</span>
-                        <span>·</span>
-                        <span>{formatDate(ret.createdAt)}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        <AlertTriangle className="size-3" />
-                        <span>{ret.reasonLabel}</span>
-                      </div>
-                    </div>
-
-                    {/* Amount & Actions */}
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
-                        {formatPrice(ret.refundAmount)}
+              <Card key={record.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">
+                        {isRTL && record.productNameAr ? record.productNameAr : record.productName}
+                      </CardTitle>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {record.orderNumber} · {record.buyerName} · {date(record.createdAt)}
                       </p>
-                      {ret.status === 'pending' && (
-                        <div className="flex gap-1.5">
-                          <Button
-                            size="sm"
-                            className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white px-2"
-                            onClick={() => { openDetail(ret); }}
-                          >
-                            <CheckCircle2 className="size-3 me-0.5" />
-                            {isRTL ? 'قبول' : 'Approve'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px] text-red-600 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950 px-2"
-                            onClick={() => { openDetail(ret); }}
-                          >
-                            <XCircle className="size-3 me-0.5" />
-                            {isRTL ? 'رفض' : 'Reject'}
-                          </Button>
-                        </div>
-                      )}
-                      {ret.status !== 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-[10px] px-2"
-                          onClick={() => openDetail(ret)}
-                        >
-                          <Eye className="size-3 me-0.5" />
-                          {isRTL ? 'عرض' : 'View'}
-                        </Button>
-                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={STATUS_STYLE[record.status]}>{record.status}</Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setExpandedId(expanded ? null : record.id);
+                          setSellerNote(record.sellerNote || '');
+                        }}
+                      >
+                        {expanded ? (isRTL ? 'إغلاق' : 'Close') : (isRTL ? 'مراجعة' : 'Review')}
+                      </Button>
                     </div>
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {record.sku && <Badge variant="outline">SKU: {record.sku}</Badge>}
+                    <Badge variant="outline">{record.resolutionLabel}</Badge>
+                    <span>{isRTL ? 'الكمية' : 'Qty'}: {record.quantity}</span>
+                    <span className="font-semibold">{formatPrice(record.referenceAmount)}</span>
+                  </div>
+                  <Attributes values={record.attributes} />
+
+                  {expanded && (
+                    <div className="space-y-4 border-t pt-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs text-muted-foreground">{isRTL ? 'السبب' : 'Reason'}</p>
+                          <p className="font-medium">{record.reasonLabel}</p>
+                          {record.details && <p className="mt-1 text-sm text-muted-foreground">{record.details}</p>}
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs text-muted-foreground">
+                            {isRTL ? 'حالة الاسترداد خارج المنصة' : 'Offline refund status'}
+                          </p>
+                          <p className="font-medium">{record.offlineRefundStatus.replaceAll('_', ' ')}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>{isRTL ? 'ملاحظة للبائع' : 'Seller note'}</Label>
+                        <Textarea
+                          rows={3}
+                          value={sellerNote}
+                          onChange={(event) => setSellerNote(event.target.value)}
+                          placeholder={isRTL ? 'أضف تعليمات أو سبب القرار' : 'Add instructions or decision reason'}
+                        />
+                      </div>
+
+                      {record.resolution === 'offline_refund' && (
+                        <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                          <Banknote className="mt-0.5 size-4 shrink-0" />
+                          {isRTL
+                            ? 'أكّد الاسترداد فقط بعد إتمامه فعلياً خارج NexaMart.'
+                            : 'Confirm the refund only after it was actually completed outside NexaMart.'}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        {record.status === 'pending' && (
+                          <>
+                            <Button
+                              onClick={() => void updateReturn(record, { targetStatus: 'approved' })}
+                              disabled={busy}
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              {busy ? <Loader2 className="me-2 size-4 animate-spin" /> : <CheckCircle2 className="me-2 size-4" />}
+                              {isRTL ? 'قبول' : 'Approve'}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={() => void updateReturn(record, { targetStatus: 'rejected' })}
+                              disabled={busy}
+                            >
+                              <XCircle className="me-2 size-4" />
+                              {isRTL ? 'رفض' : 'Reject'}
+                            </Button>
+                          </>
+                        )}
+                        {record.status === 'approved' && (
+                          <Button
+                            onClick={() => void updateReturn(record, { targetStatus: 'processing' })}
+                            disabled={busy}
+                            className="bg-amber-600 text-white hover:bg-amber-700"
+                          >
+                            {busy ? <Loader2 className="me-2 size-4 animate-spin" /> : <Clock className="me-2 size-4" />}
+                            {isRTL ? 'بدء المعالجة' : 'Start processing'}
+                          </Button>
+                        )}
+                        {record.status === 'processing' && record.resolution === 'offline_refund' && needsRefundConfirmation && (
+                          <Button
+                            variant="outline"
+                            onClick={() => void updateReturn(record, { offlineRefundStatus: 'confirmed' })}
+                            disabled={busy}
+                          >
+                            <Banknote className="me-2 size-4" />
+                            {isRTL ? 'تأكيد الاسترداد خارج المنصة' : 'Confirm offline refund'}
+                          </Button>
+                        )}
+                        {record.status === 'processing' && (
+                          <Button
+                            onClick={() => void updateReturn(record, { targetStatus: 'completed' })}
+                            disabled={busy || needsRefundConfirmation}
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          >
+                            {busy ? <Loader2 className="me-2 size-4 animate-spin" /> : <CheckCircle2 className="me-2 size-4" />}
+                            {isRTL ? 'إكمال الطلب' : 'Complete request'}
+                          </Button>
+                        )}
+                      </div>
+
+                      {record.timeline.length > 0 && (
+                        <div className="space-y-2 border-t pt-3">
+                          {record.timeline.map((entry, index) => (
+                            <div key={`${entry.date}-${index}`} className="flex gap-2 text-sm">
+                              <CheckCircle2 className="mt-0.5 size-4 text-emerald-500" />
+                              <div>
+                                <p className="font-medium">{entry.status}</p>
+                                <p className="text-xs text-muted-foreground">{date(entry.date)}</p>
+                                {entry.note && <p className="text-xs text-muted-foreground">{entry.note}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
-          })
-        )}
-      </div>
-
-      {/* Detail Dialog */}
-      <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          {selectedReturn && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <RotateCcw className="size-4 text-emerald-600" />
-                  <span>{isRTL ? 'طلب إرجاع' : 'Return Request'} — {selectedReturn.orderNumber}</span>
-                  <Badge className={`${STATUS_CONFIG[selectedReturn.status].bgColor} ${STATUS_CONFIG[selectedReturn.status].color} text-xs border-0`}>
-                    {selectedReturn.status}
-                  </Badge>
-                </DialogTitle>
-                <DialogDescription>
-                  {selectedReturn.productName} · {formatPrice(selectedReturn.refundAmount)}
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 mt-2">
-                {/* Product & Buyer Info */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      {isRTL ? 'المنتج' : 'Product'}
-                    </h4>
-                    <p className="text-sm font-medium">{selectedReturn.productName}</p>
-                    <p className="text-xs text-muted-foreground">{isRTL ? 'الكمية' : 'Qty'}: {selectedReturn.quantity}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      {isRTL ? 'المشتري' : 'Buyer'}
-                    </h4>
-                    <p className="text-sm font-medium">{selectedReturn.buyerName}</p>
-                    <p className="text-xs text-muted-foreground">ID: {selectedReturn.buyerId}</p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Reason */}
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {isRTL ? 'سبب الإرجاع' : 'Return Reason'}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="size-4 text-amber-500" />
-                    <span className="text-sm font-medium">{selectedReturn.reasonLabel}</span>
-                  </div>
-                  {selectedReturn.details && (
-                    <p className="text-sm text-muted-foreground mt-1 ms-6">{selectedReturn.details}</p>
-                  )}
-                </div>
-
-                {/* Resolution */}
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {isRTL ? 'الحل المطلوب' : 'Requested Resolution'}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    {selectedReturn.resolution === 'refund' && <RefreshCcw className="size-4 text-emerald-600" />}
-                    {selectedReturn.resolution === 'exchange' && <ShoppingBag className="size-4 text-emerald-600" />}
-                    {selectedReturn.resolution === 'store_credit' && <CreditCard className="size-4 text-emerald-600" />}
-                    <span className="text-sm font-medium">{selectedReturn.resolutionLabel}</span>
-                    <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">
-                      {formatPrice(selectedReturn.refundAmount)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Timeline */}
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    {isRTL ? 'حالة الإرجاع' : 'Return Timeline'}
-                  </h4>
-                  <div className="space-y-3">
-                    {selectedReturn.timeline.map((step, idx) => (
-                      <div key={idx} className="flex items-start gap-3">
-                        <div className="flex flex-col items-center">
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="size-3.5" />
-                          </div>
-                          {idx < selectedReturn.timeline.length - 1 && (
-                            <div className="w-0.5 h-5 bg-emerald-300 dark:bg-emerald-700" />
-                          )}
-                        </div>
-                        <div className="flex-1 pt-0.5">
-                          <p className="text-sm font-medium">{step.status}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(step.date)}</p>
-                          {step.note && (
-                            <p className="text-xs text-muted-foreground mt-0.5">{step.note}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Approve/Reject Actions (only for pending) */}
-                {selectedReturn.status === 'pending' && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                        {isRTL ? 'ملاحظة البائع' : 'Seller Note'} ({isRTL ? 'اختياري' : 'optional'})
-                      </h4>
-                      <Textarea
-                        value={sellerNote}
-                        onChange={(e) => setSellerNote(e.target.value)}
-                        placeholder={isRTL ? 'أضف ملاحظة للمشتري...' : 'Add a note for the buyer...'}
-                        className="min-h-[80px] text-sm resize-none"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <Button
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={() => handleApprove(selectedReturn)}
-                        disabled={actionLoading}
-                      >
-                        {actionLoading ? (
-                          <Loader2 className="size-4 me-2 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="size-4 me-2" />
-                        )}
-                        {isRTL ? 'قبول الإرجاع' : 'Approve Return'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 text-red-600 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                        onClick={() => handleReject(selectedReturn)}
-                        disabled={actionLoading}
-                      >
-                        {actionLoading ? (
-                          <Loader2 className="size-4 me-2 animate-spin" />
-                        ) : (
-                          <XCircle className="size-4 me-2" />
-                        )}
-                        {isRTL ? 'رفض الإرجاع' : 'Reject Return'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-
-                {/* Move to Processing (only for approved) */}
-                {selectedReturn.status === 'approved' && (
-                  <>
-                    <Separator />
-                    <Button
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => {
-                        setReturns(returns.map((r) =>
-                          r.id === selectedReturn.id
-                            ? {
-                                ...r,
-                                status: 'processing' as ReturnStatus,
-                                updatedAt: new Date().toISOString(),
-                                timeline: [
-                                  ...r.timeline,
-                                  { status: 'Processing', date: new Date().toISOString(), note: 'Seller is processing the return' },
-                                ],
-                              }
-                            : r
-                        ));
-                        setSelectedReturn({
-                          ...selectedReturn,
-                          status: 'processing',
-                          updatedAt: new Date().toISOString(),
-                          timeline: [
-                            ...selectedReturn.timeline,
-                            { status: 'Processing', date: new Date().toISOString(), note: 'Seller is processing the return' },
-                          ],
-                        });
-                        toast.success(isRTL ? 'تم تحديث الحالة إلى قيد المعالجة' : 'Status updated to Processing');
-                      }}
-                    >
-                      <Loader2 className="size-4 me-2" />
-                      {isRTL ? 'بدء المعالجة' : 'Start Processing'}
-                    </Button>
-                  </>
-                )}
-
-                {/* Complete (only for processing) */}
-                {selectedReturn.status === 'processing' && (
-                  <>
-                    <Separator />
-                    <Button
-                      className="w-full bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => {
-                        setReturns(returns.map((r) =>
-                          r.id === selectedReturn.id
-                            ? {
-                                ...r,
-                                status: 'completed' as ReturnStatus,
-                                updatedAt: new Date().toISOString(),
-                                timeline: [
-                                  ...r.timeline,
-                                  { status: 'Completed', date: new Date().toISOString(), note: 'Return completed successfully' },
-                                ],
-                              }
-                            : r
-                        ));
-                        setSelectedReturn({
-                          ...selectedReturn,
-                          status: 'completed',
-                          updatedAt: new Date().toISOString(),
-                          timeline: [
-                            ...selectedReturn.timeline,
-                            { status: 'Completed', date: new Date().toISOString(), note: 'Return completed successfully' },
-                          ],
-                        });
-                        toast.success(isRTL ? 'تم إكمال الإرجاع بنجاح' : 'Return completed successfully');
-                      }}
-                    >
-                      <CheckCircle2 className="size-4 me-2" />
-                      {isRTL ? 'إكمال الإرجاع' : 'Complete Return'}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+          })}
+        </div>
+      )}
     </div>
   );
 }
