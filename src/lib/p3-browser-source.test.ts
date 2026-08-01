@@ -34,6 +34,12 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   );
   const security = source('src/lib/security.ts');
   const proxy = source('src/proxy.ts');
+  const productActions = source(
+    'src/components/buyer/product-detail/product-actions.tsx',
+  );
+  const relatedProducts = source(
+    'src/components/buyer/product-detail/related-products.tsx',
+  );
   const quickView = source('src/components/buyer/product-quick-view.tsx');
   const hero = source('src/components/buyer/home/hero-section.tsx');
 
@@ -47,9 +53,12 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(rtlMobile, /toHaveAttribute\('dir', 'rtl'\)/);
   assert.match(rtlMobile, /reducedMotion: 'reduce'/);
   assert.match(rtlMobile, /data-product-purchase-actions/);
+  assert.match(rtlMobile, /data-product-primary-actions/);
+  assert.match(rtlMobile, /stickyPurchaseBar/);
+  assert.match(rtlMobile, /toHaveCount\(0\)/);
   assert.match(rtlMobile, /elementFromPoint/);
   assert.match(rtlMobile, /purchaseOverlapsComparison/);
-  assert.match(rtlMobile, /assistantOverlapsPurchaseBar/);
+  assert.match(rtlMobile, /assistantOverlapsActionContainer/);
   assert.match(criticalFlows, /\/api\/auth\/login/);
   assert.match(criticalFlows, /\/api\/auth\/session/);
   assert.match(criticalFlows, /\/api\/checkout/);
@@ -96,6 +105,10 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(proxy, /E2E_BROWSER_TEST_HARNESS/);
   assert.match(proxy, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS/);
   assert.match(proxy, /maxRequests: browserHarnessAuthLimit\(\)/);
+  assert.match(productActions, /data-product-primary-actions/);
+  assert.match(relatedProducts, /IntersectionObserver/);
+  assert.match(relatedProducts, /showStickyPurchaseActions/);
+  assert.match(relatedProducts, /rootMargin: '0px 0px 160px 0px'/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
