@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import {
   BadgeCheck,
@@ -104,6 +104,7 @@ export function ProductQuickView({
   );
   const [quantity, setQuantity] = useState(1);
   const [imageFailed, setImageFailed] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -111,11 +112,9 @@ export function ProductQuickView({
   }, [hydrateWishlist, isHydrated, user?.id]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setQuantity(1);
-      setImageFailed(false);
-    }, 0);
-    return () => window.clearTimeout(timer);
+    if (!open) return;
+    setQuantity(1);
+    setImageFailed(false);
   }, [open, productId]);
 
   const images = useMemo(
@@ -124,8 +123,7 @@ export function ProductQuickView({
   );
 
   if (!product) return null;
-  const currentProduct: Product = product;
-
+  const currentProduct = product;
   const displayName =
     isRTL && currentProduct.nameAr
       ? currentProduct.nameAr
@@ -152,8 +150,8 @@ export function ProductQuickView({
     !imageFailed && images[0] ? images[0] : '/placeholder-product.svg';
 
   function openProduct() {
-    nav.selectProduct(currentProduct.id);
     onClose();
+    nav.selectProduct(currentProduct.id);
   }
 
   function handlePrimaryAction() {
@@ -216,6 +214,17 @@ export function ProductQuickView({
       <DialogContent
         className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-2xl"
         dir={isRTL ? 'rtl' : 'ltr'}
+        onOpenAutoFocus={() => {
+          const activeElement = document.activeElement;
+          returnFocusRef.current =
+            activeElement instanceof HTMLElement ? activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusRef.current;
+          if (!target?.isConnected) return;
+          event.preventDefault();
+          window.requestAnimationFrame(() => target.focus());
+        }}
       >
         <div className="grid md:grid-cols-2">
           <div className="relative aspect-square overflow-hidden bg-muted">
@@ -229,7 +238,10 @@ export function ProductQuickView({
             />
             {imageSource === '/placeholder-product.svg' && (
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-950/70 dark:to-orange-950/70">
-                <Eye className="mb-2 size-14 text-amber-300 dark:text-amber-700" />
+                <Eye
+                  className="mb-2 size-14 text-amber-300 dark:text-amber-700"
+                  aria-hidden="true"
+                />
                 <p className="max-w-[80%] text-center text-sm text-muted-foreground">
                   {displayName}
                 </p>
@@ -252,14 +264,14 @@ export function ProductQuickView({
 
           <div className="flex flex-col gap-4 p-5">
             <DialogHeader className="space-y-1 text-start">
-              <DialogTitle className="text-xl leading-tight">
+              <DialogTitle className="pe-8 text-xl leading-tight">
                 {displayName}
               </DialogTitle>
               <DialogDescription>
                 {hasOptions
                   ? isRTL
-                    ? 'اعرض الملخص ثم افتح صفحة المنتج لاختيار SKU متاح.'
-                    : 'Review the summary, then open the product page to choose an available SKU.'
+                    ? 'افتح صفحة المنتج لاختيار التركيبة المتاحة والسعر الصحيح.'
+                    : 'Open the product page to choose an available option and its exact price.'
                   : isRTL
                     ? 'ملخص سريع للسعر والمخزون الحاليين.'
                     : 'A quick summary of the current price and inventory.'}
@@ -281,7 +293,11 @@ export function ProductQuickView({
             <div className="flex flex-wrap items-center gap-2">
               <div
                 className="flex items-center"
-                aria-label={`${currentProduct.rating.toFixed(1)} / 5`}
+                aria-label={
+                  isRTL
+                    ? `التقييم ${currentProduct.rating.toFixed(1)} من 5`
+                    : `${currentProduct.rating.toFixed(1)} out of 5`
+                }
               >
                 {Array.from({ length: 5 }, (_, index) => (
                   <Star
@@ -321,13 +337,13 @@ export function ProductQuickView({
                 />
                 <span>
                   {isRTL
-                    ? 'هذا المنتج مميز بشحن مجاني ضمن شحنة هذا البائع. يؤكد الإجمالي عند مراجعة الطلب.'
-                    : 'This item is marked for free shipping within this seller shipment. The final total is confirmed at order review.'}
+                    ? 'هذا المنتج مسجل بشحن مجاني ضمن شحنة هذا البائع.'
+                    : 'This item is recorded for free shipping within this seller shipment.'}
                 </span>
               </div>
             )}
 
-            {hasOptions && (
+            {hasOptions ? (
               <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
                 <p className="text-sm font-semibold">
                   {isRTL ? 'الخيارات المتاحة' : 'Available options'}
@@ -344,15 +360,8 @@ export function ProductQuickView({
                     </div>
                   </div>
                 ))}
-                <p className="text-xs text-muted-foreground">
-                  {isRTL
-                    ? 'تُختار التركيبة الفعلية في صفحة المنتج حتى يستخدم الطلب السعر والمخزون الصحيحين.'
-                    : 'Choose the exact combination on the product page so the order uses the correct price and stock.'}
-                </p>
               </div>
-            )}
-
-            {!hasOptions && (
+            ) : (
               <>
                 <Separator />
                 <div className="flex flex-wrap items-center gap-3">
@@ -362,7 +371,7 @@ export function ProductQuickView({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-10 rounded-none"
+                      className="size-11 rounded-none"
                       onClick={() =>
                         setQuantity((current) => Math.max(1, current - 1))
                       }
@@ -381,7 +390,7 @@ export function ProductQuickView({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-10 rounded-none"
+                      className="size-11 rounded-none"
                       onClick={() =>
                         setQuantity((current) =>
                           Math.min(currentProduct.stock, current + 1),
@@ -395,10 +404,7 @@ export function ProductQuickView({
                       <Plus className="size-4" aria-hidden="true" />
                     </Button>
                   </div>
-                  <span
-                    className="text-xs text-muted-foreground"
-                    aria-live="polite"
-                  >
+                  <span className="text-xs text-muted-foreground" aria-live="polite">
                     {outOfStock
                       ? t('outOfStock')
                       : `${currentProduct.stock} ${t('inStock')}`}
@@ -410,7 +416,7 @@ export function ProductQuickView({
             <div className="mt-auto flex gap-2 pt-2">
               <Button
                 type="button"
-                className="h-11 flex-1 rounded-xl bg-amber-600 text-white hover:bg-amber-700"
+                className="min-h-11 flex-1 rounded-xl bg-amber-600 text-white hover:bg-amber-700"
                 onClick={handlePrimaryAction}
                 disabled={!hasOptions && outOfStock}
               >
@@ -419,25 +425,27 @@ export function ProductQuickView({
                   ? isRTL
                     ? 'اختيار الخيارات'
                     : 'Choose options'
-                  : t('addToCart')}
+                  : outOfStock
+                    ? t('outOfStock')
+                    : t('addToCart')}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="size-11 shrink-0 rounded-xl"
+                className="size-11 rounded-xl"
                 onClick={() => void handleWishlist()}
                 disabled={!isHydrated || wishlistPending}
-                aria-pressed={isWishlisted}
                 aria-label={
                   isWishlisted
                     ? isRTL
-                      ? `إزالة ${displayName} من المفضلة`
-                      : `Remove ${displayName} from wishlist`
+                      ? 'إزالة من المفضلة'
+                      : 'Remove from wishlist'
                     : isRTL
-                      ? `إضافة ${displayName} إلى المفضلة`
-                      : `Add ${displayName} to wishlist`
+                      ? 'إضافة إلى المفضلة'
+                      : 'Add to wishlist'
                 }
+                aria-pressed={isWishlisted}
               >
                 {wishlistPending ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -451,15 +459,6 @@ export function ProductQuickView({
                 )}
               </Button>
             </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
-              onClick={openProduct}
-            >
-              {t('fullDetails')}
-            </Button>
           </div>
         </div>
       </DialogContent>
