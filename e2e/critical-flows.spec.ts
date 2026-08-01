@@ -27,9 +27,7 @@ test.describe('P3 critical authenticated flows', () => {
         response.request().method() === 'POST',
     );
     await page
-      .locator('form')
-      .first()
-      .getByRole('button', { name: /^Login$/i })
+      .getByRole('button', { name: 'Login', exact: true })
       .click();
 
     expect((await loginResponse).ok()).toBe(true);
