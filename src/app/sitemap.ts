@@ -4,11 +4,13 @@ import { getSitemapStorefrontData } from '@/lib/storefront-data';
 
 export const revalidate = 3600;
 
+const MAX_SITEMAP_URLS = 50_000;
+const MAX_PRODUCT_URLS = 40_000;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const data = await getSitemapStorefrontData();
-
-  return [
+  const staticEntries: MetadataRoute.Sitemap = [
     {
       url: APP_URL,
       lastModified: now,
@@ -27,13 +29,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.8,
     },
-    ...data.products.map((product) => ({
+  ];
+
+  const availableDynamicSlots = Math.max(
+    0,
+    MAX_SITEMAP_URLS - staticEntries.length,
+  );
+  const products = data.products.slice(
+    0,
+    Math.min(MAX_PRODUCT_URLS, availableDynamicSlots),
+  );
+  const remainingStoreSlots = Math.max(
+    0,
+    availableDynamicSlots - products.length,
+  );
+  const stores = data.stores.slice(0, remainingStoreSlots);
+
+  return [
+    ...staticEntries,
+    ...products.map((product) => ({
       url: `${APP_URL}/product/${product.id}`,
       lastModified: product.updatedAt,
       changeFrequency: 'daily' as const,
       priority: 0.8,
     })),
-    ...data.stores.map((store) => ({
+    ...stores.map((store) => ({
       url: `${APP_URL}/store/${store.id}`,
       lastModified: store.updatedAt,
       changeFrequency: 'weekly' as const,
