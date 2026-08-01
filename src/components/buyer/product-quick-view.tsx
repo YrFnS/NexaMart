@@ -123,8 +123,8 @@ export function ProductQuickView({
     [product],
   );
 
-  const currentProduct = product;
-  if (!currentProduct) return null;
+  if (!product) return null;
+  const currentProduct: Product = product;
 
   const displayName =
     isRTL && currentProduct.nameAr

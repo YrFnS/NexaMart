@@ -107,8 +107,8 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const similarScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const currentProductId = productId;
-    if (!currentProductId) return;
+    if (!productId) return;
+    const currentProductId: string = productId;
 
     const controller = new AbortController();
 

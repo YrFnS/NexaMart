@@ -71,8 +71,8 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    const currentStoreId = storeId;
-    if (!currentStoreId) return;
+    if (!storeId) return;
+    const currentStoreId: string = storeId;
 
     const controller = new AbortController();
 
