@@ -123,31 +123,36 @@ export function ProductQuickView({
     [product],
   );
 
-  if (!product) return null;
+  const currentProduct = product;
+  if (!currentProduct) return null;
 
   const displayName =
-    isRTL && product.nameAr ? product.nameAr : product.name;
+    isRTL && currentProduct.nameAr
+      ? currentProduct.nameAr
+      : currentProduct.name;
   const storeName =
-    isRTL && product.store?.nameAr
-      ? product.store.nameAr
-      : product.store?.name;
-  const variationOptions = parseVariationOptions(product.variations);
+    isRTL && currentProduct.store?.nameAr
+      ? currentProduct.store.nameAr
+      : currentProduct.store?.name;
+  const variationOptions = parseVariationOptions(currentProduct.variations);
   const hasOptions =
-    Boolean(product.variantSkus?.some((variant) => variant.isActive)) ||
+    Boolean(currentProduct.variantSkus?.some((variant) => variant.isActive)) ||
     Object.keys(variationOptions).length > 0;
   const discount =
-    product.originalPrice && product.originalPrice > product.price
+    currentProduct.originalPrice &&
+    currentProduct.originalPrice > currentProduct.price
       ? Math.round(
-          ((product.originalPrice - product.price) / product.originalPrice) *
+          ((currentProduct.originalPrice - currentProduct.price) /
+            currentProduct.originalPrice) *
             100,
         )
       : 0;
-  const outOfStock = product.stock <= 0;
+  const outOfStock = currentProduct.stock <= 0;
   const imageSource =
     !imageFailed && images[0] ? images[0] : '/placeholder-product.svg';
 
   function openProduct() {
-    nav.selectProduct(product.id);
+    nav.selectProduct(currentProduct.id);
     onClose();
   }
 
@@ -159,15 +164,15 @@ export function ProductQuickView({
     if (outOfStock) return;
 
     addItem({
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      originalPrice: product.originalPrice ?? undefined,
+      productId: currentProduct.id,
+      name: currentProduct.name,
+      price: currentProduct.price,
+      originalPrice: currentProduct.originalPrice ?? undefined,
       image: imageSource,
       quantity,
-      storeId: product.storeId,
-      storeName: product.store?.name || '',
-      hasFreeShipping: product.hasFreeShipping,
+      storeId: currentProduct.storeId,
+      storeName: currentProduct.store?.name || '',
+      hasFreeShipping: currentProduct.hasFreeShipping,
     });
     toast.success(
       isRTL ? 'تمت إضافة المنتج إلى السلة.' : 'Product added to your cart.',
@@ -188,7 +193,10 @@ export function ProductQuickView({
       return;
     }
 
-    const result = await toggleWishlist(user.id, toWishlistProduct(product));
+    const result = await toggleWishlist(
+      user.id,
+      toWishlistProduct(currentProduct),
+    );
     if (result === 'added') {
       toast.success(
         isRTL ? 'تمت الإضافة إلى المفضلة.' : 'Added to your wishlist.',
@@ -229,7 +237,7 @@ export function ProductQuickView({
             )}
 
             <div className="absolute start-3 top-3 flex flex-col gap-1">
-              {product.isNew && (
+              {currentProduct.isNew && (
                 <Badge className="bg-amber-600 text-white hover:bg-amber-700">
                   {t('new')}
                 </Badge>
@@ -258,10 +266,10 @@ export function ProductQuickView({
               </DialogDescription>
             </DialogHeader>
 
-            {product.store && (
+            {currentProduct.store && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span>{storeName}</span>
-                {product.store.isVerified && (
+                {currentProduct.store.isVerified && (
                   <BadgeCheck
                     className="size-4 text-amber-600"
                     aria-label={isRTL ? 'متجر موثق' : 'Verified store'}
@@ -273,14 +281,14 @@ export function ProductQuickView({
             <div className="flex flex-wrap items-center gap-2">
               <div
                 className="flex items-center"
-                aria-label={`${product.rating.toFixed(1)} / 5`}
+                aria-label={`${currentProduct.rating.toFixed(1)} / 5`}
               >
                 {Array.from({ length: 5 }, (_, index) => (
                   <Star
                     key={index}
                     aria-hidden="true"
                     className={`size-4 ${
-                      index < Math.floor(product.rating)
+                      index < Math.floor(currentProduct.rating)
                         ? 'fill-amber-400 text-amber-400'
                         : 'text-muted-foreground/30'
                     }`}
@@ -288,25 +296,29 @@ export function ProductQuickView({
                 ))}
               </div>
               <span className="text-sm text-muted-foreground">
-                {product.rating.toFixed(1)} · {product.reviewCount}{' '}
-                {t('reviews')}
+                {currentProduct.rating.toFixed(1)} ·{' '}
+                {currentProduct.reviewCount} {t('reviews')}
               </span>
             </div>
 
             <div className="flex flex-wrap items-baseline gap-2">
               <span className="text-3xl font-bold text-amber-700 dark:text-amber-300">
-                {formatPrice(product.price)}
+                {formatPrice(currentProduct.price)}
               </span>
-              {product.originalPrice && product.originalPrice > product.price && (
-                <span className="text-sm text-muted-foreground line-through">
-                  {formatPrice(product.originalPrice)}
-                </span>
-              )}
+              {currentProduct.originalPrice &&
+                currentProduct.originalPrice > currentProduct.price && (
+                  <span className="text-sm text-muted-foreground line-through">
+                    {formatPrice(currentProduct.originalPrice)}
+                  </span>
+                )}
             </div>
 
-            {product.hasFreeShipping && (
+            {currentProduct.hasFreeShipping && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                <Truck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <Truck
+                  className="mt-0.5 size-4 shrink-0"
+                  aria-hidden="true"
+                />
                 <span>
                   {isRTL
                     ? 'هذا المنتج مميز بشحن مجاني ضمن شحنة هذا البائع. يؤكد الإجمالي عند مراجعة الطلب.'
@@ -372,19 +384,24 @@ export function ProductQuickView({
                       className="size-10 rounded-none"
                       onClick={() =>
                         setQuantity((current) =>
-                          Math.min(product.stock, current + 1),
+                          Math.min(currentProduct.stock, current + 1),
                         )
                       }
-                      disabled={outOfStock || quantity >= product.stock}
+                      disabled={
+                        outOfStock || quantity >= currentProduct.stock
+                      }
                       aria-label={isRTL ? 'زيادة الكمية' : 'Increase quantity'}
                     >
                       <Plus className="size-4" aria-hidden="true" />
                     </Button>
                   </div>
-                  <span className="text-xs text-muted-foreground" aria-live="polite">
+                  <span
+                    className="text-xs text-muted-foreground"
+                    aria-live="polite"
+                  >
                     {outOfStock
                       ? t('outOfStock')
-                      : `${product.stock} ${t('inStock')}`}
+                      : `${currentProduct.stock} ${t('inStock')}`}
                   </span>
                 </div>
               </>
