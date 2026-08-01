@@ -34,23 +34,242 @@ jobs:
           ref: agent/production-hardening-phase-1
           fetch-depth: 0
 
-      - name: Execute reviewed patch and remove temporary workflows
+      - name: Apply conflict retries and CI-only request ceilings
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import textwrap
 
-          workflow = Path(
-              '.github/workflows/p3-fulfillment-conflict-fix.yml'
-          ).read_text()
-          opener = "python3 - <<'PY'\n"
-          start = workflow.index(opener) + len(opener)
-          end = workflow.index('\n          PY\n', start)
-          patch_script = textwrap.dedent(workflow[start:end])
-          Path('/tmp/apply-p3-fulfillment-fix.py').write_text(patch_script)
+          def replace_once(path_string: str, old: str, new: str) -> None:
+              path = Path(path_string)
+              content = path.read_text()
+              if old not in content:
+                  raise SystemExit(
+                      f'Missing patch anchor in {path_string}: {old[:160]!r}'
+                  )
+              path.write_text(content.replace(old, new, 1))
+
+          fulfillment_path = 'src/app/api/seller/fulfillment/route.ts'
+          fulfillment_helpers = (
+              "const MAX_SERIALIZABLE_ATTEMPTS = 3;\n\n"
+              "function isSerializableConflict(error: unknown): boolean {\n"
+              "  return (\n"
+              "    error instanceof Prisma.PrismaClientKnownRequestError &&\n"
+              "    error.code === 'P2034'\n"
+              "  );\n"
+              "}\n\n"
+              "async function retrySerializableTransaction<T>(\n"
+              "  operation: () => Promise<T>,\n"
+              "): Promise<T> {\n"
+              "  for (\n"
+              "    let attempt = 1;\n"
+              "    attempt <= MAX_SERIALIZABLE_ATTEMPTS;\n"
+              "    attempt += 1\n"
+              "  ) {\n"
+              "    try {\n"
+              "      return await operation();\n"
+              "    } catch (error) {\n"
+              "      if (\n"
+              "        !isSerializableConflict(error) ||\n"
+              "        attempt === MAX_SERIALIZABLE_ATTEMPTS\n"
+              "      ) {\n"
+              "        throw error;\n"
+              "      }\n"
+              "    }\n"
+              "  }\n\n"
+              "  throw new Error(\n"
+              "    'Serializable transaction retry loop exhausted unexpectedly.',\n"
+              "  );\n"
+              "}"
+          )
+          replace_once(
+              fulfillment_path,
+              "\n}\n\nfunction storeAccessWhere",
+              "\n}\n\n" + fulfillment_helpers + "\n\nfunction storeAccessWhere",
+          )
+          replace_once(
+              fulfillment_path,
+              "    const result = await db.$transaction(\n"
+              "      async (tx) => {",
+              "    const result = await retrySerializableTransaction(() =>\n"
+              "      db.$transaction(\n"
+              "        async (tx) => {",
+          )
+          replace_once(
+              fulfillment_path,
+              "      },\n"
+              "      {\n"
+              "        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,\n"
+              "        maxWait: 5_000,\n"
+              "        timeout: 15_000,\n"
+              "      },\n"
+              "    );\n\n"
+              "    return NextResponse.json({ success: true, ...result });",
+              "        },\n"
+              "        {\n"
+              "          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,\n"
+              "          maxWait: 5_000,\n"
+              "          timeout: 15_000,\n"
+              "        },\n"
+              "      ),\n"
+              "    );\n\n"
+              "    return NextResponse.json({ success: true, ...result });",
+          )
+          conflict_response = (
+              "    if (isSerializableConflict(error)) {\n"
+              "      return NextResponse.json(\n"
+              "        {\n"
+              "          error:\n"
+              "            'The fulfillment record changed while it was being updated. Reload and try again.',\n"
+              "          code: 'FULFILLMENT_CONFLICT',\n"
+              "        },\n"
+              "        { status: 409 },\n"
+              "      );\n"
+              "    }\n"
+          )
+          replace_once(
+              fulfillment_path,
+              "    console.error('Fulfillment workspace PUT error:', error);",
+              conflict_response
+              + "    console.error('Fulfillment workspace PUT error:', error);",
+          )
+
+          security_path = 'src/lib/security.ts'
+          security_anchor = (
+              "export interface RateLimitConfig {\n"
+              "  maxRequests: number;\n"
+              "  windowSeconds: number;\n"
+              "}\n\n"
+              "export const RATE_LIMITS = {"
+          )
+          security_replacement = (
+              "export interface RateLimitConfig {\n"
+              "  maxRequests: number;\n"
+              "  windowSeconds: number;\n"
+              "}\n\n"
+              "function ciRateLimitMax(environmentName: string, fallback: number): number {\n"
+              "  if (process.env.CI !== 'true') return fallback;\n\n"
+              "  const parsed = Number(process.env[environmentName]);\n"
+              "  return Number.isInteger(parsed) && parsed >= fallback ? parsed : fallback;\n"
+              "}\n\n"
+              "export const RATE_LIMITS = {"
+          )
+          replace_once(security_path, security_anchor, security_replacement)
+          replace_once(
+              security_path,
+              "  auth: { maxRequests: 5, windowSeconds: 60 },\n"
+              "  write: { maxRequests: 20, windowSeconds: 60 },",
+              "  auth: {\n"
+              "    maxRequests: ciRateLimitMax('E2E_AUTH_RATE_LIMIT_MAX_REQUESTS', 5),\n"
+              "    windowSeconds: 60,\n"
+              "  },\n"
+              "  write: {\n"
+              "    maxRequests: ciRateLimitMax('E2E_WRITE_RATE_LIMIT_MAX_REQUESTS', 20),\n"
+              "    windowSeconds: 60,\n"
+              "  },",
+          )
+
+          replace_once(
+              '.github/workflows/ci.yml',
+              "      AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"\n"
+              "      NEXT_TELEMETRY_DISABLED: \"1\"",
+              "      AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"\n"
+              "      # Stateful browser tests use isolated sessions from one loopback IP.\n"
+              "      # These values are honored only when CI=true; deployed defaults stay\n"
+              "      # at five auth and twenty write requests per minute.\n"
+              "      E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: \"30\"\n"
+              "      E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: \"100\"\n"
+              "      NEXT_TELEMETRY_DISABLED: \"1\"",
+          )
+
+          source_test = 'src/lib/p3-browser-source.test.ts'
+          replace_once(
+              source_test,
+              "  const transitionRoute = source(\n"
+              "    'src/app/api/orders/[id]/transition/route.ts',\n"
+              "  );\n"
+              "  const quickView",
+              "  const transitionRoute = source(\n"
+              "    'src/app/api/orders/[id]/transition/route.ts',\n"
+              "  );\n"
+              "  const fulfillmentRoute = source(\n"
+              "    'src/app/api/seller/fulfillment/route.ts',\n"
+              "  );\n"
+              "  const security = source('src/lib/security.ts');\n"
+              "  const quickView",
+          )
+          replace_once(
+              source_test,
+              "  assert.match(transitionRoute, /ORDER_TRANSITION_CONFLICT/);\n"
+              "  assert.match(quickView, /onOpenAutoFocus/);",
+              "  assert.match(transitionRoute, /ORDER_TRANSITION_CONFLICT/);\n"
+              "  assert.match(fulfillmentRoute, /MAX_SERIALIZABLE_ATTEMPTS = 3/);\n"
+              "  assert.match(fulfillmentRoute, /retrySerializableTransaction/);\n"
+              "  assert.match(fulfillmentRoute, /P2034/);\n"
+              "  assert.match(fulfillmentRoute, /FULFILLMENT_CONFLICT/);\n"
+              "  assert.match(security, /process\\.env\\.CI !== 'true'/);\n"
+              "  assert.match(\n"
+              "    security,\n"
+              "    /ciRateLimitMax\\('E2E_AUTH_RATE_LIMIT_MAX_REQUESTS', 5\\)/,\n"
+              "  );\n"
+              "  assert.match(\n"
+              "    security,\n"
+              "    /ciRateLimitMax\\('E2E_WRITE_RATE_LIMIT_MAX_REQUESTS', 20\\)/,\n"
+              "  );\n"
+              "  assert.match(quickView, /onOpenAutoFocus/);",
+          )
+          replace_once(
+              source_test,
+              "  assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"/);\n"
+              "  assert.match(session, /process\\.env\\.CI === 'true'/);",
+              "  assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"/);\n"
+              "  assert.match(workflow, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: \"30\"/);\n"
+              "  assert.match(workflow, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: \"100\"/);\n"
+              "  assert.match(session, /process\\.env\\.CI === 'true'/);",
+          )
+          final_guard = (
+              "  assert.equal(\n"
+              "    existsSync(\n"
+              "      join(\n"
+              "        process.cwd(),\n"
+              "        '.github/workflows/p3-browser-findings-fix.yml',\n"
+              "      ),\n"
+              "    ),\n"
+              "    false,\n"
+              "  );\n"
+              "});"
+          )
+          expanded_guard = (
+              "  assert.equal(\n"
+              "    existsSync(\n"
+              "      join(\n"
+              "        process.cwd(),\n"
+              "        '.github/workflows/p3-browser-findings-fix.yml',\n"
+              "      ),\n"
+              "    ),\n"
+              "    false,\n"
+              "  );\n"
+              "  assert.equal(\n"
+              "    existsSync(\n"
+              "      join(\n"
+              "        process.cwd(),\n"
+              "        '.github/workflows/p3-fulfillment-conflict-fix.yml',\n"
+              "      ),\n"
+              "    ),\n"
+              "    false,\n"
+              "  );\n"
+              "  assert.equal(\n"
+              "    existsSync(\n"
+              "      join(\n"
+              "        process.cwd(),\n"
+              "        '.github/workflows/p3-fulfillment-conflict-runner.yml',\n"
+              "      ),\n"
+              "    ),\n"
+              "    false,\n"
+              "  );\n"
+              "});"
+          )
+          replace_once(source_test, final_guard, expanded_guard)
           PY
-
-          python3 /tmp/apply-p3-fulfillment-fix.py
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
