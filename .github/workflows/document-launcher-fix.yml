@@ -1,0 +1,69 @@
+name: Document launcher fix
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+    paths:
+      - scripts/fix-document-launchers.py
+      - .github/workflows/document-launcher-fix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: document-launcher-fix
+  cancel-in-progress: true
+
+jobs:
+  verify-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexamart_launcher_check?schema=public
+      AUTH_SECRET: document-launcher-secret-with-at-least-32-characters
+      NEXTAUTH_SECRET: document-launcher-secret-with-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      ENABLE_DEMO_LOGIN: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Apply launcher correction
+        run: python3 scripts/fix-document-launchers.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript
+        run: npm run typecheck
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Commit verified launcher correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/seller/fulfillment-operations.tsx src/components/buyer/orders-page.tsx
+          if git diff --cached --quiet; then
+            echo "No document launcher correction was required"
+          else
+            git commit -m "fix: open printable documents securely"
+            git push origin HEAD:agent/production-hardening-phase-1
+          fi
