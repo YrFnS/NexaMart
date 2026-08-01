@@ -9,6 +9,17 @@ import {
 
 process.env.AUTH_SECRET = 'test-session-secret-with-more-than-32-characters';
 
+const mutableEnvironment = process.env as Record<string, string | undefined>;
+
+function setEnvironmentVariable(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete mutableEnvironment[name];
+    return;
+  }
+
+  mutableEnvironment[name] = value;
+}
+
 test('session tokens round-trip with identity and role', () => {
   const token = createSessionToken({ id: 'user_test_1', role: 'buyer' });
   const claims = verifySessionToken(token);
@@ -44,28 +55,20 @@ test('production cookies stay secure unless CI explicitly uses the HTTP browser 
   const originalOverride = process.env.AUTH_COOKIE_INSECURE_FOR_TESTS;
 
   try {
-    process.env.NODE_ENV = 'production';
-    delete process.env.CI;
-    delete process.env.AUTH_COOKIE_INSECURE_FOR_TESTS;
+    setEnvironmentVariable('NODE_ENV', 'production');
+    setEnvironmentVariable('CI', undefined);
+    setEnvironmentVariable('AUTH_COOKIE_INSECURE_FOR_TESTS', undefined);
     assert.match(serializeSessionCookie('secure-token'), /; Secure$/);
 
-    process.env.CI = 'true';
-    process.env.AUTH_COOKIE_INSECURE_FOR_TESTS = 'true';
+    setEnvironmentVariable('CI', 'true');
+    setEnvironmentVariable('AUTH_COOKIE_INSECURE_FOR_TESTS', 'true');
     assert.doesNotMatch(serializeSessionCookie('ci-token'), /; Secure/);
 
-    process.env.CI = 'false';
+    setEnvironmentVariable('CI', 'false');
     assert.match(serializeSessionCookie('production-token'), /; Secure$/);
   } finally {
-    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = originalNodeEnv;
-
-    if (originalCi === undefined) delete process.env.CI;
-    else process.env.CI = originalCi;
-
-    if (originalOverride === undefined) {
-      delete process.env.AUTH_COOKIE_INSECURE_FOR_TESTS;
-    } else {
-      process.env.AUTH_COOKIE_INSECURE_FOR_TESTS = originalOverride;
-    }
+    setEnvironmentVariable('NODE_ENV', originalNodeEnv);
+    setEnvironmentVariable('CI', originalCi);
+    setEnvironmentVariable('AUTH_COOKIE_INSECURE_FOR_TESTS', originalOverride);
   }
 });
