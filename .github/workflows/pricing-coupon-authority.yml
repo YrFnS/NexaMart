@@ -1,0 +1,124 @@
+name: Pricing and coupon authority generation
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+    paths:
+      - scripts/apply-pricing-coupon-authority.py
+      - .github/workflows/pricing-coupon-authority.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pricing-coupon-authority-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nexamart_pricing_authority
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexamart_pricing_authority"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexamart_pricing_authority?schema=public
+      AUTH_SECRET: pricing-authority-secret-with-at-least-32-characters
+      NEXTAUTH_SECRET: pricing-authority-secret-with-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      ENABLE_DEMO_LOGIN: "false"
+      SEED_DEMO_PASSWORD: pricing-authority-demo-password
+      AUTH_BOOTSTRAP_EMAIL: admin@nexamart.com
+      AUTH_BOOTSTRAP_TEST_PASSWORD: pricing-authority-admin-password
+      ORDER_CONFIRMATION_TTL_HOURS: "24"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Apply pricing and coupon authority changes
+        run: python3 scripts/apply-pricing-coupon-authority.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Regenerate Prisma client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Deploy migrations to a clean database
+        run: npm run db:deploy
+
+      - name: Seed fixed-precision demo data
+        run: npm run db:seed
+
+      - name: Verify paymentless order lifecycle
+        run: node --experimental-strip-types scripts/verify-order-lifecycle.ts
+
+      - name: Verify exact order-item return lifecycle
+        run: node --experimental-strip-types scripts/verify-return-lifecycle.ts
+
+      - name: Verify pricing and coupon authority
+        run: node --experimental-strip-types scripts/verify-pricing-authority.ts
+
+      - name: Exercise existing-user password bootstrap
+        run: |
+          password_file="$RUNNER_TEMP/nexamart-pricing-authority-admin-password"
+          printf '%s' "$AUTH_BOOTSTRAP_TEST_PASSWORD" > "$password_file"
+          AUTH_BOOTSTRAP_PASSWORD_FILE="$password_file" npm run auth:set-password
+          rm -f "$password_file"
+
+      - name: Reject high-severity production advisories
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript
+        run: npm run typecheck
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Commit verified pricing authority
+        run: |
+          git checkout -- .github/workflows/pricing-coupon-authority.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No pricing authority changes were required"
+          else
+            git commit -m "feat: add fixed-precision pricing authority"
+            git push origin HEAD:agent/production-hardening-phase-1
+          fi
