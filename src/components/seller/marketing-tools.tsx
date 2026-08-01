@@ -94,6 +94,7 @@ export function MarketingTools() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pendingCouponId, setPendingCouponId] = useState('');
+  const [currentTime, setCurrentTime] = useState(0);
   const [form, setForm] = useState<CouponFormData>(emptyCouponForm);
 
   const loadMarketing = useCallback(async (signal?: AbortSignal) => {
@@ -134,6 +135,7 @@ export function MarketingTools() {
       const nextStores = productPayload.stores || [];
       setCoupons(couponPayload.coupons || []);
       setStores(nextStores);
+      setCurrentTime(Date.now());
       setForm((current) => ({
         ...current,
         storeId:
@@ -427,7 +429,9 @@ export function MarketingTools() {
             <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
               <Tag className="mx-auto mb-3 size-10 opacity-40" aria-hidden="true" />
               <p className="font-medium">
-                {isRTL ? 'لم تنشئ كوبوناً بعد.' : 'No coupons have been created yet.'}
+                {isRTL
+                  ? 'لم تنشئ كوبوناً بعد.'
+                  : 'No coupons have been created yet.'}
               </p>
               <Button
                 type="button"
@@ -442,8 +446,9 @@ export function MarketingTools() {
           ) : (
             coupons.map((coupon) => {
               const expired = Boolean(
-                coupon.expiresAt &&
-                  new Date(coupon.expiresAt).getTime() < Date.now(),
+                currentTime > 0 &&
+                  coupon.expiresAt &&
+                  new Date(coupon.expiresAt).getTime() < currentTime,
               );
               return (
                 <article
@@ -682,7 +687,9 @@ export function MarketingTools() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="coupon-maximum">
-                  {isRTL ? 'أقصى خصم (اختياري)' : 'Maximum discount (optional)'}
+                  {isRTL
+                    ? 'أقصى خصم (اختياري)'
+                    : 'Maximum discount (optional)'}
                 </Label>
                 <Input
                   id="coupon-maximum"
@@ -700,7 +707,9 @@ export function MarketingTools() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="coupon-usage">
-                  {isRTL ? 'حد الاستخدام (اختياري)' : 'Usage limit (optional)'}
+                  {isRTL
+                    ? 'حد الاستخدام (اختياري)'
+                    : 'Usage limit (optional)'}
                 </Label>
                 <Input
                   id="coupon-usage"
@@ -720,7 +729,9 @@ export function MarketingTools() {
 
             <div className="space-y-2">
               <Label htmlFor="coupon-expiry">
-                {isRTL ? 'تاريخ الانتهاء (اختياري)' : 'Expiration date (optional)'}
+                {isRTL
+                  ? 'تاريخ الانتهاء (اختياري)'
+                  : 'Expiration date (optional)'}
               </Label>
               <Input
                 id="coupon-expiry"
