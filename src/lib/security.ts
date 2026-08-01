@@ -25,7 +25,9 @@ function ciRateLimitMax(
   productionDefault: number,
   ciDefault: number,
 ): number {
-  if (process.env.CI !== 'true') return productionDefault;
+  if (process.env.E2E_BROWSER_TEST_HARNESS !== 'true') {
+    return productionDefault;
+  }
 
   const parsed = Number(process.env[environmentName]);
   return Number.isInteger(parsed) && parsed >= productionDefault
