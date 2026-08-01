@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useI18n } from '@/lib/i18n';
+import type { StorefrontReviewsData } from '@/lib/storefront-types';
 import { getLocale } from '@/lib/utils';
 
 interface StoreReview {
@@ -41,21 +42,27 @@ interface StoreReviewsResponse {
 interface StoreReviewsSectionProps {
   storeId: string;
   storeName: string;
+  initialData?: StorefrontReviewsData;
 }
 
 export function StoreReviewsSection({
   storeId,
   storeName,
+  initialData,
 }: StoreReviewsSectionProps) {
   const { t, locale } = useI18n();
   const isRTL = locale === 'ar';
-  const [reviews, setReviews] = useState<StoreReview[]>([]);
-  const [total, setTotal] = useState(0);
-  const [averageRating, setAverageRating] = useState(0);
+  const [reviews, setReviews] = useState<StoreReview[]>(
+    initialData?.reviews ?? [],
+  );
+  const [total, setTotal] = useState(initialData?.total ?? 0);
+  const [averageRating, setAverageRating] = useState(
+    initialData?.averageRating ?? 0,
+  );
   const [distribution, setDistribution] = useState<
     Record<string, DistributionEntry>
-  >({});
-  const [loading, setLoading] = useState(true);
+  >(initialData?.ratingDistribution ?? {});
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState('');
   const [sortBy, setSortBy] = useState<'recent' | 'highest' | 'lowest'>(
     'recent',
@@ -99,6 +106,18 @@ export function StoreReviewsSection({
   );
 
   useEffect(() => {
+    if (initialData) {
+      const timer = window.setTimeout(() => {
+        setReviews(initialData.reviews);
+        setTotal(initialData.total);
+        setAverageRating(initialData.averageRating);
+        setDistribution(initialData.ratingDistribution);
+        setError('');
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
     const controller = new AbortController();
     const timer = window.setTimeout(
       () => void loadReviews(controller.signal),
@@ -108,7 +127,7 @@ export function StoreReviewsSection({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [loadReviews]);
+  }, [initialData, loadReviews]);
 
   const sortedReviews = useMemo(() => {
     const sorted = [...reviews];
