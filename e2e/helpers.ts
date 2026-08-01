@@ -14,7 +14,18 @@ type AxeBuilderOptions = ConstructorParameters<typeof AxeBuilder>[0];
 export async function primeBrowser(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('nexamart_onboarding_dismissed', 'true');
-    window.localStorage.setItem('nexamart_cookie_consent', 'accepted');
+    window.localStorage.setItem(
+      'nexamart_cookie_consent',
+      JSON.stringify({
+        state: 'accepted',
+        preferences: {
+          essential: true,
+          analytics: true,
+          marketing: true,
+          functional: true,
+        },
+      }),
+    );
   });
 }
 
