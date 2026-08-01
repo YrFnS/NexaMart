@@ -63,6 +63,48 @@ jobs:
       - name: Apply pricing and coupon authority changes
         run: python3 scripts/apply-pricing-coupon-authority.py
 
+      - name: Normalize Node strip-compatible error classes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          pattern = re.compile(
+              r"constructor\(\s*message: string,\s*readonly status = ([^,\n]+),\s*readonly code = (['\"][^'\"]+['\"]),\s*\)\s*\{\s*super\(message\);\s*\}",
+              re.MULTILINE,
+          )
+
+          for filename in ('src/lib/coupon-authority.ts', 'src/lib/cart-pricing.ts'):
+              path = Path(filename)
+              if not path.exists():
+                  continue
+              source = path.read_text()
+
+              def replacement(match: re.Match[str]) -> str:
+                  status = match.group(1).strip()
+                  code = match.group(2).strip()
+                  return f'''readonly status: number;
+            readonly code: string;
+
+            constructor(
+              message: string,
+              status = {status},
+              code = {code},
+            ) {{
+              super(message);
+              this.status = status;
+              this.code = code;
+            }}'''
+
+              updated, count = pattern.subn(replacement, source)
+              if count:
+                  path.write_text(updated)
+
+          coupon_source = Path('src/lib/coupon-authority.ts').read_text()
+          if 'readonly status =' in coupon_source or 'readonly code =' in coupon_source:
+              raise SystemExit('Coupon error class still uses unsupported parameter properties')
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
