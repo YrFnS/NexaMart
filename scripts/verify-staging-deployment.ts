@@ -194,6 +194,16 @@ async function main() {
     assert.equal(actual, expected, `${name} must be ${expected}.`);
   }
 
+  const robotsHeader = shopResponse.headers.get('x-robots-tag');
+  securityHeaders['x-robots-tag'] = robotsHeader;
+  if (expectNoIndex) {
+    assert.match(
+      robotsHeader || '',
+      /noindex/i,
+      'Staging HTML responses must send an X-Robots-Tag noindex directive.',
+    );
+  }
+
   const report: VerificationReport = {
     baseUrl: baseUrl.origin,
     expectedReleaseSha,
