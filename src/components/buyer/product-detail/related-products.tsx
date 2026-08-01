@@ -79,7 +79,10 @@ export function RelatedProducts({
           className="mb-4 flex items-center gap-2 text-xl font-bold"
         >
           <span className="flex size-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950">
-            <Truck className="size-4 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+            <Truck
+              className="size-4 text-amber-700 dark:text-amber-300"
+              aria-hidden="true"
+            />
           </span>
           {isRTL ? 'الشحن والإرجاع' : 'Shipping & returns'}
         </h2>
@@ -88,7 +91,10 @@ export function RelatedProducts({
           <details className="group rounded-xl border bg-card">
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2">
               <span className="flex items-center gap-3">
-                <Truck className="size-5 text-amber-600" aria-hidden="true" />
+                <Truck
+                  className="size-5 text-amber-600"
+                  aria-hidden="true"
+                />
                 {isRTL ? 'كيف يُحسب الشحن؟' : 'How shipping is calculated'}
               </span>
               <ChevronRight
@@ -119,7 +125,10 @@ export function RelatedProducts({
           <details className="group rounded-xl border bg-card">
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2">
               <span className="flex items-center gap-3">
-                <RotateCcw className="size-5 text-amber-600" aria-hidden="true" />
+                <RotateCcw
+                  className="size-5 text-amber-600"
+                  aria-hidden="true"
+                />
                 {isRTL ? 'كيف تعمل الإرجاعات؟' : 'How returns work'}
               </span>
               <ChevronRight
@@ -131,7 +140,10 @@ export function RelatedProducts({
             </summary>
             <div className="space-y-3 border-t px-4 py-4 text-sm text-muted-foreground">
               <p className="flex items-start gap-2">
-                <PackageCheck className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" />
+                <PackageCheck
+                  className="mt-0.5 size-4 shrink-0 text-amber-600"
+                  aria-hidden="true"
+                />
                 <span>
                   {isRTL
                     ? 'بعد التسليم يمكن للمشتري طلب إرجاع لعنصر طلب وSKU محددين، ضمن الكمية المتبقية القابلة للإرجاع.'
@@ -156,7 +168,10 @@ export function RelatedProducts({
               className="flex items-center gap-2 text-xl font-bold"
             >
               <span className="flex size-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950">
-                <Heart className="size-4 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+                <Heart
+                  className="size-4 text-amber-700 dark:text-amber-300"
+                  aria-hidden="true"
+                />
               </span>
               {isRTL ? 'منتجات مقترحة' : 'Suggested products'}
             </h2>
@@ -223,7 +238,10 @@ export function RelatedProducts({
             className="mb-4 flex items-center gap-2 text-xl font-bold"
           >
             <span className="flex size-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950">
-              <ShoppingCart className="size-4 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+              <ShoppingCart
+                className="size-4 text-amber-700 dark:text-amber-300"
+                aria-hidden="true"
+              />
             </span>
             {t('recentlyViewed')}
           </h2>
@@ -241,9 +259,12 @@ export function RelatedProducts({
 
       {product.stock > 0 && (
         <div
-          className="fixed inset-x-0 z-40 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur-sm md:hidden"
+          data-product-purchase-actions
+          className="nexa-product-purchase-actions fixed inset-x-0 z-40 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur-sm md:hidden"
           style={{ bottom: 'var(--nexa-mobile-nav-total)' }}
-          aria-label={isRTL ? 'إجراءات شراء المنتج' : 'Product purchase actions'}
+          aria-label={
+            isRTL ? 'إجراءات شراء المنتج' : 'Product purchase actions'
+          }
         >
           <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
             {formatPrice(effectivePrice)}
@@ -287,7 +308,10 @@ export function RelatedProducts({
               className="h-16 flex-col gap-1.5"
               onClick={() => handleShare('whatsapp')}
             >
-              <MessageCircle className="size-5 text-green-600" aria-hidden="true" />
+              <MessageCircle
+                className="size-5 text-green-600"
+                aria-hidden="true"
+              />
               <span className="text-xs">WhatsApp</span>
             </Button>
             <Button
@@ -305,7 +329,10 @@ export function RelatedProducts({
               className="h-16 flex-col gap-1.5"
               onClick={() => handleShare('facebook')}
             >
-              <Facebook className="size-5 text-blue-600" aria-hidden="true" />
+              <Facebook
+                className="size-5 text-blue-600"
+                aria-hidden="true"
+              />
               <span className="text-xs">Facebook</span>
             </Button>
             <Button
@@ -315,7 +342,10 @@ export function RelatedProducts({
               onClick={() => handleShare('copy')}
             >
               {copied ? (
-                <Check className="size-5 text-amber-600" aria-hidden="true" />
+                <Check
+                  className="size-5 text-amber-600"
+                  aria-hidden="true"
+                />
               ) : (
                 <Copy className="size-5" aria-hidden="true" />
               )}
