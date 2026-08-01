@@ -79,3 +79,17 @@ test('unimplemented follow and saved-search features fail honestly', () => {
   assert.doesNotMatch(savedPage, /toggleNotifications/);
   assert.doesNotMatch(savedPage, /newResultsCount/);
 });
+
+test('seller marketing is backed by authorized coupon APIs only', () => {
+  const marketing = source('src/components/seller/marketing-tools.tsx');
+  assert.match(marketing, /fetch\('\/api\/seller\/coupons'/);
+  assert.match(marketing, /method: 'POST'/);
+  assert.match(marketing, /method: 'PATCH'/);
+  assert.match(marketing, /storeId: form\.storeId/);
+  assert.doesNotMatch(marketing, /techstore-pro/);
+  assert.doesNotMatch(marketing, /Date\.now\(\)/);
+  assert.doesNotMatch(marketing, /setFlashSales/);
+  assert.doesNotMatch(marketing, /mktBoostNow/);
+  assert.doesNotMatch(marketing, /mktCreateCampaign/);
+  assert.doesNotMatch(marketing, /bg-emerald/);
+});
