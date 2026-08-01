@@ -12,73 +12,44 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { type Product } from '@/components/buyer/product-card';
 import { APP_NAME } from '@/lib/config';
 import { useI18n } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/use-app-navigation';
 import { useAppStore } from '@/stores/app-store';
 import { useUserStore } from '@/stores/user-store';
-import { useWishlistStore } from '@/stores/wishlist-store';
-import { type Product } from '@/components/buyer/product-card';
+import { useWishlistStore, type WishlistProduct } from '@/stores/wishlist-store';
 import { RippleButton } from './ripple-button';
 
 interface ProductActionsProps {
-  product: Product;
+  product?: Product;
+  productId?: string;
+  productName?: string;
   displayName: string;
   stock: number;
+  isWishlisted?: boolean;
+  setIsWishlisted?: (value: boolean) => void;
+  shareOpen?: boolean;
   setShareOpen: (value: boolean) => void;
+  copied?: boolean;
+  setCopied?: (value: boolean) => void;
   shareWebSuccess: boolean;
   setShareWebSuccess: (value: boolean) => void;
   handleAddToCart: () => void;
   handleBuyNow: () => void;
   isRTL: boolean;
+  listingTitle?: string;
+  t?: (key: string, params?: Record<string, unknown>) => string;
 }
 
-export function ProductActions({
-  product,
-  displayName,
-  stock,
-  setShareOpen,
-  shareWebSuccess,
-  setShareWebSuccess,
-  handleAddToCart,
-  handleBuyNow,
-  isRTL,
-}: ProductActionsProps) {
-  const { t } = useI18n();
-  const nav = useAppNavigation();
-  const toggleCompare = useAppStore((state) => state.toggleCompare);
-  const isComparing = useAppStore((state) =>
-    state.compareIds.includes(product.id),
-  );
-  const user = useUserStore((state) => state.user);
-  const isHydrated = useUserStore((state) => state.isHydrated);
-  const hydrateWishlist = useWishlistStore((state) => state.hydrate);
-  const toggleWishlist = useWishlistStore((state) => state.toggle);
-  const isWishlisted = useWishlistStore((state) =>
-    Boolean(state.productIds[product.id]),
-  );
-  const wishlistPending = useWishlistStore((state) =>
-    Boolean(state.pendingProductIds[product.id]),
-  );
-
-  useEffect(() => {
-    if (!isHydrated) return;
-    void hydrateWishlist(user?.id || null);
-  }, [hydrateWishlist, isHydrated, user?.id]);
-
-  async function handleWishlist() {
-    if (!isHydrated || wishlistPending) return;
-    if (!user) {
-      toast.info(
-        isRTL
-          ? 'سجّل الدخول لحفظ المنتج في المفضلة.'
-          : 'Sign in to save this product to your wishlist.',
-      );
-      nav.setView('auth');
-      return;
-    }
-
-    const result = await toggleWishlist(user.id, {
+function wishlistProduct(
+  product: Product | undefined,
+  productId: string,
+  productName: string,
+  stock: number,
+): WishlistProduct {
+  if (product) {
+    return {
       id: product.id,
       name: product.name,
       nameAr: product.nameAr,
@@ -98,9 +69,84 @@ export function ProductActions({
             nameAr: product.store.nameAr,
           }
         : null,
-    });
+    };
+  }
+
+  return {
+    id: productId,
+    name: productName,
+    price: 0,
+    images: '[]',
+    stock,
+    rating: 0,
+    reviewCount: 0,
+    storeId: '',
+    variations: '{}',
+    store: null,
+  };
+}
+
+export function ProductActions({
+  product,
+  productId,
+  productName,
+  displayName,
+  stock,
+  setShareOpen,
+  shareWebSuccess,
+  setShareWebSuccess,
+  handleAddToCart,
+  handleBuyNow,
+  isRTL,
+}: ProductActionsProps) {
+  const { t } = useI18n();
+  const nav = useAppNavigation();
+  const resolvedProductId = product?.id || productId || '';
+  const resolvedProductName = product?.name || productName || displayName;
+  const toggleCompare = useAppStore((state) => state.toggleCompare);
+  const isComparing = useAppStore((state) =>
+    state.compareIds.includes(resolvedProductId),
+  );
+  const user = useUserStore((state) => state.user);
+  const isHydrated = useUserStore((state) => state.isHydrated);
+  const hydrateWishlist = useWishlistStore((state) => state.hydrate);
+  const toggleWishlist = useWishlistStore((state) => state.toggle);
+  const isWishlisted = useWishlistStore((state) =>
+    Boolean(state.productIds[resolvedProductId]),
+  );
+  const wishlistPending = useWishlistStore((state) =>
+    Boolean(state.pendingProductIds[resolvedProductId]),
+  );
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    void hydrateWishlist(user?.id || null);
+  }, [hydrateWishlist, isHydrated, user?.id]);
+
+  async function handleWishlist() {
+    if (!resolvedProductId || !isHydrated || wishlistPending) return;
+    if (!user) {
+      toast.info(
+        isRTL
+          ? 'سجّل الدخول لحفظ المنتج في المفضلة.'
+          : 'Sign in to save this product to your wishlist.',
+      );
+      nav.setView('auth');
+      return;
+    }
+
+    const result = await toggleWishlist(
+      user.id,
+      wishlistProduct(
+        product,
+        resolvedProductId,
+        resolvedProductName,
+        stock,
+      ),
+    );
 
     if (result === 'added') {
+      if (!product) await hydrateWishlist(user.id, true);
       toast.success(
         isRTL ? 'تمت الإضافة إلى المفضلة.' : 'Added to your wishlist.',
       );
@@ -119,7 +165,7 @@ export function ProductActions({
       try {
         await navigator.share({
           title: displayName,
-          text: `${product.name} - ${APP_NAME}`,
+          text: `${resolvedProductName} - ${APP_NAME}`,
           url: window.location.href,
         });
         setShareWebSuccess(true);
@@ -205,7 +251,8 @@ export function ProductActions({
               ? 'border-amber-300 text-amber-700 dark:border-amber-900 dark:text-amber-300'
               : ''
           }`}
-          onClick={() => toggleCompare(product.id)}
+          onClick={() => toggleCompare(resolvedProductId)}
+          disabled={!resolvedProductId}
           aria-pressed={isComparing}
         >
           <GitCompare className="size-4" aria-hidden="true" />
