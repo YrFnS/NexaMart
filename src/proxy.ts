@@ -175,6 +175,16 @@ function requestBodyLimit(request: NextRequest): number | null {
   return null;
 }
 
+function browserHarnessAuthLimit(): number {
+  const productionDefault = 5;
+  if (process.env.E2E_BROWSER_TEST_HARNESS !== 'true') {
+    return productionDefault;
+  }
+
+  const parsed = Number(process.env.E2E_AUTH_RATE_LIMIT_MAX_REQUESTS);
+  return Number.isInteger(parsed) && parsed >= productionDefault ? parsed : 30;
+}
+
 function rateLimitPolicy(pathname: string): {
   maxRequests: number;
   windowSeconds: number;
@@ -192,7 +202,7 @@ function rateLimitPolicy(pathname: string): {
     pathname.startsWith('/api/auth/') &&
     pathname !== '/api/auth/session'
   ) {
-    return { maxRequests: 5, windowSeconds: 60 };
+    return { maxRequests: browserHarnessAuthLimit(), windowSeconds: 60 };
   }
   if (pathname === '/api/products' || pathname === '/api/search') {
     return { maxRequests: 30, windowSeconds: 60 };
