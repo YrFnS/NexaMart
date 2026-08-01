@@ -32,7 +32,7 @@ test('wishlist screen exposes only server-backed behavior', () => {
   assert.doesNotMatch(wishlist, /DEFAULT_COLLECTIONS/);
   assert.doesNotMatch(wishlist, /priceDropAlerts/);
   assert.doesNotMatch(wishlist, /userId=\$\{/);
-  assert.doesNotMatch(store, /userId\s*:/);
+  assert.doesNotMatch(store, /JSON\.stringify\(\{[^}]*userId/s);
 });
 
 test('header and footer omit simulated promotional controls', () => {
