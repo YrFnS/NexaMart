@@ -45,6 +45,10 @@ jobs:
       AUTH_BOOTSTRAP_EMAIL: admin@nexamart.com
       AUTH_BOOTSTRAP_TEST_PASSWORD: ci-admin-password-with-at-least-12-characters
       ORDER_CONFIRMATION_TTL_HOURS: "24"
+      # Production remains fail-closed when Redis is unavailable. Browser CI
+      # explicitly opts into the existing single-process fallback so real API
+      # flows can be exercised without external infrastructure.
+      RATE_LIMIT_ALLOW_MEMORY_FALLBACK: "true"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
