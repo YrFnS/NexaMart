@@ -71,7 +71,8 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!storeId) return;
+    const currentStoreId = storeId;
+    if (!currentStoreId) return;
 
     const controller = new AbortController();
 
@@ -79,9 +80,9 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
       setLoading(true);
       setError('');
       try {
-        const storeQuery = new URLSearchParams({ id: storeId });
+        const storeQuery = new URLSearchParams({ id: currentStoreId });
         const productQuery = new URLSearchParams({
-          storeId,
+          storeId: currentStoreId,
           limit: '24',
           sort: 'newest',
         });
