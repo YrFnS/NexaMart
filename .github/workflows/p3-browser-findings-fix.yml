@@ -1,0 +1,419 @@
+name: Apply first P3 browser findings
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+    paths:
+      - .github/workflows/p3-browser-findings-fix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p3-browser-findings-fix
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Patch browser findings
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path_string: str, old: str, new: str) -> None:
+              path = Path(path_string)
+              content = path.read_text()
+              if old not in content:
+                  raise SystemExit(f'Missing patch anchor in {path_string}: {old[:100]!r}')
+              path.write_text(content.replace(old, new, 1))
+
+          replace_once(
+              '.github/workflows/ci.yml',
+              '      ORDER_CONFIRMATION_TTL_HOURS: "24"\n      NEXT_TELEMETRY_DISABLED: "1"',
+              '      ORDER_CONFIRMATION_TTL_HOURS: "24"\n      # The production server normally fails closed without Redis. Browser CI\n      # opts into the explicit single-process fallback so API flows can be\n      # exercised without weakening deployed defaults.\n      RATE_LIMIT_ALLOW_MEMORY_FALLBACK: "true"\n      NEXT_TELEMETRY_DISABLED: "1"',
+          )
+
+          replace_once(
+              'e2e/critical-flows.spec.ts',
+              """    await page
+                .locator('form')
+                .first()
+                .getByRole('button', { name: /^Login$/i })
+                .click();""",
+              """    await page
+                .getByRole('button', { name: 'Login', exact: true })
+                .click();""",
+          )
+
+          replace_once(
+              'e2e/rtl-mobile.spec.ts',
+              "/أضف إلى السلة|Add to cart/i",
+              "/أضف للسلة|أضف إلى السلة|Add to cart/i",
+          )
+
+          replace_once(
+              'src/components/buyer/product-card.tsx',
+              '  onQuickView?: (product: Product) => void;',
+              '  onQuickView?: (product: Product, trigger: HTMLButtonElement) => void;',
+          )
+          replace_once(
+              'src/components/buyer/product-card.tsx',
+              '              onClick={() => onQuickView(product)}',
+              '              onClick={(event) => onQuickView(product, event.currentTarget)}',
+          )
+
+          replace_once(
+              'src/components/buyer/server-product-grid.tsx',
+              "import { useCallback, useState } from 'react';",
+              "import { useCallback, useRef, useState } from 'react';",
+          )
+          replace_once(
+              'src/components/buyer/server-product-grid.tsx',
+              """  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+            const [quickViewOpen, setQuickViewOpen] = useState(false);
+
+            const openQuickView = useCallback((product: Product) => {
+              setQuickViewProduct(product);
+              setQuickViewOpen(true);
+            }, []);""",
+              """  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+            const [quickViewOpen, setQuickViewOpen] = useState(false);
+            const quickViewTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+            const openQuickView = useCallback(
+              (product: Product, trigger: HTMLButtonElement) => {
+                quickViewTriggerRef.current = trigger;
+                setQuickViewProduct(product);
+                setQuickViewOpen(true);
+              },
+              [],
+            );""",
+          )
+          replace_once(
+              'src/components/buyer/server-product-grid.tsx',
+              """      <ProductQuickView
+                product={quickViewProduct}
+                open={quickViewOpen}
+                onClose={() => setQuickViewOpen(false)}
+              />""",
+              """      <ProductQuickView
+                product={quickViewProduct}
+                open={quickViewOpen}
+                onClose={() => setQuickViewOpen(false)}
+                returnFocusElement={quickViewTriggerRef.current}
+              />""",
+          )
+
+          replace_once(
+              'src/components/buyer/home-page.tsx',
+              "import { useCallback, useMemo, useState } from 'react';",
+              "import { useCallback, useMemo, useRef, useState } from 'react';",
+          )
+          replace_once(
+              'src/components/buyer/home-page.tsx',
+              """  const [quickViewOpen, setQuickViewOpen] = useState(false);
+
+            const featuredProducts""",
+              """  const [quickViewOpen, setQuickViewOpen] = useState(false);
+            const quickViewTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+            const featuredProducts""",
+          )
+          replace_once(
+              'src/components/buyer/home-page.tsx',
+              """  const handleQuickView = useCallback((product: Product) => {
+              setQuickViewProduct(product);
+              setQuickViewOpen(true);
+            }, []);""",
+              """  const handleQuickView = useCallback(
+              (product: Product, trigger: HTMLButtonElement) => {
+                quickViewTriggerRef.current = trigger;
+                setQuickViewProduct(product);
+                setQuickViewOpen(true);
+              },
+              [],
+            );""",
+          )
+          replace_once(
+              'src/components/buyer/home-page.tsx',
+              """      <ProductQuickView
+                product={quickViewProduct}
+                open={quickViewOpen}
+                onClose={() => setQuickViewOpen(false)}
+              />""",
+              """      <ProductQuickView
+                product={quickViewProduct}
+                open={quickViewOpen}
+                onClose={() => setQuickViewOpen(false)}
+                returnFocusElement={quickViewTriggerRef.current}
+              />""",
+          )
+
+          replace_once(
+              'src/components/buyer/product-quick-view.tsx',
+              """interface ProductQuickViewProps {
+              product: Product | null;
+              open: boolean;
+              onClose: () => void;
+            }""",
+              """interface ProductQuickViewProps {
+              product: Product | null;
+              open: boolean;
+              onClose: () => void;
+              returnFocusElement?: HTMLElement | null;
+            }""",
+          )
+          replace_once(
+              'src/components/buyer/product-quick-view.tsx',
+              """export function ProductQuickView({
+              product,
+              open,
+              onClose,
+            }: ProductQuickViewProps) {""",
+              """export function ProductQuickView({
+              product,
+              open,
+              onClose,
+              returnFocusElement,
+            }: ProductQuickViewProps) {""",
+          )
+          replace_once(
+              'src/components/buyer/product-quick-view.tsx',
+              """      <DialogContent
+                className=\"max-h-[92vh] overflow-y-auto p-0 sm:max-w-2xl\"
+                dir={isRTL ? 'rtl' : 'ltr'}
+              >""",
+              """      <DialogContent
+                className=\"max-h-[92vh] overflow-y-auto p-0 sm:max-w-2xl\"
+                dir={isRTL ? 'rtl' : 'ltr'}
+                onCloseAutoFocus={(event) => {
+                  if (!returnFocusElement?.isConnected) return;
+                  event.preventDefault();
+                  returnFocusElement.focus();
+                }}
+              >""",
+          )
+
+          hero_path = Path('src/components/buyer/home/hero-section.tsx')
+          hero = hero_path.read_text()
+          old_badges = """              {/* Trust badges */}
+                        <div className=\"flex flex-wrap gap-6 pt-3\">
+                          <div className=\"flex items-center gap-2\">
+                            <div className=\"w-8 h-8 rounded-lg flex items-center justify-center\" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                              <Package className=\"size-4\" style={{ color: '#d4a853' }} />
+                            </div>
+                            <span className=\"text-white/70 text-sm font-medium\">10K+ Products</span>
+                          </div>
+                          <div className=\"flex items-center gap-2\">
+                            <div className=\"w-8 h-8 rounded-lg flex items-center justify-center\" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                              <Users className=\"size-4\" style={{ color: '#d4a853' }} />
+                            </div>
+                            <span className=\"text-white/70 text-sm font-medium\">500+ Sellers</span>
+                          </div>
+                          <div className=\"flex items-center gap-2\">
+                            <div className=\"w-8 h-8 rounded-lg flex items-center justify-center\" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                              <ShieldCheck className=\"size-4\" style={{ color: '#d4a853' }} />
+                            </div>
+                            <span className=\"text-white/70 text-sm font-medium\">{t('securePayments')}</span>
+                          </div>
+                        </div>"""
+          new_badges = """              {/* Trust badges */}
+                        <div className=\"flex flex-wrap gap-6 pt-3\">
+                          <div className=\"flex items-center gap-2\">
+                            <div className=\"flex size-8 items-center justify-center rounded-lg\" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                              <Package className=\"size-4\" style={{ color: '#d4a853' }} aria-hidden=\"true\" />
+                            </div>
+                            <span className=\"text-sm font-medium text-white/70\">
+                              {isRTL ? 'متاجر مستقلة' : 'Independent stores'}
+                            </span>
+                          </div>
+                          <div className=\"flex items-center gap-2\">
+                            <div className=\"flex size-8 items-center justify-center rounded-lg\" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                              <Users className=\"size-4\" style={{ color: '#d4a853' }} aria-hidden=\"true\" />
+                            </div>
+                            <span className=\"text-sm font-medium text-white/70\">
+                              {isRTL ? 'الدفع عند الاستلام' : 'Pay on delivery'}
+                            </span>
+                          </div>
+                          <div className=\"flex items-center gap-2\">
+                            <div className=\"flex size-8 items-center justify-center rounded-lg\" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
+                              <ShieldCheck className=\"size-4\" style={{ color: '#d4a853' }} aria-hidden=\"true\" />
+                            </div>
+                            <span className=\"text-sm font-medium text-white/70\">
+                              {isRTL ? 'تتبع تنفيذ الطلب' : 'Tracked fulfilment'}
+                            </span>
+                          </div>
+                        </div>"""
+          if old_badges not in hero:
+              raise SystemExit('Missing hero trust badge anchor')
+          hero = hero.replace(old_badges, new_badges, 1)
+
+          old_dots = """        <div className=\"flex items-center gap-2.5\">
+                    {heroSlides.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => goToSlide(i)}
+                        className={`transition-all duration-300 rounded-full ${
+                          i === currentSlide
+                            ? 'w-10 h-3 shadow-lg'
+                            : 'w-3 h-3 bg-white/30 hover:bg-white/50 hover:scale-125'
+                        }`}
+                        style={i === currentSlide ? { backgroundColor: '#d4a853', boxShadow: '0 0 12px rgba(212, 168, 83, 0.5)' } : undefined}
+                        aria-label={`Go to slide ${i + 1}`}
+                      />
+                    ))}
+                  </div>"""
+          new_dots = """        <div
+                    className=\"flex items-center gap-1.5\"
+                    role=\"group\"
+                    aria-label={isRTL ? 'شرائح العرض' : 'Hero slides'}
+                  >
+                    {heroSlides.map((_, i) => (
+                      <button
+                        key={i}
+                        type=\"button\"
+                        onClick={() => goToSlide(i)}
+                        className=\"flex size-7 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black/60\"
+                        aria-label={
+                          isRTL
+                            ? `الانتقال إلى الشريحة ${i + 1}`
+                            : `Go to slide ${i + 1}`
+                        }
+                        aria-current={i === currentSlide ? 'true' : undefined}
+                      >
+                        <span
+                          aria-hidden=\"true\"
+                          className={`block rounded-full transition-all duration-300 ${
+                            i === currentSlide
+                              ? 'h-2.5 w-6 shadow-lg'
+                              : 'size-2.5 bg-white/40'
+                          }`}
+                          style={
+                            i === currentSlide
+                              ? {
+                                  backgroundColor: '#d4a853',
+                                  boxShadow: '0 0 12px rgba(212, 168, 83, 0.5)',
+                                }
+                              : undefined
+                          }
+                        />
+                      </button>
+                    ))}
+                  </div>"""
+          if old_dots not in hero:
+              raise SystemExit('Missing hero dot anchor')
+          hero = hero.replace(old_dots, new_dots, 1)
+
+          old_prev = """      <Button
+                variant=\"ghost\"
+                size=\"icon\"
+                className=\"absolute top-1/2 -translate-y-1/2 left-3 md:left-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110\"
+                onClick={prevSlide}
+              >
+                <PrevIcon className=\"size-5 md:size-6\" />
+              </Button>"""
+          new_prev = """      <Button
+                type=\"button\"
+                variant=\"ghost\"
+                size=\"icon\"
+                className=\"absolute top-1/2 -translate-y-1/2 left-3 md:left-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110\"
+                onClick={prevSlide}
+                aria-label={isRTL ? 'الشريحة السابقة' : 'Previous slide'}
+              >
+                <PrevIcon className=\"size-5 md:size-6\" aria-hidden=\"true\" />
+              </Button>"""
+          if old_prev not in hero:
+              raise SystemExit('Missing hero previous-button anchor')
+          hero = hero.replace(old_prev, new_prev, 1)
+
+          old_next = """      <Button
+                variant=\"ghost\"
+                size=\"icon\"
+                className=\"absolute top-1/2 -translate-y-1/2 right-3 md:right-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110\"
+                onClick={nextSlide}
+              >
+                <NextIcon className=\"size-5 md:size-6\" />
+              </Button>"""
+          new_next = """      <Button
+                type=\"button\"
+                variant=\"ghost\"
+                size=\"icon\"
+                className=\"absolute top-1/2 -translate-y-1/2 right-3 md:right-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110\"
+                onClick={nextSlide}
+                aria-label={isRTL ? 'الشريحة التالية' : 'Next slide'}
+              >
+                <NextIcon className=\"size-5 md:size-6\" aria-hidden=\"true\" />
+              </Button>"""
+          if old_next not in hero:
+              raise SystemExit('Missing hero next-button anchor')
+          hero_path.write_text(hero.replace(old_next, new_next, 1))
+
+          replace_once(
+              'src/lib/p3-browser-source.test.ts',
+              """  const publicSmoke = source('e2e/public-smoke.spec.ts');
+            const rtlMobile = source('e2e/rtl-mobile.spec.ts');
+            const criticalFlows = source('e2e/critical-flows.spec.ts');""",
+              """  const publicSmoke = source('e2e/public-smoke.spec.ts');
+            const rtlMobile = source('e2e/rtl-mobile.spec.ts');
+            const criticalFlows = source('e2e/critical-flows.spec.ts');
+            const hero = source('src/components/buyer/home/hero-section.tsx');
+            const quickView = source('src/components/buyer/product-quick-view.tsx');""",
+          )
+          replace_once(
+              'src/lib/p3-browser-source.test.ts',
+              """  assert.match(criticalFlows, /\\/api\\/checkout/);
+            assert.match(criticalFlows, /toHaveLength\\(2\\)/);""",
+              """  assert.match(criticalFlows, /\\/api\\/checkout/);
+            assert.match(criticalFlows, /toHaveLength\\(2\\)/);
+            assert.match(quickView, /onCloseAutoFocus/);
+            assert.match(hero, /Independent stores/);
+            assert.match(hero, /Pay on delivery/);
+            assert.doesNotMatch(hero, /10K\\+ Products|500\\+ Sellers|securePayments/);""",
+          )
+          replace_once(
+              'src/lib/p3-browser-source.test.ts',
+              """  assert.match(workflow, /npx playwright test/);
+            assert.match(workflow, /actions\\/upload-artifact@v4/);""",
+              """  assert.match(workflow, /npx playwright test/);
+            assert.match(workflow, /RATE_LIMIT_ALLOW_MEMORY_FALLBACK: \"true\"/);
+            assert.match(workflow, /actions\\/upload-artifact@v4/);""",
+          )
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run unit and source tests
+        run: npm test
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run strict TypeScript
+        run: npm run typecheck
+
+      - name: Commit verified fixes and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/ci.yml e2e src/components src/lib/p3-browser-source.test.ts
+          git rm .github/workflows/p3-browser-findings-fix.yml
+          git commit -m "fix: address first P3 browser findings"
+          git push origin HEAD:agent/production-hardening-phase-1
