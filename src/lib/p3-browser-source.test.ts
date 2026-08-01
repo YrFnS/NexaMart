@@ -23,6 +23,7 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   const publicSmoke = source('e2e/public-smoke.spec.ts');
   const rtlMobile = source('e2e/rtl-mobile.spec.ts');
   const criticalFlows = source('e2e/critical-flows.spec.ts');
+  const fulfillmentRace = source('e2e/fulfillment-race.spec.ts');
   const inventoryRace = source('e2e/inventory-race.spec.ts');
   const checkoutRoute = source('src/app/api/checkout/route.ts');
   const transitionRoute = source(
@@ -49,6 +50,15 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(criticalFlows, /\/api\/checkout/);
   assert.match(criticalFlows, /toHaveLength\(2\)/);
   assert.match(criticalFlows, /reducedMotion: 'reduce'/);
+  assert.match(fulfillmentRace, /UHC-004/);
+  assert.match(fulfillmentRace, /return_only/);
+  assert.match(fulfillmentRace, /resolution: 'exchange'/);
+  assert.match(fulfillmentRace, /set_return_disposition/);
+  assert.match(fulfillmentRace, /upsert_replacement/);
+  assert.match(fulfillmentRace, /transition_replacement/);
+  assert.match(fulfillmentRace, /duplicatePut/);
+  assert.match(fulfillmentRace, /inventoryRestoredAt/);
+  assert.match(fulfillmentRace, /describe\.configure\(\{ retries: 0 \}\)/);
   assert.match(inventoryRace, /UHC-004/);
   assert.match(inventoryRace, /Promise\.all/);
   assert.match(inventoryRace, /one competing checkout wins/);
