@@ -52,11 +52,17 @@ test('header and footer omit simulated promotional controls', () => {
   assert.doesNotMatch(footer, /App Store|Google Play|QR/);
 });
 
-test('homepage prioritizes real merchandising over simulated sections', () => {
+test('homepage renders bounded server data without simulated urgency', () => {
+  const route = source('src/app/(buyer)/page.tsx');
   const home = source('src/components/buyer/home-page.tsx');
 
-  assert.match(home, /fetch\('\/api\/products\?limit=24'/);
+  assert.doesNotMatch(route, /'use client'/);
+  assert.match(route, /getHomePageData/);
+  assert.match(route, /<HomePage initialData=\{initialData\}/);
   assert.match(home, /FeaturedProductsSection/);
+  assert.doesNotMatch(home, /fetch\('\/api\//);
+  assert.doesNotMatch(home, /FlashSaleBanner/);
+  assert.doesNotMatch(home, /Math\.random/);
   assert.doesNotMatch(home, /AIRecommendationsSection/);
   assert.doesNotMatch(home, /NewsletterSection/);
   assert.doesNotMatch(home, /TrendingSearchesSection/);
