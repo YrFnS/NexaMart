@@ -34,6 +34,35 @@ jobs:
           ref: agent/production-hardening-phase-1
           fetch-depth: 0
 
+      - name: Apply explicit non-null snapshots
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('src/components/buyer/product-detail-page.tsx'): (
+                  "    const currentProductId = productId;\n    if (!currentProductId) return;",
+                  "    if (!productId) return;\n    const currentProductId: string = productId;",
+              ),
+              Path('src/components/buyer/store-profile-page.tsx'): (
+                  "    const currentStoreId = storeId;\n    if (!currentStoreId) return;",
+                  "    if (!storeId) return;\n    const currentStoreId: string = storeId;",
+              ),
+              Path('src/components/buyer/product-quick-view.tsx'): (
+                  "  const currentProduct = product;\n  if (!currentProduct) return null;",
+                  "  if (!product) return null;\n  const currentProduct: Product = product;",
+              ),
+          }
+
+          for path, (old, new) in replacements.items():
+              content = path.read_text()
+              if new in content:
+                  continue
+              if old not in content:
+                  raise SystemExit(f'Missing narrowing anchor in {path}')
+              path.write_text(content.replace(old, new, 1))
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -43,27 +72,17 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
-      - name: Capture TypeScript errors
-        shell: bash
-        run: |
-          set +e
-          npm run typecheck > "$RUNNER_TEMP/tsc.log" 2>&1
-          status=$?
-          set -e
-          {
-            echo "TypeScript exit status: $status"
-            grep -E "error TS|Found [0-9]+ error" "$RUNNER_TEMP/tsc.log" || true
-          } > typescript-diagnostics.txt
-          cat typescript-diagnostics.txt
+      - name: Verify strict TypeScript
+        run: npm run typecheck
 
-      - name: Commit diagnostics
+      - name: Commit verified narrowing fix
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add typescript-diagnostics.txt
+          git add src/components/buyer/product-detail-page.tsx src/components/buyer/product-quick-view.tsx src/components/buyer/store-profile-page.tsx
           if git diff --cached --quiet; then
-            echo "No diagnostics change"
+            echo "No narrowing fix was required"
           else
-            git commit -m "chore: record TypeScript diagnostics"
+            git commit -m "fix: preserve strict UI data narrowing"
             git push origin HEAD:agent/production-hardening-phase-1
           fi
