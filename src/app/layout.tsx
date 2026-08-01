@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
 import { Geist, Geist_Mono, Noto_Sans_Arabic } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
@@ -7,6 +7,12 @@ import './ui-foundation.css';
 import { Toaster } from '@/components/ui/toaster';
 import { DirectionProvider } from '@/components/common/direction-provider';
 import { AuthSessionSync } from '@/components/auth/auth-session-sync';
+import {
+  APP_DESCRIPTION,
+  APP_NAME,
+  APP_TAGLINE,
+  APP_URL,
+} from '@/lib/config';
 import {
   LOCALE_COOKIE,
   localeDirection,
@@ -29,13 +35,68 @@ const notoSansArabic = Noto_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: 'NexaMart - AI-Powered Multi-Vendor Commerce Platform',
-  description:
-    'Discover AI-powered shopping with smart search, visual discovery, and products from verified sellers worldwide.',
-  keywords: ['NexaMart', 'e-commerce', 'AI shopping', 'multi-vendor', 'marketplace'],
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: `${APP_NAME} | ${APP_TAGLINE}`,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
+  applicationName: APP_NAME,
+  category: 'shopping',
+  keywords: [
+    APP_NAME,
+    'multi-vendor marketplace',
+    'pay on delivery',
+    'online shopping',
+    'order tracking',
+    'Iraq marketplace',
+  ],
+  alternates: { canonical: '/' },
+  manifest: '/manifest.json',
   icons: {
     icon: '/logo.svg',
+    apple: '/icon-192.svg',
   },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    alternateLocale: ['ar_IQ'],
+    url: '/',
+    siteName: APP_NAME,
+    title: `${APP_NAME} | ${APP_TAGLINE}`,
+    description: APP_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${APP_NAME} | ${APP_TAGLINE}`,
+    description: APP_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: APP_NAME,
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#d97706' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f0f0f' },
+  ],
 };
 
 export default async function RootLayout({
@@ -54,17 +115,6 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-scroll-behavior="smooth"
     >
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#d97706" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansArabic.variable} antialiased bg-background text-foreground overflow-x-hidden`}
       >
