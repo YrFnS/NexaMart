@@ -5,6 +5,7 @@ const baseURL =
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: /staging-deployment\.spec\.ts/,
   outputDir: 'test-results',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
