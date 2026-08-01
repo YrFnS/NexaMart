@@ -93,3 +93,18 @@ test('seller marketing is backed by authorized coupon APIs only', () => {
   assert.doesNotMatch(marketing, /mktCreateCampaign/);
   assert.doesNotMatch(marketing, /bg-emerald/);
 });
+
+test('admin dashboard reports operations rather than invented revenue', () => {
+  const route = source('src/app/api/admin/dashboard/route.ts');
+  const dashboard = source('src/components/admin/admin-dashboard.tsx');
+  assert.match(route, /recordedOrderValue/);
+  assert.match(route, /orderValueChart/);
+  assert.doesNotMatch(route, /0\.1; \/\/ 10% commission estimate/);
+  assert.doesNotMatch(route, /platformRevenue/);
+  assert.match(dashboard, /Recorded order value is not collected revenue/);
+  assert.match(dashboard, /href="\/admin\/orders"/);
+  assert.match(dashboard, /href="\/admin\/users"/);
+  assert.doesNotMatch(dashboard, /adminViewPayouts/);
+  assert.doesNotMatch(dashboard, /<Wallet/);
+  assert.doesNotMatch(dashboard, /bg-emerald/);
+});
