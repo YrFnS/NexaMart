@@ -10,6 +10,7 @@ import {
   Package,
   RotateCcw,
   Search,
+  Truck,
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -56,6 +57,18 @@ interface ReturnRecord {
   sellerName: string;
   sellerNote?: string;
   createdAt: string;
+  replacementShipment: {
+    id: string;
+    status: 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+    carrier: string | null;
+    trackingNumber: string | null;
+    quantity: number;
+    sku: string | null;
+    shippedAt: string | null;
+    deliveredAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
   timeline: TimelineEntry[];
 }
 
@@ -363,6 +376,49 @@ export function ReturnsPage() {
                         {isRTL
                           ? 'لا ينقل NexaMart الأموال. يؤكد البائع هنا فقط أن الاسترداد تم خارج المنصة.'
                           : 'NexaMart does not move money. The seller only records here when the refund was completed outside the platform.'}
+                      </div>
+                    )}
+                    {record.replacementShipment && (
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm dark:border-violet-900 dark:bg-violet-950/30">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 font-medium text-violet-800 dark:text-violet-300">
+                            <Truck className="size-4" />
+                            {isRTL ? 'شحنة المنتج البديل' : 'Replacement shipment'}
+                          </div>
+                          <Badge variant="outline">
+                            {record.replacementShipment.status.replaceAll('_', ' ')}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                          <p>
+                            <strong>{isRTL ? 'شركة الشحن' : 'Carrier'}:</strong>{' '}
+                            {record.replacementShipment.carrier || '—'}
+                          </p>
+                          <p>
+                            <strong>{isRTL ? 'رقم التتبع' : 'Tracking number'}:</strong>{' '}
+                            {record.replacementShipment.trackingNumber || '—'}
+                          </p>
+                          <p>
+                            <strong>{isRTL ? 'الكمية' : 'Quantity'}:</strong>{' '}
+                            {record.replacementShipment.quantity}
+                          </p>
+                          <p>
+                            <strong>SKU:</strong>{' '}
+                            {record.replacementShipment.sku || record.sku || '—'}
+                          </p>
+                          {record.replacementShipment.shippedAt && (
+                            <p>
+                              <strong>{isRTL ? 'تاريخ الشحن' : 'Shipped'}:</strong>{' '}
+                              {date(record.replacementShipment.shippedAt)}
+                            </p>
+                          )}
+                          {record.replacementShipment.deliveredAt && (
+                            <p>
+                              <strong>{isRTL ? 'تاريخ التسليم' : 'Delivered'}:</strong>{' '}
+                              {date(record.replacementShipment.deliveredAt)}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                     {record.sellerNote && (

@@ -133,6 +133,7 @@ const returnInclude = {
   product: { select: { id: true, name: true, nameAr: true, images: true } },
   buyer: { select: { id: true, name: true, email: true } },
   seller: { select: { id: true, name: true, email: true } },
+  replacementShipment: true,
 } satisfies Prisma.ReturnInclude;
 
 type ReturnWithRelations = Prisma.ReturnGetPayload<{
@@ -184,6 +185,22 @@ function serializeReturn(record: ReturnWithRelations) {
     buyerName: record.buyer.name || record.buyer.email,
     buyerId: record.buyerId,
     sellerNote: record.sellerNote || undefined,
+    replacementShipment: record.replacementShipment
+      ? {
+          id: record.replacementShipment.id,
+          status: record.replacementShipment.status,
+          carrier: record.replacementShipment.carrier,
+          trackingNumber: record.replacementShipment.trackingNumber,
+          quantity: record.replacementShipment.quantity,
+          sku: record.replacementShipment.sku,
+          shippedAt:
+            record.replacementShipment.shippedAt?.toISOString() || null,
+          deliveredAt:
+            record.replacementShipment.deliveredAt?.toISOString() || null,
+          createdAt: record.replacementShipment.createdAt.toISOString(),
+          updatedAt: record.replacementShipment.updatedAt.toISOString(),
+        }
+      : null,
     timeline: parseArray(record.timeline),
     evidencePhotos: parseArray(record.evidencePhotos),
   };
@@ -499,11 +516,22 @@ export async function PUT(request: Request) {
           }
           effectiveOfflineStatus = 'confirmed';
         }
-        if (
-          targetStatus === 'completed' &&
-          !canCompleteReturn(record.resolution, effectiveOfflineStatus)
-        ) {
-          throw new Error('OFFLINE_REFUND_CONFIRMATION_REQUIRED');
+        if (targetStatus === 'completed') {
+          if (!canCompleteReturn(record.resolution, effectiveOfflineStatus)) {
+            throw new Error('OFFLINE_REFUND_CONFIRMATION_REQUIRED');
+          }
+          if (
+            ['return_only', 'exchange'].includes(record.resolution) &&
+            !record.inventoryDisposition
+          ) {
+            throw new Error('RETURN_DISPOSITION_REQUIRED');
+          }
+          if (
+            record.resolution === 'exchange' &&
+            record.replacementShipment?.status !== 'delivered'
+          ) {
+            throw new Error('EXCHANGE_REPLACEMENT_REQUIRED');
+          }
         }
 
         const timeline = parseArray(record.timeline);
@@ -591,6 +619,8 @@ export async function PUT(request: Request) {
       OFFLINE_REFUND_NOT_REQUIRED: { status: 409, error: 'This return does not require an offline refund.' },
       OFFLINE_REFUND_CONFIRMATION_INVALID: { status: 409, error: 'The offline refund cannot be confirmed in this state.' },
       OFFLINE_REFUND_CONFIRMATION_REQUIRED: { status: 409, error: 'Confirm the offline refund before completing this return.' },
+      RETURN_DISPOSITION_REQUIRED: { status: 409, error: 'Record the returned item inventory disposition before completing this return.' },
+      EXCHANGE_REPLACEMENT_REQUIRED: { status: 409, error: 'Deliver the replacement shipment before completing this exchange.' },
     };
     if (known[code]) {
       return NextResponse.json(

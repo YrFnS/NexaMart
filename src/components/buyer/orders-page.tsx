@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  FileText,
   Loader2,
   Package,
   RefreshCw,
@@ -381,6 +382,31 @@ export function OrdersPage() {
                     <Separator />
 
                     <div className="flex flex-wrap justify-end gap-2 p-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const query = new URLSearchParams({
+                            type: 'order',
+                            lang: isRTL ? 'ar' : 'en',
+                            print: '1',
+                          });
+                          const opened = window.open(
+                            `/api/orders/${encodeURIComponent(order.id)}/document?${query.toString()}`,
+                            '_blank',
+                            'noopener,noreferrer',
+                          );
+                          if (!opened) {
+                            setError(
+                              isRTL
+                                ? 'تعذر فتح مستند الطلب. تحقق من حظر النوافذ المنبثقة.'
+                                : 'The order document could not open. Check the popup blocker.',
+                            );
+                          }
+                        }}
+                      >
+                        <FileText className="me-2 size-4" />
+                        {isRTL ? 'فتح مستند الطلب' : 'Open order document'}
+                      </Button>
                       <Button variant="outline" onClick={() => buyAgain(order)}>
                         <RefreshCw className="me-2 size-4" />
                         {isRTL ? 'إعادة الطلب' : 'Buy again'}

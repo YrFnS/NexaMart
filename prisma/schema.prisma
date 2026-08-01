@@ -46,7 +46,9 @@ model User {
   disputesAsSeller Dispute[]      @relation("DisputeSeller")
   helpTickets      HelpTicket[]
   staffRoles       Staff[]
-  auditLogs        AuditLog[]
+  auditLogs                    AuditLog[]
+  replacementShipmentsAsBuyer  ReplacementShipment[] @relation("ReplacementBuyer")
+  replacementShipmentsAsSeller ReplacementShipment[] @relation("ReplacementSeller")
 
   @@index([role])
 }
@@ -78,7 +80,8 @@ model Store {
   cars       Car[]
   properties Property[]
   payouts    Payout[]
-  staff      Staff[]
+  staff                Staff[]
+  replacementShipments ReplacementShipment[]
 
   @@index([isVerified])
 }
@@ -137,8 +140,9 @@ model Product {
   wishlistItems Wishlist[]
   priceAlerts   PriceAlert[]
   returns       Return[]
-  auctions      Auction[]
-  variantSkus   ProductVariant[]
+  auctions             Auction[]
+  variantSkus          ProductVariant[]
+  replacementShipments ReplacementShipment[]
 
   @@index([status, createdAt])
   @@index([categoryId, status])
@@ -160,7 +164,8 @@ model ProductVariant {
   updatedAt     DateTime @updatedAt
 
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  orderItems OrderItem[]
+  orderItems           OrderItem[]
+  replacementShipments ReplacementShipment[]
 
   @@unique([productId, optionKey])
   @@index([productId, isActive])
@@ -194,8 +199,11 @@ model Order {
   rejectedAt           DateTime?
   cancelledBy          String?
   cancellationReason   String?
-  inventoryRestoredAt  DateTime?
-  createdAt            DateTime @default(now())
+  inventoryRestoredAt      DateTime?
+  sellerFulfillmentNote    String?
+  packingSlipGeneratedAt   DateTime?
+  packingSlipGeneratedBy   String?
+  createdAt                DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
   user     User        @relation(fields: [userId], references: [id])
@@ -204,7 +212,8 @@ model Order {
   returns      Return[]
   invoices     Invoice[]
   disputes     Dispute[]
-  statusEvents OrderStatusEvent[]
+  statusEvents         OrderStatusEvent[]
+  replacementShipments ReplacementShipment[]
 
   @@unique([idempotencyKey, storeId])
   @@index([userId, createdAt])
@@ -225,7 +234,8 @@ model OrderItem {
   order   Order           @relation(fields: [orderId], references: [id])
   product Product         @relation(fields: [productId], references: [id])
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  returns Return[]
+  returns              Return[]
+  replacementShipments ReplacementShipment[]
 
   @@index([variantId])
 }
@@ -563,6 +573,10 @@ model Return {
   offlineRefundStatus      String    @default("not_required") // not_required, required, confirmed
   offlineRefundConfirmedAt DateTime?
   offlineRefundConfirmedBy String?
+  inventoryDisposition     String?
+  inventoryDispositionAt   DateTime?
+  inventoryDispositionBy   String?
+  inventoryRestoredAt      DateTime?
   sellerNote               String?
   evidencePhotos           String    @default("[]") // JSON array
   timeline                 String    @default("[]") // JSON array of {status, date, note}
@@ -573,11 +587,51 @@ model Return {
   orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   product   Product    @relation(fields: [productId], references: [id])
   buyer     User       @relation("ReturnBuyer", fields: [buyerId], references: [id])
-  seller    User       @relation("ReturnSeller", fields: [sellerId], references: [id])
+  seller              User                 @relation("ReturnSeller", fields: [sellerId], references: [id])
+  replacementShipment ReplacementShipment?
 
   @@index([buyerId, status])
   @@index([sellerId, status])
   @@index([orderItemId, status])
+}
+
+model ReplacementShipment {
+  id                    String   @id @default(cuid())
+  returnId              String   @unique
+  orderId               String
+  orderItemId           String?
+  productId             String
+  variantId             String?
+  buyerId               String
+  sellerId              String
+  storeId               String
+  sku                   String?
+  quantity              Int
+  carrier               String?
+  trackingNumber        String?
+  status                String   @default("preparing") // preparing, shipped, delivered, cancelled
+  notes                 String?
+  inventoryReservedAt   DateTime @default(now())
+  inventoryRestoredAt   DateTime?
+  shippedAt             DateTime?
+  deliveredAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  return    Return          @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  order     Order           @relation(fields: [orderId], references: [id])
+  orderItem OrderItem?      @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  product   Product         @relation(fields: [productId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  buyer     User            @relation("ReplacementBuyer", fields: [buyerId], references: [id])
+  seller    User            @relation("ReplacementSeller", fields: [sellerId], references: [id])
+  store     Store           @relation(fields: [storeId], references: [id])
+
+  @@index([sellerId, status])
+  @@index([buyerId, createdAt])
+  @@index([storeId, status])
+  @@index([productId])
+  @@index([variantId])
 }
 
 model PriceAlert {

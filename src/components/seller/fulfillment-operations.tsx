@@ -718,7 +718,7 @@ export function FulfillmentOperations() {
                             id={`carrier-${record.id}`}
                             value={draft.carrier}
                             disabled={
-                              Boolean(replacement) && replacement.status !== 'preparing'
+                              replacement ? replacement.status !== 'preparing' : false
                             }
                             onChange={(event) =>
                               setReplacementDrafts((current) => ({
@@ -739,7 +739,7 @@ export function FulfillmentOperations() {
                             id={`tracking-${record.id}`}
                             value={draft.trackingNumber}
                             disabled={
-                              Boolean(replacement) && replacement.status !== 'preparing'
+                              replacement ? replacement.status !== 'preparing' : false
                             }
                             onChange={(event) =>
                               setReplacementDrafts((current) => ({
@@ -762,7 +762,7 @@ export function FulfillmentOperations() {
                           rows={2}
                           value={draft.notes}
                           disabled={
-                            Boolean(replacement) && replacement.status !== 'preparing'
+                            replacement ? replacement.status !== 'preparing' : false
                           }
                           onChange={(event) =>
                             setReplacementDrafts((current) => ({
