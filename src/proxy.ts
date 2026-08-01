@@ -60,6 +60,10 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   return response;
 }
 
+function isPrintableOrderDocument(pathname: string): boolean {
+  return /^\/api\/orders\/[^/]+\/document$/.test(pathname);
+}
+
 function jsonError(
   status: number,
   error: string,
@@ -302,7 +306,10 @@ export async function proxy(request: NextRequest) {
     rateLimit,
   );
 
-  if (pathname.startsWith('/api/')) {
+  // Printable order documents are authenticated HTML and define their own
+  // narrow CSP. Applying the generic API policy as a second CSP would block
+  // their inline print stylesheet and collapse the generated document layout.
+  if (pathname.startsWith('/api/') && !isPrintableOrderDocument(pathname)) {
     response.headers.set('Content-Security-Policy', "default-src 'none'");
   }
 
