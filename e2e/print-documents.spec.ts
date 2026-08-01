@@ -40,7 +40,18 @@ async function expectA4PrintLayout(
 
   const layout = await page.evaluate(() => {
     const main = document.querySelector<HTMLElement>('main');
+    const header = document.querySelector<HTMLElement>('header');
+    const grid = document.querySelector<HTMLElement>('.grid');
+    const brand = document.querySelector<HTMLElement>('.brand');
+    const headingCell = document.querySelector<HTMLElement>('thead th');
     const mainRect = main?.getBoundingClientRect() || null;
+    const headerStyle = header ? window.getComputedStyle(header) : null;
+    const gridStyle = grid ? window.getComputedStyle(grid) : null;
+    const brandStyle = brand ? window.getComputedStyle(brand) : null;
+    const headingCellStyle = headingCell
+      ? window.getComputedStyle(headingCell)
+      : null;
+
     return {
       lang: document.documentElement.lang,
       direction: document.documentElement.dir,
@@ -51,12 +62,28 @@ async function expectA4PrintLayout(
       viewportWidth: window.innerWidth,
       mainLeft: mainRect?.left ?? -1,
       mainRight: mainRect?.right ?? -1,
+      headerDisplay: headerStyle?.display || '',
+      headerBorderBottomWidth: Number.parseFloat(
+        headerStyle?.borderBottomWidth || '0',
+      ),
+      gridDisplay: gridStyle?.display || '',
+      gridColumnCount: (gridStyle?.gridTemplateColumns || '')
+        .split(' ')
+        .filter(Boolean).length,
+      brandColor: brandStyle?.color || '',
+      headingBackground: headingCellStyle?.backgroundColor || '',
     };
   });
 
   expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 2);
   expect(layout.mainLeft).toBeGreaterThanOrEqual(0);
   expect(layout.mainRight).toBeLessThanOrEqual(layout.viewportWidth + 2);
+  expect(layout.headerDisplay).toBe('flex');
+  expect(layout.headerBorderBottomWidth).toBeGreaterThanOrEqual(2);
+  expect(layout.gridDisplay).toBe('grid');
+  expect(layout.gridColumnCount).toBe(2);
+  expect(layout.brandColor).toBe('rgb(180, 83, 9)');
+  expect(layout.headingBackground).toBe('rgb(255, 251, 235)');
 
   const pdf = await page.pdf({
     format: 'A4',
@@ -102,6 +129,9 @@ test.describe('P3 authenticated print documents', () => {
     expect(response?.status()).toBe(200);
     expect(response?.headers()['cache-control']).toContain('private');
     expect(response?.headers()['cache-control']).toContain('no-store');
+    expect(response?.headers()['content-security-policy']).toContain(
+      "style-src 'unsafe-inline'",
+    );
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
     await expect(page.getByRole('heading', { name: 'Order document' })).toBeVisible();
@@ -140,6 +170,9 @@ test.describe('P3 authenticated print documents', () => {
     );
     expect(response?.status()).toBe(200);
     expect(response?.headers()['content-disposition']).toContain('packing-slip');
+    expect(response?.headers()['content-security-policy']).toContain(
+      "style-src 'unsafe-inline'",
+    );
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.getByRole('heading', { name: 'قائمة تجهيز الطلب' })).toBeVisible();
