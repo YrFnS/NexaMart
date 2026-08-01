@@ -63,20 +63,34 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { dir } = useI18n();
+  const { dir, locale } = useI18n();
   const compareActive = useAppStore((state) => state.compareIds.length > 0);
+  const skipLabel = locale === 'ar' ? 'انتقل إلى المحتوى الرئيسي' : 'Skip to main content';
 
   return (
     <div
       dir={dir()}
       className="min-h-screen flex flex-col bg-background text-foreground w-full max-w-full overflow-x-hidden"
     >
+      <a
+        href="#main-content"
+        data-skip-link
+        className="sr-only z-[100] rounded-lg bg-background px-4 py-3 font-semibold text-foreground shadow-lg ring-2 ring-amber-500 ring-offset-2 focus:fixed focus:left-4 focus:top-4 focus:not-sr-only"
+      >
+        {skipLabel}
+      </a>
+
       <ErrorBoundary>
         <OfflineBanner />
         <Header />
         <BreadcrumbNav />
 
-        <main data-app-shell-main className="flex-1 w-full max-w-full">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          data-app-shell-main
+          className="flex-1 w-full max-w-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500"
+        >
           {children}
         </main>
 
