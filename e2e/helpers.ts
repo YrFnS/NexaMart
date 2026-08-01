@@ -86,26 +86,39 @@ export async function loginWithApi(
   page: Page,
   email = 'demo@nexamart.com',
 ) {
-  const response = await page.request.post(`${APP_URL}/api/auth/login`, {
-    headers: {
-      origin: APP_URL,
-      referer: `${APP_URL}/auth`,
+  if (page.url() === 'about:blank') {
+    await gotoAndExpectOk(page, '/');
+  }
+
+  const result = await page.evaluate(
+    async ({ loginEmail, password }) => {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        user?: { email?: string; role?: string };
+        error?: string;
+      };
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        payload,
+      };
     },
-    data: {
-      email,
-      password: SEEDED_PASSWORD,
-    },
-  });
-  const payload = (await response.json().catch(() => ({}))) as {
-    user?: { email?: string; role?: string };
-    error?: string;
-  };
+    { loginEmail: email, password: SEEDED_PASSWORD },
+  );
 
   expect(
-    response.ok(),
-    `Seeded login failed: ${payload.error || response.statusText()}`,
+    result.ok,
+    `Seeded login failed (${result.status}): ${
+      result.payload.error || result.statusText
+    }`,
   ).toBe(true);
-  expect(payload.user?.email).toBe(email);
+  expect(result.payload.user?.email).toBe(email);
 }
 
 export async function firstPublicStoreId(page: Page): Promise<string> {
