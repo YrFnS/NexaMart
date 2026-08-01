@@ -25,6 +25,9 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   const criticalFlows = source('e2e/critical-flows.spec.ts');
   const inventoryRace = source('e2e/inventory-race.spec.ts');
   const checkoutRoute = source('src/app/api/checkout/route.ts');
+  const transitionRoute = source(
+    'src/app/api/orders/[id]/transition/route.ts',
+  );
   const quickView = source('src/components/buyer/product-quick-view.tsx');
   const hero = source('src/components/buyer/home/hero-section.tsx');
 
@@ -57,6 +60,10 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(checkoutRoute, /retrySerializableTransaction/);
   assert.match(checkoutRoute, /P2034/);
   assert.match(checkoutRoute, /CHECKOUT_CONFLICT/);
+  assert.match(transitionRoute, /MAX_SERIALIZABLE_ATTEMPTS = 3/);
+  assert.match(transitionRoute, /retrySerializableTransaction/);
+  assert.match(transitionRoute, /P2034/);
+  assert.match(transitionRoute, /ORDER_TRANSITION_CONFLICT/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
