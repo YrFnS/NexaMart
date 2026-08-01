@@ -391,7 +391,7 @@ export const getStoreReviewsData = cache(
   async (storeId: string, limit = 20): Promise<StorefrontReviewsData> => {
     const boundedLimit = Math.min(50, Math.max(1, limit));
     const where: Prisma.StoreReviewWhereInput = { storeId };
-    const [reviews, aggregate, groupedRatings] = await db.$transaction([
+    const [reviews, aggregate, groupedRatings] = await Promise.all([
       db.storeReview.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -412,7 +412,8 @@ export const getStoreReviewsData = cache(
       db.storeReview.groupBy({
         by: ['rating'],
         where,
-        _count: { _all: true },
+        orderBy: { rating: 'desc' },
+        _count: { rating: true },
       }),
     ]);
 
@@ -426,8 +427,13 @@ export const getStoreReviewsData = cache(
         : [];
     const userById = new Map(users.map((user) => [user.id, user]));
     const total = aggregate._count._all;
-    const countByRating = new Map(
-      groupedRatings.map((entry) => [entry.rating, entry._count._all]),
+    const countByRating = new Map<number, number>(
+      groupedRatings.map((entry) => [
+        entry.rating,
+        typeof entry._count === 'object' && entry._count
+          ? entry._count.rating || 0
+          : 0,
+      ]),
     );
 
     return {
