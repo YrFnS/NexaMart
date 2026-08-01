@@ -61,8 +61,8 @@ test('store pages contain no simulated following or invented service promises', 
   assert.doesNotMatch(profile, /avgResponseTime/);
   assert.doesNotMatch(profile, /Business Hours/);
   assert.doesNotMatch(profile, /Free shipping on orders over/);
-  assert.match(profile, /StoreReviewsSection storeId=/);
-  assert.match(reviews, /A valid store ID is required|storeId/);
+  assert.match(profile, /storeId=\{store\.id\}/);
+  assert.match(reviews, /storeId/);
   assert.doesNotMatch(reviews, /Review Submitted/);
   assert.doesNotMatch(reviews, /handleSubmitReview/);
 });
