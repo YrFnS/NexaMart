@@ -1,8 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ProductQuickView } from '@/components/buyer/product-quick-view';
-import { type Product } from '@/components/buyer/product-card';
 import { type Category } from '@/components/buyer/category-grid';
 import {
   CategorySection,
@@ -15,6 +13,8 @@ import {
   TrustStrip,
   type FeaturedStore,
 } from '@/components/buyer/home';
+import { type Product } from '@/components/buyer/product-card';
+import { ProductQuickView } from '@/components/buyer/product-quick-view';
 import { useI18n } from '@/lib/i18n';
 
 interface HeroBanner {
@@ -37,7 +37,9 @@ export function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<FeaturedStore[]>([]);
   const [heroBanners, setHeroBanners] = useState<HeroBanner[]>([]);
-  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(
+    null,
+  );
   const [quickViewOpen, setQuickViewOpen] = useState(false);
 
   useEffect(() => {
@@ -49,7 +51,9 @@ export function HomePage() {
           await Promise.all([
             fetch('/api/categories', { signal: controller.signal }),
             fetch('/api/products?limit=24', { signal: controller.signal }),
-            fetch('/api/stores?limit=12', { signal: controller.signal }),
+            fetch('/api/stores?limit=12&sort=rating', {
+              signal: controller.signal,
+            }),
             fetch('/api/banners?position=hero', { signal: controller.signal }),
           ]);
 
@@ -64,11 +68,10 @@ export function HomePage() {
           setProducts(payload.products || []);
         }
         if (storeResponse.ok) {
-          const payload = (await storeResponse.json()) as unknown;
-          const list = Array.isArray(payload)
-            ? (payload as FeaturedStore[])
-            : [];
-          setStores(list);
+          const payload = (await storeResponse.json()) as {
+            stores?: FeaturedStore[];
+          };
+          setStores(payload.stores || []);
         }
         if (bannerResponse.ok) {
           const payload = (await bannerResponse.json()) as {
@@ -100,14 +103,17 @@ export function HomePage() {
     [products],
   );
   const popularProducts = useMemo(
-    () => [...products].sort((a, b) => b.soldCount - a.soldCount).slice(0, 8),
+    () =>
+      [...products]
+        .sort((left, right) => right.soldCount - left.soldCount)
+        .slice(0, 8),
     [products],
   );
   const featuredStores = useMemo(
     () =>
       stores
         .filter((store) => store.isVerified)
-        .sort((a, b) => b.rating - a.rating)
+        .sort((left, right) => right.rating - left.rating)
         .slice(0, 4),
     [stores],
   );
@@ -122,7 +128,9 @@ export function HomePage() {
       icon: 'Sparkles',
     },
     {
-      title: isRTL ? 'منتجات من متاجر متعددة' : 'Products from multiple stores',
+      title: isRTL
+        ? 'منتجات من متاجر متعددة'
+        : 'Products from multiple stores',
       description: isRTL
         ? 'قارن الخيارات والأسعار ثم تابع تنفيذ طلبك من كل بائع.'
         : 'Compare options and prices, then follow fulfilment from every seller.',
@@ -142,7 +150,8 @@ export function HomePage() {
               ? banner.descriptionAr
               : banner.description || '',
           gradient:
-            banner.gradient || 'from-amber-700 via-amber-600 to-orange-600',
+            banner.gradient ||
+            'from-amber-700 via-amber-600 to-orange-600',
           cta:
             isRTL && banner.ctaTextAr
               ? banner.ctaTextAr
