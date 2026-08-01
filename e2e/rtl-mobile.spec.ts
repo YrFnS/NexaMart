@@ -1,4 +1,9 @@
-import { expect, test, type Locator } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import {
   APP_URL,
   expectNoHorizontalOverflow,
@@ -22,6 +27,31 @@ async function isInViewport(locator: Locator): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function scrollSelectorIntoView(page: Page, selector: string) {
+  const locator = page.locator(selector);
+  await expect(locator).toBeVisible();
+  await page.evaluate((value) => {
+    document.querySelector<HTMLElement>(value)?.scrollIntoView({
+      behavior: 'auto',
+      block: 'center',
+      inline: 'nearest',
+    });
+  }, selector);
+  await expect(locator).toBeInViewport();
+}
+
+async function scrollLocatorIntoView(locator: Locator) {
+  await expect(locator).toBeVisible();
+  await locator.evaluate((element) => {
+    (element as HTMLElement).scrollIntoView({
+      behavior: 'auto',
+      block: 'center',
+      inline: 'nearest',
+    });
+  });
+  await expect(locator).toBeInViewport();
 }
 
 test.describe('P3 Arabic and mobile verification', () => {
@@ -89,8 +119,7 @@ test.describe('P3 Arabic and mobile verification', () => {
     // The compact bar must not appear before buyers reach the complete product
     // options and primary controls, otherwise it can cover selectable variants.
     await expect(stickyPurchaseBar).toHaveCount(0);
-    await primaryPurchaseActions.scrollIntoViewIfNeeded();
-    await expect(primaryPurchaseActions).toBeInViewport();
+    await scrollSelectorIntoView(page, '[data-product-primary-actions]');
 
     const addToCart = primaryPurchaseActions.getByRole('button', {
       name: actionName,
@@ -176,8 +205,7 @@ test.describe('P3 Arabic and mobile verification', () => {
     expect(actionLayout.blockers).toEqual([]);
     expect(actionLayout.assistantOverlapsActionContainer).toBe(false);
 
-    const fulfillmentSection = page.locator('#fulfillment-details-title');
-    await fulfillmentSection.scrollIntoViewIfNeeded();
+    await scrollSelectorIntoView(page, '#fulfillment-details-title');
     await expect
       .poll(async () => isInViewport(stickyPurchaseBar))
       .toBe(true);
@@ -190,7 +218,7 @@ test.describe('P3 Arabic and mobile verification', () => {
     const compareToggle = page
       .getByRole('button', { name: /مقارنة|Compare/i })
       .first();
-    await compareToggle.scrollIntoViewIfNeeded();
+    await scrollLocatorIntoView(compareToggle);
     await expect(primaryPurchaseActions).toBeInViewport();
     await expect(stickyPurchaseBar).toHaveCount(0);
     await compareToggle.click();
