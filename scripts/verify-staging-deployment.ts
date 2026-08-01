@@ -60,6 +60,23 @@ function stagingBaseUrl(): URL {
   return url;
 }
 
+function stagingAuthHeaders(): Record<string, string> {
+  const name = process.env.STAGING_AUTH_HEADER_NAME?.trim();
+  const value = process.env.STAGING_AUTH_HEADER_VALUE?.trim();
+  if (Boolean(name) !== Boolean(value)) {
+    throw new Error(
+      'STAGING_AUTH_HEADER_NAME and STAGING_AUTH_HEADER_VALUE must be configured together.',
+    );
+  }
+  if (!name || !value) return {};
+  if (/\r|\n/.test(name) || /\r|\n/.test(value)) {
+    throw new Error('Staging authentication headers cannot contain newlines.');
+  }
+  return { [name]: value };
+}
+
+const authHeaders = stagingAuthHeaders();
+
 async function fetchWithTimeout(url: URL, accept: string): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
@@ -68,7 +85,7 @@ async function fetchWithTimeout(url: URL, accept: string): Promise<Response> {
     return await fetch(url, {
       redirect: 'follow',
       cache: 'no-store',
-      headers: { Accept: accept },
+      headers: { Accept: accept, ...authHeaders },
       signal: controller.signal,
     });
   } finally {
