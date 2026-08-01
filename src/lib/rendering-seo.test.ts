@@ -31,18 +31,23 @@ test('primary storefront routes render their data on the server', () => {
 
 test('storefront data is bounded, serialized, and review counts are grouped', () => {
   const data = source('src/lib/storefront-data.ts');
+  const reviewApi = source('src/app/api/store-reviews/route.ts');
 
   assert.match(data, /take: 24/);
   assert.match(data, /Number\(product\.price\)/);
   assert.match(data, /toISOString\(\)/);
   assert.match(data, /storeReview\.groupBy/);
+  assert.match(reviewApi, /storeReview\.groupBy/);
+  assert.doesNotMatch(reviewApi, /rating: 5 \}\) \}\),/);
   assert.doesNotMatch(data, /Math\.random/);
 });
 
-test('metadata, crawler files, and structured data are present', () => {
+test('metadata, crawler files, structured data, and PWA branding are present', () => {
   const layout = source('src/app/layout.tsx');
   const robots = source('src/app/robots.ts');
   const sitemap = source('src/app/sitemap.ts');
+  const openGraphImage = source('src/app/opengraph-image.tsx');
+  const manifest = source('public/manifest.json');
   const product = source('src/app/(buyer)/product/[id]/page.tsx');
   const store = source('src/app/(buyer)/store/[id]/page.tsx');
 
@@ -52,6 +57,11 @@ test('metadata, crawler files, and structured data are present', () => {
   assert.match(robots, /sitemap\.xml/);
   assert.match(robots, /disallow/);
   assert.match(sitemap, /getSitemapStorefrontData/);
+  assert.match(openGraphImage, /new ImageResponse/);
+  assert.match(openGraphImage, /Pay on delivery/);
+  assert.match(manifest, /Multi-Vendor Marketplace/);
+  assert.match(manifest, /#d97706/);
+  assert.doesNotMatch(manifest, /AI-Powered/);
   assert.match(product, /application\/ld\+json/);
   assert.match(product, /'@type': 'Product'/);
   assert.match(store, /application\/ld\+json/);
