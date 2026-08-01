@@ -44,8 +44,12 @@ export function getRateLimitMode(
   );
   if (redisConfigured) return 'redis';
 
+  // Keep readiness reporting aligned with the actual limiter implementation:
+  // any Node production process fails closed unless fallback is explicitly
+  // enabled, including a production-built staging deployment.
+  const nodeEnvironment = value(environment.NODE_ENV)?.toLowerCase();
   const memoryFallbackAllowed =
-    getDeploymentEnvironment(environment) !== 'production' ||
+    nodeEnvironment !== 'production' ||
     environment.RATE_LIMIT_ALLOW_MEMORY_FALLBACK === 'true';
 
   return memoryFallbackAllowed ? 'memory-fallback' : 'unavailable';
