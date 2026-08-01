@@ -36,6 +36,13 @@ test('production rate limiting requires both Redis REST credentials', () => {
   );
   assert.equal(
     getRateLimitMode({
+      DEPLOYMENT_ENV: 'staging',
+      NODE_ENV: 'production',
+    }),
+    'unavailable',
+  );
+  assert.equal(
+    getRateLimitMode({
       NODE_ENV: 'production',
       RATE_LIMIT_ALLOW_MEMORY_FALLBACK: 'true',
     }),
