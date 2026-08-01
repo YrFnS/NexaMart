@@ -35,6 +35,10 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(rtlMobile, /nexamart_locale/);
   assert.match(rtlMobile, /toHaveAttribute\('dir', 'rtl'\)/);
   assert.match(rtlMobile, /reducedMotion: 'reduce'/);
+  assert.match(rtlMobile, /data-product-purchase-actions/);
+  assert.match(rtlMobile, /elementFromPoint/);
+  assert.match(rtlMobile, /purchaseOverlapsComparison/);
+  assert.match(rtlMobile, /assistantOverlapsPurchaseBar/);
   assert.match(criticalFlows, /\/api\/auth\/login/);
   assert.match(criticalFlows, /\/api\/auth\/session/);
   assert.match(criticalFlows, /\/api\/checkout/);
