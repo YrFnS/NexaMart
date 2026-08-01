@@ -106,8 +106,9 @@ model Product {
   nameAr          String?
   description     String?
   descriptionAr   String?
-  price           Float
-  originalPrice   Float?
+  price           Decimal  @db.Decimal(18, 2)
+  originalPrice   Decimal? @db.Decimal(18, 2)
+  currency        String   @default("USD") @db.Char(3)
   images          String   @default("[]") // JSON array
   categoryId      String
   storeId         String
@@ -150,8 +151,9 @@ model ProductVariant {
   sku           String   @unique
   attributes    String   // canonical JSON object shown to users and orders
   optionKey     String   // canonical JSON key used for uniqueness/lookups
-  price         Float
-  originalPrice Float?
+  price         Decimal  @db.Decimal(18, 2)
+  originalPrice Decimal? @db.Decimal(18, 2)
+  currency      String   @default("USD") @db.Char(3)
   stock         Int      @default(0)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -171,11 +173,12 @@ model Order {
   userId          String
   storeId         String?
   status          String   @default("pending") // pending, processing, shipped, delivered, cancelled, disputed
-  subtotal        Float
-  shippingCost    Float    @default(0)
-  discount        Float    @default(0)
-  tax             Float    @default(0)
-  total           Float
+  subtotal        Decimal  @db.Decimal(18, 2)
+  shippingCost    Decimal  @default(0) @db.Decimal(18, 2)
+  discount        Decimal  @default(0) @db.Decimal(18, 2)
+  tax             Decimal  @default(0) @db.Decimal(18, 2)
+  total           Decimal  @db.Decimal(18, 2)
+  currency        String   @default("USD") @db.Char(3)
   paymentMethod   String?
   paymentStatus   String   @default("pending") // pending, paid, refunded
   shippingAddress String?
@@ -214,8 +217,9 @@ model OrderItem {
   productId String
   variantId String?
   quantity  Int
-  price     Float
-  total     Float
+  price     Decimal @db.Decimal(18, 2)
+  total     Decimal @db.Decimal(18, 2)
+  currency  String  @default("USD") @db.Char(3)
   variation String? // canonical JSON snapshot
 
   order   Order           @relation(fields: [orderId], references: [id])
@@ -326,10 +330,11 @@ model FlashSale {
 model Coupon {
   id          String    @id @default(cuid())
   code        String    @unique
-  discount    Float
+  discount    Decimal   @db.Decimal(18, 2)
   type        String    @default("percentage") // percentage, fixed
-  minOrder    Float     @default(0)
-  maxDiscount Float?
+  minOrder    Decimal   @default(0) @db.Decimal(18, 2)
+  maxDiscount Decimal?  @db.Decimal(18, 2)
+  currency    String    @default("USD") @db.Char(3)
   usageLimit  Int?
   usedCount   Int       @default(0)
   storeId     String?
@@ -548,8 +553,9 @@ model Return {
   buyerId                  String
   sellerId                 String
   quantity                 Int
-  unitPrice                Float?
-  refundAmount             Float
+  unitPrice                Decimal?  @db.Decimal(18, 2)
+  refundAmount             Decimal   @db.Decimal(18, 2)
+  currency                 String    @default("USD") @db.Char(3)
   reason                   String    @default("other") // wrong_item, defective, not_as_described, changed_mind, damaged_shipping, other
   details                  String?
   resolution               String    @default("return_only") // return_only, exchange, offline_refund
@@ -596,11 +602,12 @@ model Invoice {
   invoiceNumber String    @unique
   sellerId      String
   buyerId       String
-  subtotal      Float
-  shipping      Float     @default(0)
-  discount      Float     @default(0)
-  tax           Float     @default(0)
-  total         Float
+  subtotal      Decimal   @db.Decimal(18, 2)
+  shipping      Decimal   @default(0) @db.Decimal(18, 2)
+  discount      Decimal   @default(0) @db.Decimal(18, 2)
+  tax           Decimal   @default(0) @db.Decimal(18, 2)
+  total         Decimal   @db.Decimal(18, 2)
+  currency      String    @default("USD") @db.Char(3)
   taxId         String?
   paymentMethod String?
   status        String    @default("unpaid") // paid, unpaid, overdue

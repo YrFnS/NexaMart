@@ -22,16 +22,17 @@ export async function GET(request: Request) {
 
     // Calculate discount percentage for each product
     const flashSales = products.map(product => {
-      const originalPrice = product.originalPrice || product.price;
+      const price = Number(product.price);
+      const originalPrice = Number(product.originalPrice ?? product.price);
       const discountPercent = originalPrice > 0
-        ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
+        ? Math.round(((originalPrice - price) / originalPrice) * 100)
         : 0;
 
       return {
         id: product.id,
         name: product.name,
         nameAr: product.nameAr,
-        price: product.price,
+        price,
         originalPrice,
         discountPercent,
         image: product.images ? JSON.parse(product.images)[0] || '' : '',

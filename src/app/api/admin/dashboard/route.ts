@@ -28,8 +28,8 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const platformRevenue = (orderAgg._sum.total || 0) * 0.1; // 10% commission estimate
-    const avgOrderValue = orderAgg._avg.total || 0;
+    const platformRevenue = Number(orderAgg._sum.total || 0) * 0.1; // 10% commission estimate
+    const avgOrderValue = Number(orderAgg._avg.total || 0);
 
     // Get orders by status
     const ordersByStatusRaw = await db.order.groupBy({
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
     const topSellers = topStores.map((store) => ({
       name: store.name,
-      revenue: store.orders.reduce((sum, o) => sum + o.total, 0),
+      revenue: store.orders.reduce((sum, o) => sum + Number(o.total), 0),
       orders: store.orders.length,
       rating: store.rating,
     }));
@@ -128,7 +128,8 @@ export async function GET(request: Request) {
 
     for (const order of ordersForChart) {
       const monthKey = `${monthNames[order.createdAt.getMonth()]} ${order.createdAt.getFullYear()}`;
-      revenueByMonth[monthKey] = (revenueByMonth[monthKey] || 0) + order.total;
+      revenueByMonth[monthKey] =
+        (revenueByMonth[monthKey] || 0) + Number(order.total);
     }
 
     const revenueChart = Object.entries(revenueByMonth).map(([month, revenue]) => ({
@@ -142,7 +143,7 @@ export async function GET(request: Request) {
 
     const dashboardData = {
       kpi: {
-        gmv: orderAgg._sum.total || 0,
+        gmv: Number(orderAgg._sum.total || 0),
         gmvChange: 0,
         totalUsers,
         totalUsersChange: 0,

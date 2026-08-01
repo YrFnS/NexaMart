@@ -14,8 +14,6 @@ import {
   Tag,
   X,
   CheckCircle2,
-  Sparkles,
-  Gift,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,8 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useI18n } from '@/lib/i18n';
 import { getLocale } from '@/lib/utils';
-import { formatPrice, CURRENCIES, type CurrencyCode } from '@/lib/currency';
-import type { Address, ShippingMethod, PaymentMethod, AppliedCoupon, AvailableCoupon, CheckoutStep } from '../../checkout-types';
+import { formatPrice, type CurrencyCode } from '@/lib/currency';
+import type { Address, ShippingMethod, PaymentMethod, AppliedCoupon, CheckoutStep } from '../../checkout-types';
 import { getPlaceholderImage } from '@/lib/placeholder-image';
 
 interface CartItem {
@@ -54,7 +52,6 @@ interface CheckoutReviewProps {
   couponError: string;
   isApplyingCoupon: boolean;
   couponCode: string;
-  availableCoupons: AvailableCoupon[];
   items: CartItem[];
   selectedAddress: Address | undefined;
   showNewAddress: boolean;
@@ -83,7 +80,6 @@ export function CheckoutReview({
   couponError,
   isApplyingCoupon,
   couponCode,
-  availableCoupons,
   items,
   selectedAddress,
   showNewAddress,
@@ -249,8 +245,6 @@ export function CheckoutReview({
                     <Badge className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px]">
                       {appliedCoupon.discountType === 'percentage'
                         ? `${appliedCoupon.discountValue}% ${t('b_offLower')}`
-                        : appliedCoupon.discountType === 'free_shipping'
-                        ? t('b_freeShippingLabel')
                         : `${formatPrice(appliedCoupon.discountValue, currency)} ${t('b_offLower')}`}
                     </Badge>
                   </div>
@@ -297,46 +291,6 @@ export function CheckoutReview({
         </CardContent>
       </Card>
 
-      {/* Available Coupons */}
-      {availableCoupons.length > 0 && !appliedCoupon && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Gift className="size-4 text-amber-500" />
-              {t('b_availableCoupons')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {availableCoupons.slice(0, 4).map((coupon) => (
-                <button
-                  key={coupon.id}
-                  type="button"
-                  onClick={() => { setCouponCode(coupon.code); }}
-                  className="w-full flex items-center justify-between p-2.5 rounded-lg border border-dashed border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors text-start"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-md bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-                      <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-xs text-emerald-700 dark:text-emerald-300">{coupon.code}</span>
-                      <p className="text-[10px] text-muted-foreground">{isRTL ? coupon.descriptionAr : coupon.description}</p>
-                    </div>
-                  </div>
-                  <Badge className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[10px] shrink-0">
-                    {coupon.discountType === 'percentage'
-                      ? `${coupon.discountValue}%`
-                      : coupon.discountType === 'free_shipping'
-                      ? t('b_freeShip')
-                      : `$${coupon.discountValue}`}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Totals */}
       <Card className="bg-muted/30">
@@ -376,15 +330,6 @@ export function CheckoutReview({
               <span className="text-emerald-600 dark:text-emerald-400">-{formatPrice(couponDiscount, currency)}</span>
             </div>
           )}
-          {appliedCoupon && couponDiscount === 0 && appliedCoupon.discountType === 'free_shipping' && (
-            <div className="flex justify-between text-sm">
-              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <Tag className="size-3" />
-                {t('b_freeShippingLabel')} ({appliedCoupon.code})
-              </span>
-              <span className="text-emerald-600 dark:text-emerald-400">{t('b_applied')}</span>
-            </div>
-          )}
           <Separator />
           <div className="flex justify-between text-lg font-bold">
             <span>{t('total')}</span>
@@ -392,7 +337,7 @@ export function CheckoutReview({
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1">
             <Lock className="size-3" />
-            {t('b_pricesDisplayedIn', { currency: isRTL ? (CURRENCIES[currency]?.nameAr || currency) : (CURRENCIES[currency]?.name || currency) })}
+            {t('b_pricesDisplayedIn', { currency })}
           </div>
         </CardContent>
       </Card>

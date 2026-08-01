@@ -1,4 +1,5 @@
 import { SHIPPING_CONFIG } from './config.ts';
+import { fromCents, toCents } from './money.ts';
 import { COUNTRY_TAX_RATES, isTaxExempt } from './tax.ts';
 
 export type ShippingMethod = 'standard' | 'express' | 'next_day';
@@ -22,10 +23,7 @@ export interface ValidatedVariation {
 
 export class VariationValidationError extends Error {}
 
-export const toCents = (value: number): number =>
-  Math.round((value + Number.EPSILON) * 100);
-
-export const fromCents = (value: number): number => value / 100;
+export { fromCents, toCents } from './money.ts';
 
 export function allocateCents(total: number, weights: number[]): number[] {
   if (weights.length === 0) return [];

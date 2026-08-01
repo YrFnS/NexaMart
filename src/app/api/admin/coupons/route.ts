@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { BASE_CURRENCY } from '@/lib/money';
 import {
   getAdminActorId,
   validateAdminRequest,
@@ -16,6 +17,7 @@ const couponFields = z.object({
   maxDiscount: z.number().positive().max(1_000_000).optional().nullable(),
   usageLimit: z.number().int().positive().max(10_000_000).optional().nullable(),
   storeId: z.string().min(1).max(64).optional().nullable(),
+  currency: z.literal(BASE_CURRENCY).default(BASE_CURRENCY),
   isActive: z.boolean().default(true),
   expiresAt: z.coerce.date().optional().nullable(),
 });
@@ -51,6 +53,17 @@ async function audit(
   });
 }
 
+function serializeCoupon<T extends { discount: unknown; minOrder: unknown; maxDiscount: unknown }>(coupon: T) {
+  return {
+    ...coupon,
+    discount: Number(coupon.discount),
+    minOrder: Number(coupon.minOrder),
+    maxDiscount:
+      coupon.maxDiscount === null ? null : Number(coupon.maxDiscount),
+    currency: BASE_CURRENCY,
+  };
+}
+
 function requireActor(request: Request): string | NextResponse {
   const actorId = getAdminActorId(request);
   if (actorId) return actorId;
@@ -80,7 +93,13 @@ export async function GET(request: Request) {
       }),
       db.coupon.count(),
     ]);
-    return NextResponse.json({ coupons, total, page, limit });
+    return NextResponse.json({
+      coupons: coupons.map(serializeCoupon),
+      total,
+      page,
+      limit,
+      currency: BASE_CURRENCY,
+    });
   } catch (error) {
     console.error('Admin coupons GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch coupons.' }, { status: 500 });
@@ -116,7 +135,10 @@ export async function POST(request: Request) {
       });
       return created;
     });
-    return NextResponse.json({ success: true, coupon }, { status: 201 });
+    return NextResponse.json(
+      { success: true, coupon: serializeCoupon(coupon) },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'Coupon code already exists.' }, { status: 409 });
@@ -168,7 +190,7 @@ export async function PUT(request: Request) {
     if (!coupon) {
       return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, coupon });
+    return NextResponse.json({ success: true, coupon: serializeCoupon(coupon) });
   } catch (error) {
     if (error instanceof CouponError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

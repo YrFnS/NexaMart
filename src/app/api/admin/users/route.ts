@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
     const result = users.map(u => {
       const orderCount = u.orders.length;
-      const revenue = u.orders.reduce((sum, o) => sum + o.total, 0);
+      const revenue = u.orders.reduce((sum, o) => sum + Number(o.total), 0);
       let status: 'active' | 'banned' | 'suspended' = 'active';
       if (u.isBanned) status = 'banned';
 

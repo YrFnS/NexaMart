@@ -30,7 +30,6 @@ import type {
   CheckoutStep,
   Address,
   AppliedCoupon,
-  AvailableCoupon,
   PaymentMethod,
   ShippingMethod,
   CheckoutStepInfo,
@@ -91,6 +90,7 @@ interface CheckoutResponse {
   orderNumbers?: string[];
   total?: number;
   error?: string;
+  currency?: 'USD';
 }
 
 export function CheckoutPage() {
@@ -119,17 +119,8 @@ export function CheckoutPage() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponError, setCouponError] = useState('');
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-  const [availableCoupons, setAvailableCoupons] = useState<AvailableCoupon[]>([]);
-
   const [newAddress, setNewAddress] = useState(DEFAULT_NEW_ADDRESS);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-
-  useEffect(() => {
-    void fetch('/api/coupons?action=available')
-      .then((response) => response.json())
-      .then((data) => setAvailableCoupons(data.coupons || []))
-      .catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,7 +247,15 @@ export function CheckoutPage() {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponCode, subtotal }),
+        body: JSON.stringify({
+          code: couponCode,
+          items: items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity: item.quantity,
+            variation: item.variation,
+          })),
+        }),
       });
       const data = await response.json();
       if (data.valid) {
@@ -544,8 +543,7 @@ export function CheckoutPage() {
             couponError={couponError}
             isApplyingCoupon={isApplyingCoupon}
             couponCode={couponCode}
-            availableCoupons={availableCoupons}
-            items={items}
+              items={items}
             selectedAddress={selectedAddress}
             showNewAddress={showNewAddress}
             newAddress={newAddress}

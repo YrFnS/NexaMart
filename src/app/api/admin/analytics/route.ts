@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       for (const o of orders) {
         const dateKey = o.createdAt.toISOString().slice(0, 10);
         const existing = dailyMap.get(dateKey) || { date: dateKey, revenue: 0, orders: 0 };
-        existing.revenue += o.total;
+        existing.revenue += Number(o.total);
         existing.orders += 1;
         dailyMap.set(dateKey, existing);
       }
@@ -77,7 +77,10 @@ export async function GET(request: Request) {
         id: c.id,
         name: c.name,
         productCount: c._count.products,
-        estimatedRevenue: c.products.reduce((sum, p) => sum + (p.soldCount * p.price), 0),
+        estimatedRevenue: c.products.reduce(
+          (sum, p) => sum + p.soldCount * Number(p.price),
+          0,
+        ),
       }));
 
       return NextResponse.json({ categoryBreakdown });
@@ -105,7 +108,7 @@ export async function GET(request: Request) {
         storeId: s.storeId,
         storeName: storeMap.get(s.storeId!)?.name || 'Unknown',
         tier: storeMap.get(s.storeId!)?.tier || 'free',
-        revenue: s._sum.total || 0,
+        revenue: Number(s._sum.total || 0),
         orders: s._count.id,
       }));
 
@@ -122,7 +125,7 @@ export async function GET(request: Request) {
       const orderStatusBreakdown = statusCounts.map(s => ({
         status: s.status,
         count: s._count.status,
-        revenue: s._sum.total || 0,
+        revenue: Number(s._sum.total || 0),
       }));
 
       return NextResponse.json({ orderStatusBreakdown });
@@ -160,14 +163,14 @@ export async function GET(request: Request) {
         totalStores,
         totalOrders,
         totalProducts,
-        totalRevenue: orderAgg._sum.total || 0,
-        avgOrderValue: orderAgg._avg.total || 0,
+        totalRevenue: Number(orderAgg._sum.total || 0),
+        avgOrderValue: Number(orderAgg._avg.total || 0),
         pendingKYC,
         openDisputes,
         pendingPayouts,
         recentOrders: recentOrders.map(o => ({
           orderNumber: o.orderNumber,
-          total: o.total,
+          total: Number(o.total),
           status: o.status,
           date: o.createdAt.toISOString().slice(0, 10),
         })),

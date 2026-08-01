@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuthenticatedUser, type AuthenticatedUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { BASE_CURRENCY, centsToDecimal, fromCents, toCents } from '@/lib/money';
 import {
   canCompleteReturn,
   canTransitionReturn,
@@ -142,7 +143,9 @@ function serializeReturn(record: ReturnWithRelations) {
   const product = record.orderItem?.product || record.product;
   const variant = record.orderItem?.variant;
   const unitPrice = Number(
-    record.unitPrice ?? record.orderItem?.price ?? record.refundAmount / record.quantity,
+    record.unitPrice ??
+      record.orderItem?.price ??
+      Number(record.refundAmount) / record.quantity,
   );
   const attributes = variant
     ? parseObject(variant.attributes)
@@ -164,6 +167,7 @@ function serializeReturn(record: ReturnWithRelations) {
     unitPrice,
     referenceAmount: Number(record.refundAmount),
     refundAmount: Number(record.refundAmount),
+    currency: record.currency,
     reason: record.reason,
     reasonLabel: label(record.reason),
     details: record.details || '',
@@ -233,6 +237,7 @@ async function eligibleOrders(userId: string) {
             nameAr: item.product.nameAr,
             image: firstImage(item.product.images),
             unitPrice: Number(item.price),
+            currency: item.currency,
             quantityPurchased: item.quantity,
             alreadyRequested,
             remainingQuantity,
@@ -361,8 +366,8 @@ export async function POST(request: Request) {
           throw new Error('RETURN_QUANTITY_EXCEEDED');
         }
 
-        const unitPrice = Number(item.price);
-        const amount = Math.round(unitPrice * parsed.data.quantity * 100) / 100;
+        const unitPriceCents = toCents(item.price);
+        const amountCents = unitPriceCents * parsed.data.quantity;
         const now = new Date().toISOString();
         return tx.return.create({
           data: {
@@ -374,8 +379,9 @@ export async function POST(request: Request) {
             buyerId: auth.user.id,
             sellerId: item.order.store.ownerId,
             quantity: parsed.data.quantity,
-            unitPrice,
-            refundAmount: amount,
+            unitPrice: centsToDecimal(unitPriceCents),
+            refundAmount: centsToDecimal(amountCents),
+            currency: item.currency || BASE_CURRENCY,
             reason: parsed.data.reason,
             details: parsed.data.details || null,
             resolution: parsed.data.resolution,

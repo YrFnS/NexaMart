@@ -161,7 +161,7 @@ export async function POST(request: Request) {
         userId: auth.user.id,
         productId: product.id,
         targetPrice: parsed.data.targetPrice,
-        currentPrice: product.price,
+        currentPrice: Number(product.price),
         isActive: true,
         isNotified: false,
         expiresAt: parsed.data.expiresAt || null,

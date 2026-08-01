@@ -3,16 +3,27 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuthenticatedUser } from '@/lib/auth';
 import {
+  CartPricingError,
+  groupPricedCart,
+  priceCartLines,
+} from '@/lib/cart-pricing';
+import {
   allocateCents,
   calculateStoreShippingCents,
   calculateStoreTaxCents,
-  fromCents,
   resolveTaxCountryCode,
-  toCents,
-  validateVariationSelection,
-  VariationValidationError,
 } from '@/lib/checkout-authority';
+import {
+  CouponValidationError,
+  quoteCoupon,
+} from '@/lib/coupon-authority';
 import { db } from '@/lib/db';
+import {
+  BASE_CURRENCY,
+  centsToDecimal,
+  fromCents,
+  toCents,
+} from '@/lib/money';
 import { confirmationDeadline } from '@/lib/order-lifecycle';
 import {
   checkApiRateLimit,
@@ -55,10 +66,7 @@ const checkoutSchema = z.object({
 });
 
 class CheckoutError extends Error {
-  constructor(
-    message: string,
-    readonly status = 400,
-  ) {
+  constructor(message: string, readonly status = 400) {
     super(message);
   }
 }
@@ -76,16 +84,17 @@ function makeInvoiceNumber(index: number): string {
 async function existingCheckout(userId: string, idempotencyKey: string) {
   const orders = await db.order.findMany({
     where: { userId, idempotencyKey },
-    select: { orderNumber: true, total: true },
+    select: { orderNumber: true, total: true, currency: true },
     orderBy: { createdAt: 'asc' },
   });
-
   if (orders.length === 0) return null;
+  const totalCents = orders.reduce((sum, order) => sum + toCents(order.total), 0);
   return {
     success: true,
     idempotentReplay: true,
     orderNumbers: orders.map((order) => order.orderNumber),
-    total: orders.reduce((sum, order) => sum + Number(order.total), 0),
+    total: fromCents(totalCents),
+    currency: BASE_CURRENCY,
     paymentStatus: 'not_applicable' as const,
     orderMethod: 'cash_on_delivery' as const,
   };
@@ -94,7 +103,6 @@ async function existingCheckout(userId: string, idempotencyKey: string) {
 export async function POST(request: Request) {
   const rateLimit = checkApiRateLimit(request, RATE_LIMITS.write);
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
-
   const csrf = validateCsrf(request);
   if (!csrf.valid) {
     return NextResponse.json(
@@ -102,18 +110,18 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-
   const auth = await requireAuthenticatedUser(request);
   if (auth.response) return auth.response;
 
-  const parsed = checkoutSchema.safeParse(await request.json().catch(() => null));
+  const parsed = checkoutSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'The checkout information is incomplete or invalid.' },
       { status: 400 },
     );
   }
-
   const input = parsed.data;
   const replay = await existingCheckout(auth.user.id, input.idempotencyKey);
   if (replay) return NextResponse.json(replay);
@@ -123,7 +131,6 @@ export async function POST(request: Request) {
       async (tx) => {
         let shippingAddress: Record<string, unknown>;
         let shippingCountry: string;
-
         if (input.addressId) {
           const address = await tx.address.findFirst({
             where: { id: input.addressId, userId: auth.user.id },
@@ -154,202 +161,40 @@ export async function POST(request: Request) {
         if (!taxCountryCode) {
           throw new CheckoutError(
             'The selected shipping country is not supported for checkout.',
-            400,
           );
         }
         shippingAddress = { ...shippingAddress, countryCode: taxCountryCode };
 
-        const productIds = [...new Set(input.items.map((item) => item.productId))];
-        const products = await tx.product.findMany({
-          where: { id: { in: productIds }, status: 'active' },
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            stock: true,
-            storeId: true,
-            variations: true,
-            hasFreeShipping: true,
-            category: { select: { id: true, slug: true, name: true } },
-            store: { select: { ownerId: true, name: true } },
-            variantSkus: {
-              where: { isActive: true },
-              select: {
-                id: true,
-                sku: true,
-                attributes: true,
-                optionKey: true,
-                price: true,
-                stock: true,
-              },
-            },
-          },
-        });
-        const productsById = new Map(products.map((product) => [product.id, product]));
-        if (products.length !== productIds.length) {
-          throw new CheckoutError('One or more products are no longer available.', 409);
-        }
-
-        const requested = new Map<string, {
-          productId: string;
-          variantId: string | null;
-          quantity: number;
-          variation: string | null;
-        }>();
-
-        for (const item of input.items) {
-          const product = productsById.get(item.productId);
-          if (!product) throw new CheckoutError('Product not found.', 404);
-
-          let canonicalSelection: string | null = null;
-          try {
-            canonicalSelection = validateVariationSelection(
-              product.variations,
-              item.variation,
-            ).canonical;
-          } catch (error) {
-            if (error instanceof VariationValidationError) {
-              throw new CheckoutError(`${product.name}: ${error.message}`, 409);
-            }
-            throw error;
-          }
-
-          let variant: (typeof product.variantSkus)[number] | null = null;
-          if (product.variantSkus.length > 0) {
-            variant = item.variantId
-              ? product.variantSkus.find((candidate) => candidate.id === item.variantId) || null
-              : product.variantSkus.find((candidate) => candidate.optionKey === canonicalSelection) || null;
-            if (!variant) {
-              throw new CheckoutError(
-                `${product.name}: the selected SKU is no longer available.`,
-                409,
-              );
-            }
-            if (canonicalSelection && variant.optionKey !== canonicalSelection) {
-              throw new CheckoutError(
-                `${product.name}: the submitted SKU does not match the selected options.`,
-                409,
-              );
-            }
-            canonicalSelection = variant.attributes;
-          } else if (item.variantId) {
-            throw new CheckoutError(`${product.name}: invalid SKU selection.`, 409);
-          }
-
-          const key = variant?.id || `${item.productId}:base`;
-          const current = requested.get(key);
-          requested.set(key, {
-            productId: item.productId,
-            variantId: variant?.id || null,
-            variation: canonicalSelection,
-            quantity: (current?.quantity || 0) + item.quantity,
-          });
-        }
-
-        const prepared = [...requested.values()].map((item) => {
-          const product = productsById.get(item.productId);
-          if (!product) throw new CheckoutError('Product not found.', 404);
-          const variant = item.variantId
-            ? product.variantSkus.find((candidate) => candidate.id === item.variantId) || null
-            : null;
-          const unitPrice = toCents(Number(variant?.price ?? product.price));
-          return {
-            ...item,
-            product,
-            variant,
-            unitPrice,
-            availableStock: variant?.stock ?? product.stock,
-            lineTotal: unitPrice * item.quantity,
-          };
-        });
-
-        const quantitiesByProduct = new Map<string, number>();
-        const quantitiesByVariant = new Map<string, { quantity: number; name: string }>();
-        for (const item of prepared) {
-          quantitiesByProduct.set(
-            item.product.id,
-            (quantitiesByProduct.get(item.product.id) || 0) + item.quantity,
-          );
-          if (item.variant) {
-            const current = quantitiesByVariant.get(item.variant.id);
-            quantitiesByVariant.set(item.variant.id, {
-              quantity: (current?.quantity || 0) + item.quantity,
-              name: `${item.product.name} (${item.variant.sku})`,
-            });
-          }
-          if (item.availableStock < item.quantity) {
-            throw new CheckoutError(
-              `${item.product.name} does not have enough stock for this SKU.`,
-              409,
-            );
-          }
-        }
-
-        const groups = new Map<string, typeof prepared>();
-        for (const item of prepared) {
-          const group = groups.get(item.product.storeId) || [];
-          group.push(item);
-          groups.set(item.product.storeId, group);
-        }
-        const stores = [...groups.entries()];
-        const subtotals = stores.map(([, items]) =>
-          items.reduce((sum, item) => sum + item.lineTotal, 0),
+        const lines = await priceCartLines(tx, input.items);
+        const groups = groupPricedCart(lines);
+        const checkoutSubtotal = groups.reduce(
+          (sum, group) => sum + group.subtotalCents,
+          0,
         );
-        const checkoutSubtotal = subtotals.reduce((sum, value) => sum + value, 0);
-
-        let couponDiscount = 0;
-        let couponId: string | null = null;
-        let eligibleStoreId: string | null = null;
-        if (input.couponCode) {
-          const coupon = await tx.coupon.findUnique({
-            where: { code: input.couponCode.toUpperCase() },
-          });
-          const now = new Date();
-          if (
-            !coupon ||
-            !coupon.isActive ||
-            (coupon.expiresAt && coupon.expiresAt <= now) ||
-            (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit)
-          ) {
-            throw new CheckoutError('This coupon is invalid or has expired.');
-          }
-          eligibleStoreId = coupon.storeId;
-          const eligibleSubtotal = coupon.storeId
-            ? stores.reduce(
-                (sum, [storeId], index) =>
-                  storeId === coupon.storeId ? sum + subtotals[index] : sum,
-                0,
-              )
-            : checkoutSubtotal;
-          if (eligibleSubtotal < toCents(Number(coupon.minOrder))) {
-            throw new CheckoutError('The order does not meet this coupon minimum.');
-          }
-          couponDiscount = coupon.type === 'fixed'
-            ? toCents(Number(coupon.discount))
-            : Math.round((eligibleSubtotal * Number(coupon.discount)) / 100);
-          if (coupon.maxDiscount !== null) {
-            couponDiscount = Math.min(couponDiscount, toCents(Number(coupon.maxDiscount)));
-          }
-          couponDiscount = Math.min(couponDiscount, eligibleSubtotal);
-          couponId = coupon.id;
-        }
-
-        const eligibleWeights = stores.map(([storeId], index) =>
-          !eligibleStoreId || storeId === eligibleStoreId ? subtotals[index] : 0,
+        const couponQuote = await quoteCoupon(
+          tx,
+          input.couponCode,
+          groups.map((group) => ({
+            storeId: group.storeId,
+            subtotalCents: group.subtotalCents,
+          })),
         );
-        const discounts = allocateCents(couponDiscount, eligibleWeights);
-        const shippingAllocations = stores.map(([, items], index) =>
+        const discounts =
+          couponQuote?.allocations || groups.map(() => 0);
+        const shippingAllocations = groups.map((group) =>
           calculateStoreShippingCents(
             input.shippingMethod,
-            subtotals[index],
-            items.map((item) => ({ hasFreeShipping: item.product.hasFreeShipping })),
+            group.subtotalCents,
+            group.items.map((item) => ({
+              hasFreeShipping: item.product.hasFreeShipping,
+            })),
           ),
         );
-        const taxes = stores.map(([, items], index) =>
+        const taxes = groups.map((group, index) =>
           calculateStoreTaxCents(
             taxCountryCode,
-            items.map((item) => ({
-              lineTotalCents: item.lineTotal,
+            group.items.map((item) => ({
+              lineTotalCents: item.lineTotalCents,
               categoryId: item.product.category.id,
               categorySlug: item.product.category.slug,
               categoryName: item.product.category.name,
@@ -357,26 +202,58 @@ export async function POST(request: Request) {
             discounts[index],
           ),
         );
-        const totals = subtotals.map(
-          (subtotal, index) =>
-            subtotal + shippingAllocations[index] - discounts[index] + taxes[index],
+        const totals = groups.map(
+          (group, index) =>
+            group.subtotalCents +
+            shippingAllocations[index] -
+            discounts[index] +
+            taxes[index],
         );
         const checkoutTotal = totals.reduce((sum, value) => sum + value, 0);
 
+        const quantitiesByProduct = new Map<string, number>();
+        const quantitiesByVariant = new Map<
+          string,
+          { quantity: number; name: string }
+        >();
+        for (const line of lines) {
+          quantitiesByProduct.set(
+            line.product.id,
+            (quantitiesByProduct.get(line.product.id) || 0) + line.quantity,
+          );
+          if (line.variant) {
+            const current = quantitiesByVariant.get(line.variant.id);
+            quantitiesByVariant.set(line.variant.id, {
+              quantity: (current?.quantity || 0) + line.quantity,
+              name: `${line.product.name} (${line.variant.sku})`,
+            });
+          }
+        }
 
         for (const [variantId, reservation] of quantitiesByVariant) {
           const updated = await tx.productVariant.updateMany({
-            where: { id: variantId, isActive: true, stock: { gte: reservation.quantity } },
+            where: {
+              id: variantId,
+              isActive: true,
+              stock: { gte: reservation.quantity },
+            },
             data: { stock: { decrement: reservation.quantity } },
           });
           if (updated.count !== 1) {
-            throw new CheckoutError(`${reservation.name} changed while ordering.`, 409);
+            throw new CheckoutError(
+              `${reservation.name} changed while ordering.`,
+              409,
+            );
           }
         }
         for (const [productId, quantity] of quantitiesByProduct) {
-          const product = productsById.get(productId);
+          const product = lines.find((line) => line.product.id === productId)?.product;
           const updated = await tx.product.updateMany({
-            where: { id: productId, status: 'active', stock: { gte: quantity } },
+            where: {
+              id: productId,
+              status: 'active',
+              stock: { gte: quantity },
+            },
             data: {
               stock: { decrement: quantity },
               soldCount: { increment: quantity },
@@ -390,43 +267,56 @@ export async function POST(request: Request) {
           }
         }
 
-        if (couponId) {
-          await tx.coupon.update({
-            where: { id: couponId },
+        if (couponQuote) {
+          const updatedCoupon = await tx.coupon.updateMany({
+            where: {
+              id: couponQuote.couponId,
+              isActive: true,
+              ...(couponQuote.usageLimit !== null
+                ? { usedCount: { lt: couponQuote.usageLimit } }
+                : {}),
+            },
             data: { usedCount: { increment: 1 } },
           });
+          if (updatedCoupon.count !== 1) {
+            throw new CouponValidationError(
+              'This coupon reached its usage limit while the order was being placed.',
+              409,
+            );
+          }
         }
 
         const orderNumbers: string[] = [];
-        for (let index = 0; index < stores.length; index += 1) {
-          const [storeId, items] = stores[index];
+        for (let index = 0; index < groups.length; index += 1) {
+          const group = groups[index];
           const orderNumber = makeOrderNumber(index);
           const invoiceNumber = makeInvoiceNumber(index);
-          const paymentStatus = 'not_applicable';
           const order = await tx.order.create({
             data: {
               orderNumber,
               idempotencyKey: input.idempotencyKey,
               userId: auth.user.id,
-              storeId,
+              storeId: group.storeId,
               status: 'pending',
               confirmationExpiresAt: confirmationDeadline(),
-              subtotal: fromCents(subtotals[index]),
-              shippingCost: fromCents(shippingAllocations[index]),
-              discount: fromCents(discounts[index]),
-              tax: fromCents(taxes[index]),
-              total: fromCents(totals[index]),
+              subtotal: centsToDecimal(group.subtotalCents),
+              shippingCost: centsToDecimal(shippingAllocations[index]),
+              discount: centsToDecimal(discounts[index]),
+              tax: centsToDecimal(taxes[index]),
+              total: centsToDecimal(totals[index]),
+              currency: BASE_CURRENCY,
               paymentMethod: 'cash_on_delivery',
-              paymentStatus,
+              paymentStatus: 'not_applicable',
               shippingAddress: JSON.stringify(shippingAddress),
               notes: input.notes || null,
               items: {
-                create: items.map((item) => ({
+                create: group.items.map((item) => ({
                   productId: item.product.id,
                   variantId: item.variant?.id || null,
                   quantity: item.quantity,
-                  price: fromCents(item.unitPrice),
-                  total: fromCents(item.lineTotal),
+                  price: centsToDecimal(item.unitPriceCents),
+                  total: centsToDecimal(item.lineTotalCents),
+                  currency: BASE_CURRENCY,
                   variation: item.variation,
                 })),
               },
@@ -445,13 +335,14 @@ export async function POST(request: Request) {
             data: {
               orderId: order.id,
               invoiceNumber,
-              sellerId: items[0].product.store.ownerId,
+              sellerId: group.items[0].product.store.ownerId,
               buyerId: auth.user.id,
-              subtotal: fromCents(subtotals[index]),
-              shipping: fromCents(shippingAllocations[index]),
-              discount: fromCents(discounts[index]),
-              tax: fromCents(taxes[index]),
-              total: fromCents(totals[index]),
+              subtotal: centsToDecimal(group.subtotalCents),
+              shipping: centsToDecimal(shippingAllocations[index]),
+              discount: centsToDecimal(discounts[index]),
+              tax: centsToDecimal(taxes[index]),
+              total: centsToDecimal(totals[index]),
+              currency: BASE_CURRENCY,
               paymentMethod: 'cash_on_delivery',
               status: 'issued',
             },
@@ -476,17 +367,21 @@ export async function POST(request: Request) {
           orderNumbers,
           total: fromCents(checkoutTotal),
           subtotal: fromCents(checkoutSubtotal),
-          shipping: fromCents(shippingAllocations.reduce((sum, value) => sum + value, 0)),
-          discount: fromCents(couponDiscount),
+          shipping: fromCents(
+            shippingAllocations.reduce((sum, value) => sum + value, 0),
+          ),
+          discount: fromCents(couponQuote?.discountCents || 0),
           tax: fromCents(taxes.reduce((sum, value) => sum + value, 0)),
           taxCountryCode,
-          shipments: stores.map(([storeId], index) => ({
-            storeId,
-            subtotal: fromCents(subtotals[index]),
+          currency: BASE_CURRENCY,
+          shipments: groups.map((group, index) => ({
+            storeId: group.storeId,
+            subtotal: fromCents(group.subtotalCents),
             shipping: fromCents(shippingAllocations[index]),
             discount: fromCents(discounts[index]),
             tax: fromCents(taxes[index]),
             total: fromCents(totals[index]),
+            currency: BASE_CURRENCY,
           })),
           paymentStatus: 'not_applicable' as const,
           orderMethod: 'cash_on_delivery' as const,
@@ -498,19 +393,34 @@ export async function POST(request: Request) {
         timeout: 15_000,
       },
     );
-
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    if (error instanceof CheckoutError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+    if (
+      error instanceof CheckoutError ||
+      error instanceof CartPricingError ||
+      error instanceof CouponValidationError
+    ) {
+      return NextResponse.json(
+        { error: error.message, code: 'code' in error ? error.code : undefined },
+        { status: error.status },
+      );
     }
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const replayAfterRace = await existingCheckout(auth.user.id, input.idempotencyKey);
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const replayAfterRace = await existingCheckout(
+        auth.user.id,
+        input.idempotencyKey,
+      );
       if (replayAfterRace) return NextResponse.json(replayAfterRace);
     }
     console.error('Checkout error:', error);
     return NextResponse.json(
-      { error: 'The order could not be completed. No partial order was saved.' },
+      {
+        error:
+          'The order could not be completed. No partial order was saved.',
+      },
       { status: 500 },
     );
   }
