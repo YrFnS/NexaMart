@@ -180,7 +180,10 @@ export function ProductActions({
 
   return (
     <>
-      <div className="relative rounded-xl p-[2px] action-buttons-gradient-border">
+      <div
+        data-product-primary-actions
+        className="relative rounded-xl p-[2px] action-buttons-gradient-border"
+      >
         <div className="flex flex-col gap-3 rounded-xl bg-background p-1 sm:flex-row">
           <RippleButton
             size="lg"
