@@ -154,7 +154,13 @@ export function ShopPage() {
 	]);
 
 	useEffect(() => {
-		fetchProducts();
+		let cancelled = false;
+		queueMicrotask(() => {
+			if (!cancelled) void fetchProducts();
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, [fetchProducts]);
 
 	useEffect(() => {
@@ -167,11 +173,13 @@ export function ShopPage() {
 	}, [total]);
 
 	useEffect(() => {
-		if (selectedCategory) setCategoryId(selectedCategory);
+		if (!selectedCategory) return;
+		queueMicrotask(() => setCategoryId(selectedCategory));
 	}, [selectedCategory]);
 
 	useEffect(() => {
-		if (searchQuery) setSearch(searchQuery);
+		if (!searchQuery) return;
+		queueMicrotask(() => setSearch(searchQuery));
 	}, [searchQuery]);
 
 	const activeFilters: ActiveFilter[] = [];

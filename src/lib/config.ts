@@ -115,12 +115,12 @@ export const LOYALTY_CONFIG = {
 // ─── Auth / User Defaults ────────────────────────────────────────────────────
 
 export const AUTH_CONFIG = {
-	minPasswordLength: 6,
+	minPasswordLength: 8,
 	demoUser: {
 		id: "demo-user",
 		email: "demo@nexamart.com",
 		name: "Demo User",
-		role: "admin" as const,
+		role: "buyer" as const,
 		loyaltyTier: "gold",
 		loyaltyPoints: 2500,
 		walletBalance: 150.0,

@@ -1,167 +1,142 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { GitCompare, X, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAppStore } from '@/stores/app-store';
-import { useI18n } from '@/lib/i18n';
-import { formatPrice } from '@/lib/currency';
-import { type Product } from '@/components/buyer/product-card';
+import { GitCompare, Trash2, X } from 'lucide-react';
 import { CompareModal } from '@/components/buyer/compare-modal';
+import type { Product } from '@/components/buyer/product-card';
+import { Button } from '@/components/ui/button';
+import { formatPrice } from '@/lib/currency';
+import { useI18n } from '@/lib/i18n';
+import { useAppStore } from '@/stores/app-store';
+
+function productImages(product: Product): string[] {
+  try {
+    const images = JSON.parse(product.images) as unknown;
+    return Array.isArray(images)
+      ? images.filter(
+          (value): value is string =>
+            typeof value === 'string' &&
+            (value.startsWith('/') || value.startsWith('https://')),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 export function CompareDrawer() {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   const isRTL = locale === 'ar';
   const { compareIds, toggleCompare, clearCompare, currency } = useAppStore();
-  const [fetchedProducts, setFetchedProducts] = useState<Product[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  // Compute displayed products from fetched data, preserving compare order
-  const products = compareIds.length > 0
-    ? compareIds
-        .map((id) => fetchedProducts.find((p) => p.id === id))
-        .filter(Boolean) as Product[]
-    : [];
-
-  // Fetch product details for compared items
   useEffect(() => {
     if (compareIds.length === 0) return;
-    let cancelled = false;
-    const idsParam = compareIds.join(',');
-    fetch(`/api/products?ids=${idsParam}&limit=4`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        const allProducts: Product[] = data.products || [];
-        setFetchedProducts(allProducts);
+
+    const controller = new AbortController();
+    fetch(`/api/products?ids=${encodeURIComponent(compareIds.join(','))}&limit=4`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!controller.signal.aborted) setCatalog(payload?.products || []);
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => undefined);
+
+    return () => controller.abort();
   }, [compareIds]);
 
-  // Auto-hide when no items
   if (compareIds.length === 0) return null;
 
-  const getImages = (product: Product): string[] => {
-    try {
-      const parsed = JSON.parse(product.images);
-      if (Array.isArray(parsed)) return parsed.filter((img: string) => typeof img === 'string' && img.startsWith('/'));
-      return [];
-    } catch {
-      return [];
-    }
-  };
+  const products = compareIds
+    .map((id) => catalog.find((product) => product.id === id))
+    .filter((product): product is Product => Boolean(product));
 
   return (
     <>
-      {/* Floating compare bar at the bottom */}
-      <div className="fixed bottom-0 inset-x-0 z-40 animate-in slide-in-from-bottom duration-300">
-        <div className="bg-white/95 dark:bg-card/95 backdrop-blur-lg border-t border-border shadow-2xl">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center gap-3">
-              {/* Compare icon */}
-              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 shrink-0">
-                <GitCompare className="size-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
+      <section
+        aria-label={isRTL ? 'مقارنة المنتجات' : 'Product comparison'}
+        className="nexa-compare-drawer fixed inset-x-3 z-40 animate-in slide-in-from-bottom duration-300 md:inset-x-0"
+      >
+        <div className="rounded-xl border border-amber-200 bg-card/95 shadow-2xl backdrop-blur-lg dark:border-amber-900 md:rounded-none md:border-x-0 md:border-b-0">
+          <div className="container mx-auto flex items-center gap-3 px-3 py-2 md:px-4 md:py-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950">
+              <GitCompare aria-hidden="true" className="size-5 text-amber-700 dark:text-amber-300" />
+            </div>
 
-              {/* Product thumbnails */}
-              <div className="flex items-center gap-2 overflow-x-auto flex-1 scrollbar-thin">
-                {products.map((product) => {
-                  const imgs = getImages(product);
-                  const displayName = isRTL && product.nameAr ? product.nameAr : product.name;
-                  return (
-                    <div
-                      key={product.id}
-                      className="flex items-center gap-2 bg-muted/50 rounded-lg px-2 py-1.5 shrink-0 group/item"
-                    >
-                      {/* Thumbnail */}
-                      <div className="relative w-10 h-10 rounded-md overflow-hidden bg-muted shrink-0">
-                        {imgs.length > 0 ? (
-                          <Image
-                            src={imgs[0]}
-                            alt={displayName}
-                            fill
-                            sizes="40px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900 dark:to-teal-900">
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              {displayName.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+            <div className="min-w-0 flex-1 md:hidden">
+              <p className="truncate text-sm font-semibold">
+                {isRTL ? 'منتجات للمقارنة' : 'Products selected'}
+              </p>
+              <p className="text-xs text-muted-foreground">{compareIds.length}/4</p>
+            </div>
 
-                      {/* Name & Price */}
-                      <div className="min-w-0 max-w-[100px]">
-                        <p className="text-xs font-medium truncate">{displayName}</p>
-                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          {formatPrice(product.price, currency)}
-                        </p>
-                      </div>
-
-                      {/* Remove button */}
-                      <button
-                        onClick={() => toggleCompare(product.id)}
-                        className="size-5 rounded-full flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors shrink-0"
-                        aria-label={isRTL ? 'إزالة' : 'Remove'}
-                      >
-                        <X className="size-3" />
-                      </button>
+            <div className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto md:flex">
+              {products.map((product) => {
+                const name = isRTL && product.nameAr ? product.nameAr : product.name;
+                const image = productImages(product)[0];
+                return (
+                  <article key={product.id} className="flex shrink-0 items-center gap-2 rounded-lg bg-muted/50 px-2 py-1.5">
+                    <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-amber-100 dark:bg-amber-950">
+                      {image ? (
+                        <Image src={image} alt={name} fill sizes="40px" className="object-cover" />
+                      ) : (
+                        <span className="flex h-full items-center justify-center text-xs font-bold text-amber-700 dark:text-amber-300">
+                          {name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
+                    <div className="max-w-28 min-w-0">
+                      <p className="truncate text-xs font-medium">{name}</p>
+                      <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                        {formatPrice(product.price, currency)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleCompare(product.id)}
+                      aria-label={isRTL ? `إزالة ${name}` : `Remove ${name}`}
+                      className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+                    >
+                      <X aria-hidden="true" className="size-3.5" />
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
 
-                {/* Empty slots */}
-                {Array.from({ length: Math.max(0, 4 - products.length) }).map((_, i) => (
-                  <div
-                    key={`empty-${i}`}
-                    className="flex items-center justify-center w-24 h-12 border-2 border-dashed border-muted-foreground/20 rounded-lg shrink-0"
-                  >
-                    <span className="text-[10px] text-muted-foreground/50">
-                      {isRTL ? `فارغ ${products.length + i + 1}` : `Slot ${products.length + i + 1}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 border-red-200 dark:border-red-800 text-xs gap-1.5"
-                  onClick={clearCompare}
-                >
-                  <Trash2 className="size-3" />
-                  {isRTL ? 'مسح الكل' : 'Clear All'}
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs shadow-lg shadow-emerald-500/20 gap-1.5"
-                  onClick={() => setIsModalOpen(true)}
-                  disabled={compareIds.length < 2}
-                >
-                  <GitCompare className="size-3" />
-                  {isRTL ? 'قارن الآن' : 'Compare Now'}
-                  <span className="bg-white/20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
-                    {compareIds.length}
-                  </span>
-                </Button>
-              </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-10 border-red-200 text-red-600 md:w-auto md:px-3"
+                onClick={clearCompare}
+                aria-label={isRTL ? 'مسح المقارنة' : 'Clear comparison'}
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
+                <span className="ms-1.5 hidden md:inline">{isRTL ? 'مسح الكل' : 'Clear all'}</span>
+              </Button>
+              <Button
+                type="button"
+                className="h-10 bg-gradient-to-r from-amber-500 to-amber-700 px-3 text-white"
+                onClick={() => setModalOpen(true)}
+                disabled={compareIds.length < 2}
+              >
+                <GitCompare aria-hidden="true" className="me-1.5 size-4" />
+                {isRTL ? 'قارن' : 'Compare'}
+                <span className="ms-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">
+                  {compareIds.length}
+                </span>
+              </Button>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Compare Modal */}
-      <CompareModal
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        products={products}
-      />
+      <CompareModal open={modalOpen} onOpenChange={setModalOpen} products={products} />
     </>
   );
 }

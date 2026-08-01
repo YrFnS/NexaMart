@@ -1,9 +1,70 @@
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "../src/lib/password.ts";
 
 const db = new PrismaClient();
 
+function canonicalSeedAttributes(attributes: Record<string, string>): string {
+	return JSON.stringify(
+		Object.fromEntries(
+			Object.entries(attributes).sort(([left], [right]) =>
+				left.localeCompare(right),
+			),
+		),
+	);
+}
+
+function expandSeedOptions(raw: string): Record<string, string>[] {
+	let parsed: Record<string, string[]> = {};
+	try {
+		const value = JSON.parse(raw) as unknown;
+		if (value && typeof value === "object" && !Array.isArray(value)) {
+			parsed = Object.fromEntries(
+				Object.entries(value)
+					.filter(([, options]) => Array.isArray(options))
+					.map(([key, options]) => [
+						key,
+						(options as unknown[])
+							.filter((option): option is string => typeof option === "string")
+							.map((option) => option.trim())
+							.filter(Boolean),
+					]),
+			);
+		}
+	} catch {
+		return [];
+	}
+
+	const entries = Object.entries(parsed)
+		.filter(([, options]) => options.length > 0)
+		.sort(([left], [right]) => left.localeCompare(right));
+	if (entries.length === 0) return [];
+
+	return entries.reduce<Record<string, string>[]>(
+		(combinations, [key, options]) =>
+			combinations.flatMap((combination) =>
+				options.map((option) => ({ ...combination, [key]: option })),
+			),
+		[{}],
+	);
+}
+
+function seedSkuPart(value: string): string {
+	return value
+		.toUpperCase()
+		.replace(/[^A-Z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 16) || "OPTION";
+}
+
 async function main() {
 	const now = new Date();
+	const seedPassword = process.env.SEED_DEMO_PASSWORD;
+	if (!seedPassword || seedPassword.length < 12) {
+		throw new Error(
+			"SEED_DEMO_PASSWORD with at least 12 characters is required before seeding.",
+		);
+	}
+	const passwordHash = await hashPassword(seedPassword);
 
 	// ─── CLEANUP ──────────────────────────────────────────────────────────────────
 	await db.auditLog.deleteMany({});
@@ -17,6 +78,7 @@ async function main() {
 	await db.priceAlert.deleteMany({});
 	await db.return.deleteMany({});
 	await db.orderItem.deleteMany({});
+	await db.productVariant.deleteMany({});
 	await db.order.deleteMany({});
 	await db.chatMessage.deleteMany({});
 	await db.wishlist.deleteMany({});
@@ -43,6 +105,7 @@ async function main() {
 		data: [
 			{
 				email: "demo@nexamart.com",
+				passwordHash,
 				name: "Demo User",
 				phone: "+9647701234567",
 				role: "buyer",
@@ -54,6 +117,7 @@ async function main() {
 			},
 			{
 				email: "seller@nexamart.com",
+				passwordHash,
 				name: "TechStore Pro",
 				phone: "+9647709876543",
 				role: "seller",
@@ -65,6 +129,7 @@ async function main() {
 			},
 			{
 				email: "admin@nexamart.com",
+				passwordHash,
 				name: "Admin User",
 				role: "admin",
 				isVerified: true,
@@ -74,6 +139,7 @@ async function main() {
 			},
 			{
 				email: "fashion@nexamart.com",
+				passwordHash,
 				name: "Fashion Hub Seller",
 				role: "seller",
 				isVerified: true,
@@ -83,6 +149,7 @@ async function main() {
 			},
 			{
 				email: "home@nexamart.com",
+				passwordHash,
 				name: "Home Essentials Seller",
 				role: "seller",
 				isVerified: true,
@@ -92,6 +159,7 @@ async function main() {
 			},
 			{
 				email: "beauty@nexamart.com",
+				passwordHash,
 				name: "Beauty World Seller",
 				role: "seller",
 				isVerified: true,
@@ -101,6 +169,7 @@ async function main() {
 			},
 			{
 				email: "sports@nexamart.com",
+				passwordHash,
 				name: "Sports Zone Seller",
 				role: "seller",
 				isVerified: true,
@@ -110,6 +179,7 @@ async function main() {
 			},
 			{
 				email: "ahmed@nexamart.com",
+				passwordHash,
 				name: "Ahmed Al-Rashid",
 				phone: "+966501234567",
 				role: "buyer",
@@ -120,6 +190,7 @@ async function main() {
 			},
 			{
 				email: "fatima@nexamart.com",
+				passwordHash,
 				name: "Fatima Al-Zahra",
 				phone: "+971501112233",
 				role: "buyer",
@@ -130,6 +201,7 @@ async function main() {
 			},
 			{
 				email: "omar@nexamart.com",
+				passwordHash,
 				name: "Omar Hassan",
 				phone: "+962799887766",
 				role: "buyer",
@@ -601,6 +673,32 @@ async function main() {
 		orderBy: { createdAt: "asc" },
 	});
 
+	// ─── PRODUCT VARIANTS / SKUS ─────────────────────────────────────────────────
+	const variantRows = allProducts.flatMap((product) => {
+		const combinations = expandSeedOptions(product.variations);
+		if (combinations.length === 0) return [];
+
+		const evenStock = Math.floor(product.stock / combinations.length);
+		const remainder = product.stock % combinations.length;
+		return combinations.map((attributes, index) => {
+			const optionKey = canonicalSeedAttributes(attributes);
+			const suffix = Object.values(attributes).map(seedSkuPart).join("-");
+			return {
+				productId: product.id,
+				sku: `${product.sku || product.id}-${suffix}`.slice(0, 96),
+				attributes: optionKey,
+				optionKey,
+				price: product.price,
+				originalPrice: product.originalPrice,
+				stock: evenStock + (index < remainder ? 1 : 0),
+				isActive: true,
+			};
+		});
+	});
+	if (variantRows.length > 0) {
+		await db.productVariant.createMany({ data: variantRows });
+	}
+
 	// ─── ORDERS ───────────────────────────────────────────────────────────────────
 	await db.order.createMany({
 		data: [
@@ -614,8 +712,8 @@ async function main() {
 				discount: 10,
 				tax: 6.3,
 				total: 86.29,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "123 Main St",
@@ -633,8 +731,8 @@ async function main() {
 				discount: 0,
 				tax: 14.0,
 				total: 213.99,
-				paymentMethod: "wallet",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "123 Main St",
@@ -648,14 +746,14 @@ async function main() {
 				orderNumber: "ORD-003",
 				userId: user.id,
 				storeId: stores[0].id,
-				status: "processing",
+				status: "preparing",
 				subtotal: 249.99,
 				shippingCost: 0,
 				discount: 25,
 				tax: 15.75,
 				total: 240.74,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "456 Oak Ave",
@@ -668,13 +766,14 @@ async function main() {
 				userId: user.id,
 				storeId: stores[3].id,
 				status: "pending",
+				confirmationExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
 				subtotal: 79.99,
 				shippingCost: 5.99,
 				discount: 0,
 				tax: 5.6,
 				total: 91.58,
-				paymentMethod: "zain_cash",
-				paymentStatus: "pending",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Demo User",
 					address1: "789 Pine Rd",
@@ -692,8 +791,8 @@ async function main() {
 				discount: 15,
 				tax: 9.45,
 				total: 144.44,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Ahmed Al-Rashid",
 					address1: "King Fahd Road",
@@ -711,8 +810,8 @@ async function main() {
 				discount: 0,
 				tax: 12.6,
 				total: 192.59,
-				paymentMethod: "credit_card",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Ahmed Al-Rashid",
 					address1: "Olaya District",
@@ -732,8 +831,8 @@ async function main() {
 				discount: 0,
 				tax: 9.1,
 				total: 139.09,
-				paymentMethod: "apple_pay",
-				paymentStatus: "paid",
+				paymentMethod: "cash_on_delivery",
+				paymentStatus: "not_applicable",
 				shippingAddress: JSON.stringify({
 					fullName: "Fatima Al-Zahra",
 					address1: "Dubai Marina Walk",
@@ -745,6 +844,18 @@ async function main() {
 	});
 
 	const orders = await db.order.findMany({ orderBy: { createdAt: "asc" } });
+
+	await db.orderStatusEvent.createMany({
+		data: orders.map((order) => ({
+			orderId: order.id,
+			fromStatus: null,
+			toStatus: order.status,
+			actorId: order.userId,
+			actorRole: "buyer",
+			note: "Seeded order state",
+			createdAt: order.createdAt,
+		})),
+	});
 
 	// ─── ORDER ITEMS ──────────────────────────────────────────────────────────────
 	if (allProducts.length >= 11 && orders.length >= 7) {
@@ -1498,6 +1609,7 @@ async function main() {
 		stores: await db.store.count(),
 		categories: await db.category.count(),
 		products: await db.product.count(),
+		productVariants: await db.productVariant.count(),
 		orders: await db.order.count(),
 		reviews: await db.review.count(),
 		cars: await db.car.count(),

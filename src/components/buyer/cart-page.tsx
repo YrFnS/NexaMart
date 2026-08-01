@@ -285,7 +285,7 @@ export function CartPage() {
               </CardHeader>
               <CardContent className="p-0">
                 {group.items.map((item, idx) => (
-                  <React.Fragment key={item.productId}>
+                  <React.Fragment key={item.lineId}>
                     {idx > 0 && <Separator />}
                     <div className="flex gap-4 p-4 hover:bg-muted/20 transition-colors">
                       {/* Product Image */}
@@ -340,7 +340,7 @@ export function CartPage() {
                             variant="ghost"
                             size="icon"
                             className="size-8 text-muted-foreground hover:text-red-500 flex-shrink-0"
-                            onClick={() => setRemoveTarget(item.productId)}
+                            onClick={() => setRemoveTarget(item.lineId)}
                           >
                             <X className="size-4" />
                           </Button>
@@ -353,7 +353,7 @@ export function CartPage() {
                               variant="outline"
                               size="icon"
                               className="size-8 rounded-lg ripple"
-                              onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                              onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
                               disabled={item.quantity <= 1}
                             >
                               <Minus className="size-3" />
@@ -365,7 +365,7 @@ export function CartPage() {
                               variant="outline"
                               size="icon"
                               className="size-8 rounded-lg ripple"
-                              onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                              onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
                             >
                               <Plus className="size-3" />
                             </Button>

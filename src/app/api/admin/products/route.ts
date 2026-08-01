@@ -1,38 +1,58 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
-import { validatePagination, validateSearchParam, validateEnum, isValidId, checkApiRateLimit, RATE_LIMITS, requireAdminAuth } from '@/lib/security';
+import {
+  getAdminActorId,
+  validateAdminRequest,
+  validateEnum,
+  validatePagination,
+  validateSearchParam,
+} from '@/lib/security';
 
 const VALID_PRODUCT_STATUSES = ['active', 'draft', 'archived'] as const;
+const moderationSchema = z.object({
+  productId: z.string().min(1).max(64),
+  action: z.enum(['approve', 'flag', 'archive']),
+});
 
 export async function GET(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
-  }
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
-    const searchRaw = searchParams.get('search') || '';
-    const search = searchRaw ? validateSearchParam(searchRaw) : '';
+    const search = validateSearchParam(searchParams.get('search') || '');
     const category = searchParams.get('category') || '';
     const statusRaw = searchParams.get('status') || '';
-    const status = statusRaw ? validateEnum(statusRaw, [...VALID_PRODUCT_STATUSES]) || '' : '';
+    const status = statusRaw
+      ? validateEnum(statusRaw, VALID_PRODUCT_STATUSES)
+      : null;
     const storeId = searchParams.get('storeId') || '';
-    const { page, limit } = validatePagination(searchParams.get('page'), searchParams.get('limit'), 100);
+    const { page, limit } = validatePagination(
+      searchParams.get('page'),
+      searchParams.get('limit'),
+      100,
+    );
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-    if (category) where.categoryId = category;
-    if (storeId) where.storeId = storeId;
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { sku: { contains: search } },
-      ];
+    if (statusRaw && !status) {
+      return NextResponse.json({ error: 'Invalid product status.' }, { status: 400 });
     }
 
-    const [products, total] = await Promise.all([
+    const where = {
+      ...(status ? { status } : {}),
+      ...(category ? { categoryId: category } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { sku: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [products, total] = await db.$transaction([
       db.product.findMany({
         where,
         skip: (page - 1) * limit,
@@ -46,96 +66,109 @@ export async function GET(request: Request) {
       db.product.count({ where }),
     ]);
 
-    const result = products.map(p => ({
-      id: p.id,
-      name: p.name,
-      nameAr: p.nameAr,
-      price: p.price,
-      originalPrice: p.originalPrice,
-      stock: p.stock,
-      rating: p.rating,
-      reviewCount: p.reviewCount,
-      soldCount: p.soldCount,
-      sku: p.sku,
-      status: p.status,
-      isFeatured: p.isFeatured,
-      isSale: p.isSale,
-      categoryId: p.categoryId,
-      categoryName: p.category.name,
-      storeId: p.storeId,
-      storeName: p.store.name,
-      images: p.images,
-      createdAt: p.createdAt.toISOString(),
-    }));
-
-    return NextResponse.json({ products: result, total, page, limit });
+    return NextResponse.json({
+      products: products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        nameAr: product.nameAr,
+        price: Number(product.price),
+        originalPrice:
+          product.originalPrice === null ? null : Number(product.originalPrice),
+        stock: product.stock,
+        rating: product.rating,
+        reviewCount: product.reviewCount,
+        soldCount: product.soldCount,
+        sku: product.sku,
+        status: product.status,
+        isFeatured: product.isFeatured,
+        isSale: product.isSale,
+        categoryId: product.categoryId,
+        categoryName: product.category.name,
+        storeId: product.storeId,
+        storeName: product.store.name,
+        images: product.images,
+        createdAt: product.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+    });
   } catch (error) {
     console.error('Admin products GET error:', error);
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch products.' },
+      { status: 500 },
+    );
   }
 }
 
 export async function PUT(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const parsed = moderationSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid moderation request.' }, { status: 400 });
   }
+
+  const adminId = getAdminActorId(request);
+  if (!adminId) {
+    return NextResponse.json(
+      { error: 'An administrator identity is required for audit logging.' },
+      { status: 401 },
+    );
+  }
+
+  const statusMap = {
+    approve: 'active',
+    flag: 'draft',
+    archive: 'archived',
+  } as const;
+  const newStatus = statusMap[parsed.data.action];
+
   try {
-    const body = await request.json();
-    const { productId, action, adminId } = body;
+    const result = await db.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({
+        where: { id: parsed.data.productId },
+        select: { id: true, name: true, status: true },
+      });
+      if (!product) return null;
 
-    if (!productId || !action) {
-      return NextResponse.json({ error: 'Missing productId or action' }, { status: 400 });
-    }
-
-    // Validate productId format
-    if (typeof productId === 'string' && !isValidId(productId)) {
-      return NextResponse.json({ error: 'Invalid productId format' }, { status: 400 });
-    }
-
-    // Validate action against allowed values
-    const validActions = ['approve', 'flag', 'archive'];
-    if (!validActions.includes(action)) {
-      return NextResponse.json({ error: 'Invalid action. Use approve, flag, or archive' }, { status: 400 });
-    }
-
-    const product = await db.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-
-    const statusMap: Record<string, string> = {
-      approve: 'active',
-      flag: 'draft',
-      archive: 'archived',
-    };
-
-    const newStatus = statusMap[action];
-    if (!newStatus) {
-      return NextResponse.json({ error: 'Invalid action. Use approve, flag, or archive' }, { status: 400 });
-    }
-
-    await db.product.update({
-      where: { id: productId },
-      data: { status: newStatus },
+      const updated = await tx.product.update({
+        where: { id: product.id },
+        data: { status: newStatus },
+        select: { id: true, status: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          adminId,
+          action: `product_${parsed.data.action}`,
+          targetType: 'product',
+          targetId: product.id,
+          details: JSON.stringify({
+            name: product.name,
+            previousStatus: product.status,
+            newStatus,
+          }),
+        },
+      });
+      return updated;
     });
 
-    // Create audit log
-    await db.auditLog.create({
-      data: {
-        adminId: adminId || 'system',
-        action: `product_${action}`,
-        targetType: 'product',
-        targetId: productId,
-        details: `Product status changed to ${newStatus}`,
-      },
-    });
+    if (!result) {
+      return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
+    }
 
-    return NextResponse.json({ success: true, productId, status: newStatus });
+    return NextResponse.json({
+      success: true,
+      productId: result.id,
+      status: result.status,
+    });
   } catch (error) {
     console.error('Admin products PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update product.' },
+      { status: 500 },
+    );
   }
 }

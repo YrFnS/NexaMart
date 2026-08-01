@@ -106,7 +106,13 @@ export function NearMePage() {
   }, [userLocation, selectedCity, selectedDistance, selectedCategory]);
 
   useEffect(() => {
-    fetchProducts();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void fetchProducts();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchProducts]);
 
   const handleUseMyLocation = () => {

@@ -10,6 +10,7 @@ datasource db {
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
+  passwordHash  String?
   name          String?
   phone         String?
   avatar        String?
@@ -24,28 +25,30 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  store       Store?
-  orders      Order[]
-  reviews     Review[]
-  wishlist    Wishlist[]
-  addresses   Address[]
-  notifications Notification[]
-  cars            Car[]
-  properties      Property[]
-  classifieds     Classified[]
-  jobs            Job[]
-  services        Service[]
-  returnsAsBuyer  Return[]      @relation("ReturnBuyer")
-  returnsAsSeller Return[]      @relation("ReturnSeller")
-  priceAlerts     PriceAlert[]
-  invoicesAsSeller Invoice[]   @relation("InvoiceSeller")
-  invoicesAsBuyer  Invoice[]   @relation("InvoiceBuyer")
-  payouts         Payout[]
-  disputesAsBuyer  Dispute[]   @relation("DisputeBuyer")
-  disputesAsSeller Dispute[]   @relation("DisputeSeller")
-  helpTickets     HelpTicket[]
-  staffRoles      Staff[]
-  auditLogs       AuditLog[]
+  store            Store?
+  orders           Order[]
+  reviews          Review[]
+  wishlist         Wishlist[]
+  addresses        Address[]
+  notifications    Notification[]
+  cars             Car[]
+  properties       Property[]
+  classifieds      Classified[]
+  jobs             Job[]
+  services         Service[]
+  returnsAsBuyer   Return[]       @relation("ReturnBuyer")
+  returnsAsSeller  Return[]       @relation("ReturnSeller")
+  priceAlerts      PriceAlert[]
+  invoicesAsSeller Invoice[]      @relation("InvoiceSeller")
+  invoicesAsBuyer  Invoice[]      @relation("InvoiceBuyer")
+  payouts          Payout[]
+  disputesAsBuyer  Dispute[]      @relation("DisputeBuyer")
+  disputesAsSeller Dispute[]      @relation("DisputeSeller")
+  helpTickets      HelpTicket[]
+  staffRoles       Staff[]
+  auditLogs        AuditLog[]
+
+  @@index([role])
 }
 
 model Store {
@@ -67,62 +70,65 @@ model Store {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  location  String?
-  owner     User      @relation(fields: [ownerId], references: [id])
-  products  Product[]
-  orders    Order[]
-  reviews   StoreReview[]
-  cars      Car[]
+  location   String?
+  owner      User          @relation(fields: [ownerId], references: [id])
+  products   Product[]
+  orders     Order[]
+  reviews    StoreReview[]
+  cars       Car[]
   properties Property[]
-  payouts   Payout[]
-  staff     Staff[]
+  payouts    Payout[]
+  staff      Staff[]
+
+  @@index([isVerified])
 }
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String
-  nameAr      String?
-  slug        String   @unique
-  icon        String?
-  image       String?
-  parentId    String?
-  productCount Int     @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  nameAr       String?
+  slug         String   @unique
+  icon         String?
+  image        String?
+  parentId     String?
+  productCount Int      @default(0)
+  createdAt    DateTime @default(now())
 
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryHierarchy")
+  parent      Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[]   @relation("CategoryHierarchy")
   products    Product[]
   classifieds Classified[]
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  nameAr        String?
-  description   String?
-  descriptionAr String?
-  price         Float
-  originalPrice Float?
-  images        String   @default("[]") // JSON array
-  categoryId    String
-  storeId       String
-  sku           String?
-  stock         Int      @default(0)
-  rating        Float    @default(0)
-  reviewCount   Int      @default(0)
-  soldCount     Int      @default(0)
-  views         Int      @default(0)
-  isFeatured    Boolean  @default(false)
-  isNew         Boolean  @default(false)
-  isSale        Boolean  @default(false)
-  isB2b         Boolean  @default(false)
-  hasFreeShipping Boolean @default(false)
-  variations    String   @default("{}") // JSON object
-  tieredPricing String   @default("[]") // JSON array
-  tags          String   @default("[]") // JSON array
-  status        String   @default("active") // active, draft, archived
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  nameAr          String?
+  description     String?
+  descriptionAr   String?
+  price           Decimal  @db.Decimal(18, 2)
+  originalPrice   Decimal? @db.Decimal(18, 2)
+  currency        String   @default("USD") @db.Char(3)
+  images          String   @default("[]") // JSON array
+  categoryId      String
+  storeId         String
+  sku             String?
+  stock           Int      @default(0)
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  soldCount       Int      @default(0)
+  views           Int      @default(0)
+  isFeatured      Boolean  @default(false)
+  isNew           Boolean  @default(false)
+  isSale          Boolean  @default(false)
+  isB2b           Boolean  @default(false)
+  hasFreeShipping Boolean  @default(false)
+  variations      String   @default("{}") // JSON object
+  tieredPricing   String   @default("[]") // JSON array
+  tags            String   @default("[]") // JSON array
+  status          String   @default("active") // active, draft, archived
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   category      Category     @relation(fields: [categoryId], references: [id])
   store         Store        @relation(fields: [storeId], references: [id])
@@ -132,59 +138,123 @@ model Product {
   priceAlerts   PriceAlert[]
   returns       Return[]
   auctions      Auction[]
+  variantSkus   ProductVariant[]
+
+  @@index([status, createdAt])
+  @@index([categoryId, status])
+  @@index([storeId, status])
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  sku           String   @unique
+  attributes    String   // canonical JSON object shown to users and orders
+  optionKey     String   // canonical JSON key used for uniqueness/lookups
+  price         Decimal  @db.Decimal(18, 2)
+  originalPrice Decimal? @db.Decimal(18, 2)
+  currency      String   @default("USD") @db.Char(3)
+  stock         Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([productId, optionKey])
+  @@index([productId, isActive])
 }
 
 model Order {
   id              String   @id @default(cuid())
   orderNumber     String   @unique
+  idempotencyKey  String?
   userId          String
   storeId         String?
   status          String   @default("pending") // pending, processing, shipped, delivered, cancelled, disputed
-  subtotal        Float
-  shippingCost    Float    @default(0)
-  discount        Float    @default(0)
-  tax             Float    @default(0)
-  total           Float
+  subtotal        Decimal  @db.Decimal(18, 2)
+  shippingCost    Decimal  @default(0) @db.Decimal(18, 2)
+  discount        Decimal  @default(0) @db.Decimal(18, 2)
+  tax             Decimal  @default(0) @db.Decimal(18, 2)
+  total           Decimal  @db.Decimal(18, 2)
+  currency        String   @default("USD") @db.Char(3)
   paymentMethod   String?
   paymentStatus   String   @default("pending") // pending, paid, refunded
   shippingAddress String?
-  trackingNumber  String?
-  carrier         String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  trackingNumber       String?
+  carrier              String?
+  notes                String?
+  confirmationExpiresAt DateTime?
+  confirmedAt          DateTime?
+  preparingAt          DateTime?
+  shippedAt            DateTime?
+  deliveredAt          DateTime?
+  cancelledAt          DateTime?
+  rejectedAt           DateTime?
+  cancelledBy          String?
+  cancellationReason   String?
+  inventoryRestoredAt  DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  user      User        @relation(fields: [userId], references: [id])
-  store     Store?      @relation(fields: [storeId], references: [id])
-  items     OrderItem[]
-  returns   Return[]
-  invoices  Invoice[]
-  disputes  Dispute[]
+  user     User        @relation(fields: [userId], references: [id])
+  store    Store?      @relation(fields: [storeId], references: [id])
+  items        OrderItem[]
+  returns      Return[]
+  invoices     Invoice[]
+  disputes     Dispute[]
+  statusEvents OrderStatusEvent[]
+
+  @@unique([idempotencyKey, storeId])
+  @@index([userId, createdAt])
+  @@index([status, confirmationExpiresAt])
 }
 
 model OrderItem {
   id        String  @id @default(cuid())
   orderId   String
   productId String
+  variantId String?
   quantity  Int
-  price     Float
-  total     Float
-  variation String? // JSON
+  price     Decimal @db.Decimal(18, 2)
+  total     Decimal @db.Decimal(18, 2)
+  currency  String  @default("USD") @db.Char(3)
+  variation String? // canonical JSON snapshot
 
-  order   Order   @relation(fields: [orderId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  order   Order           @relation(fields: [orderId], references: [id])
+  product Product         @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  returns Return[]
+
+  @@index([variantId])
+}
+
+model OrderStatusEvent {
+  id         String   @id @default(cuid())
+  orderId    String
+  fromStatus String?
+  toStatus   String
+  actorId    String
+  actorRole  String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
-  rating    Int
-  comment   String?
-  images    String   @default("[]") // JSON array
-  isVerified Boolean @default(false)
-  helpful   Int      @default(0)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  productId  String
+  rating     Int
+  comment    String?
+  images     String   @default("[]") // JSON array
+  isVerified Boolean  @default(false)
+  helpful    Int      @default(0)
+  createdAt  DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id])
   product Product @relation(fields: [productId], references: [id])
@@ -228,6 +298,8 @@ model Address {
   isDefault  Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isDefault])
 }
 
 model Notification {
@@ -245,61 +317,64 @@ model Notification {
 }
 
 model FlashSale {
-  id          String   @id @default(cuid())
-  title       String
-  titleAr     String?
-  discount    Int
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  title     String
+  titleAr   String?
+  discount  Int
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 model Coupon {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  discount    Float
-  type        String   @default("percentage") // percentage, fixed
-  minOrder    Float    @default(0)
-  maxDiscount Float?
+  id          String    @id @default(cuid())
+  code        String    @unique
+  discount    Decimal   @db.Decimal(18, 2)
+  type        String    @default("percentage") // percentage, fixed
+  minOrder    Decimal   @default(0) @db.Decimal(18, 2)
+  maxDiscount Decimal?  @db.Decimal(18, 2)
+  currency    String    @default("USD") @db.Char(3)
   usageLimit  Int?
-  usedCount   Int      @default(0)
+  usedCount   Int       @default(0)
   storeId     String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean   @default(true)
   expiresAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([isActive, expiresAt])
 }
 
 model Auction {
-  id            String   @id @default(cuid())
-  productId     String
-  startPrice    Float
-  currentPrice  Float
-  reservePrice  Float?
-  startTime     DateTime
-  endTime       DateTime
-  status        String   @default("upcoming") // upcoming, active, ended
-  bidCount      Int      @default(0)
-  winnerId      String?
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  productId    String
+  startPrice   Float
+  currentPrice Float
+  reservePrice Float?
+  startTime    DateTime
+  endTime      DateTime
+  status       String   @default("upcoming") // upcoming, active, ended
+  bidCount     Int      @default(0)
+  winnerId     String?
+  createdAt    DateTime @default(now())
 
-  product       Product      @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 }
 
 model App {
-  id          String   @id @default(cuid())
-  name        String
-  nameAr      String?
-  description String?
+  id            String   @id @default(cuid())
+  name          String
+  nameAr        String?
+  description   String?
   descriptionAr String?
-  icon        String?
-  category    String
-  developer   String
-  rating      Float    @default(0)
-  installs    Int      @default(0)
-  price       Float    @default(0)
-  isFree      Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  icon          String?
+  category      String
+  developer     String
+  rating        Float    @default(0)
+  installs      Int      @default(0)
+  price         Float    @default(0)
+  isFree        Boolean  @default(true)
+  createdAt     DateTime @default(now())
 }
 
 model ChatMessage {
@@ -309,6 +384,8 @@ model ChatMessage {
   message    String
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
+
+  @@index([senderId, receiverId, createdAt])
 }
 
 model PlatformSettings {
@@ -467,83 +544,103 @@ model Service {
 }
 
 model Return {
-  id             String   @id @default(cuid())
-  orderId        String
-  productId      String
-  buyerId        String
-  sellerId       String
-  quantity       Int
-  refundAmount   Float
-  reason         String   @default("other") // wrong_item, defective, not_as_described, changed_mind, damaged_shipping, other
-  details        String?
-  resolution     String   @default("refund") // refund, exchange, store_credit
-  status         String   @default("pending") // pending, approved, rejected, processing, completed
-  sellerNote     String?
-  evidencePhotos String   @default("[]") // JSON array
-  timeline       String   @default("[]") // JSON array of {status, date, note}
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                       String    @id @default(cuid())
+  orderId                  String
+  orderItemId              String?
+  productId                String
+  variantId                String?
+  sku                      String?
+  buyerId                  String
+  sellerId                 String
+  quantity                 Int
+  unitPrice                Decimal?  @db.Decimal(18, 2)
+  refundAmount             Decimal   @db.Decimal(18, 2)
+  currency                 String    @default("USD") @db.Char(3)
+  reason                   String    @default("other") // wrong_item, defective, not_as_described, changed_mind, damaged_shipping, other
+  details                  String?
+  resolution               String    @default("return_only") // return_only, exchange, offline_refund
+  status                   String    @default("pending") // pending, approved, rejected, processing, completed
+  offlineRefundStatus      String    @default("not_required") // not_required, required, confirmed
+  offlineRefundConfirmedAt DateTime?
+  offlineRefundConfirmedBy String?
+  sellerNote               String?
+  evidencePhotos           String    @default("[]") // JSON array
+  timeline                 String    @default("[]") // JSON array of {status, date, note}
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  order   Order   @relation(fields: [orderId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-  buyer   User    @relation("ReturnBuyer", fields: [buyerId], references: [id])
-  seller  User    @relation("ReturnSeller", fields: [sellerId], references: [id])
+  order     Order      @relation(fields: [orderId], references: [id])
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  product   Product    @relation(fields: [productId], references: [id])
+  buyer     User       @relation("ReturnBuyer", fields: [buyerId], references: [id])
+  seller    User       @relation("ReturnSeller", fields: [sellerId], references: [id])
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([orderItemId, status])
 }
 
 model PriceAlert {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
   productId    String
   targetPrice  Float
   currentPrice Float
-  isActive     Boolean  @default(true)
-  isNotified   Boolean  @default(false)
+  isActive     Boolean   @default(true)
+  isNotified   Boolean   @default(false)
   expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user    User    @relation(fields: [userId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 }
 
 model Invoice {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   orderId       String
-  invoiceNumber String
+  invoiceNumber String    @unique
   sellerId      String
   buyerId       String
-  subtotal      Float
-  shipping      Float    @default(0)
-  discount      Float    @default(0)
-  tax           Float    @default(0)
-  total         Float
+  subtotal      Decimal   @db.Decimal(18, 2)
+  shipping      Decimal   @default(0) @db.Decimal(18, 2)
+  discount      Decimal   @default(0) @db.Decimal(18, 2)
+  tax           Decimal   @default(0) @db.Decimal(18, 2)
+  total         Decimal   @db.Decimal(18, 2)
+  currency      String    @default("USD") @db.Char(3)
   taxId         String?
   paymentMethod String?
-  status        String   @default("unpaid") // paid, unpaid, overdue
+  status        String    @default("unpaid") // paid, unpaid, overdue
   dueDate       DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   order  Order @relation(fields: [orderId], references: [id])
   seller User  @relation("InvoiceSeller", fields: [sellerId], references: [id])
   buyer  User  @relation("InvoiceBuyer", fields: [buyerId], references: [id])
+
+  @@index([orderId])
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
 }
 
 model Payout {
-  id           String    @id @default(cuid())
-  sellerId     String
-  storeId      String
-  amount       Float
-  method       String    @default("bank_transfer") // bank_transfer, wallet, check
-  status       String    @default("pending") // pending, processing, completed, rejected
-  requestedAt  DateTime  @default(now())
-  processedAt  DateTime?
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  sellerId    String
+  storeId     String
+  amount      Float
+  method      String    @default("bank_transfer") // bank_transfer, wallet, check
+  status      String    @default("pending") // pending, processing, completed, rejected
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   seller User  @relation(fields: [sellerId], references: [id])
   store  Store @relation(fields: [storeId], references: [id])
+
+  @@index([status, requestedAt])
 }
 
 model Dispute {
@@ -579,25 +676,25 @@ model Staff {
 }
 
 model Banner {
-  id          String   @id @default(cuid())
-  title       String
-  titleAr     String?
-  description String?
+  id            String    @id @default(cuid())
+  title         String
+  titleAr       String?
+  description   String?
   descriptionAr String?
-  image       String?
-  link        String?
-  ctaText     String?   // "Shop Now", "Explore Deals" etc.
-  ctaTextAr   String?
-  ctaLink     String?   // Where the CTA button navigates to
-  gradient    String?   // Tailwind gradient classes e.g. "from-emerald-600 via-teal-600 to-cyan-600"
-  icon        String?   // Icon name: "Sparkles", "Zap", "TrendingUp", "Flame", "ShoppingBag"
-  position    String    @default("hero") // hero, sidebar, category, footer, popup
-  sortOrder   Int       @default(0) // Lower = shown first
-  isActive    Boolean   @default(true)
-  startDate   DateTime?
-  endDate     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  image         String?
+  link          String?
+  ctaText       String? // "Shop Now", "Explore Deals" etc.
+  ctaTextAr     String?
+  ctaLink       String? // Where the CTA button navigates to
+  gradient      String? // Tailwind gradient classes e.g. "from-emerald-600 via-teal-600 to-cyan-600"
+  icon          String? // Icon name: "Sparkles", "Zap", "TrendingUp", "Flame", "ShoppingBag"
+  position      String    @default("hero") // hero, sidebar, category, footer, popup
+  sortOrder     Int       @default(0) // Lower = shown first
+  isActive      Boolean   @default(true)
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model HelpTicket {
@@ -615,13 +712,15 @@ model HelpTicket {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  adminId     String
-  action      String   // create, update, delete, approve, flag, archive, verify, etc.
-  targetType  String   // store, product, category, coupon, banner, order, etc.
-  targetId    String?
-  details     String   @default("{}") // JSON object with change details
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String // create, update, delete, approve, flag, archive, verify, etc.
+  targetType String // store, product, category, coupon, banner, order, etc.
+  targetId   String?
+  details    String   @default("{}") // JSON object with change details
+  createdAt  DateTime @default(now())
 
   admin User @relation(fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt])
 }
