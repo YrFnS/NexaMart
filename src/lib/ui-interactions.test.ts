@@ -7,13 +7,16 @@ function source(path: string) {
   return readFileSync(join(process.cwd(), path), 'utf8');
 }
 
-test('product cards use sibling links and actions with persistent wishlist state', () => {
+test('product cards use sibling actions, persistent wishlist, and bounded image preload', () => {
   const card = source('src/components/buyer/product-card.tsx');
+  const grid = source('src/components/buyer/server-product-grid.tsx');
 
   assert.match(card, /<article className=/);
   assert.match(card, /useWishlistStore/);
   assert.match(card, /aria-pressed=\{isWishlisted\}/);
-  assert.match(card, /loading="lazy"/);
+  assert.match(card, /preload \? \{ preload: true \}/);
+  assert.match(card, /loading: 'lazy' as const/);
+  assert.match(grid, /preload=\{index < 2\}/);
   assert.doesNotMatch(card, /setIsWishlisted/);
   assert.doesNotMatch(card, /loading="eager"/);
   assert.doesNotMatch(
