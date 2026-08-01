@@ -24,13 +24,15 @@ test('product cards use sibling links and actions with persistent wishlist state
 
 test('wishlist screen exposes only server-backed behavior', () => {
   const wishlist = source('src/components/buyer/wishlist-page.tsx');
+  const store = source('src/stores/wishlist-store.ts');
 
   assert.match(wishlist, /useWishlistStore/);
-  assert.match(wishlist, /\/api\/wishlist/);
+  assert.match(store, /\/api\/wishlist/);
   assert.match(wishlist, /removeAll\(user\.id\)/);
   assert.doesNotMatch(wishlist, /DEFAULT_COLLECTIONS/);
   assert.doesNotMatch(wishlist, /priceDropAlerts/);
   assert.doesNotMatch(wishlist, /userId=\$\{/);
+  assert.doesNotMatch(store, /userId\s*:/);
 });
 
 test('header and footer omit simulated promotional controls', () => {
