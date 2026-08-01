@@ -4,9 +4,23 @@
   --nexa-mobile-nav-total: calc(
     var(--nexa-mobile-nav-height) + var(--nexa-safe-bottom)
   );
-  --nexa-floating-bottom: calc(var(--nexa-mobile-nav-total) + 0.875rem);
+  --nexa-mobile-overlay-gap: 0.875rem;
+  --nexa-product-actions-height: 4.5rem;
+  --nexa-compare-drawer-height: 4.5rem;
+  --nexa-floating-bottom: calc(
+    var(--nexa-mobile-nav-total) + var(--nexa-mobile-overlay-gap)
+  );
   --nexa-floating-bottom-with-compare: calc(
-    var(--nexa-mobile-nav-total) + 5.75rem
+    var(--nexa-mobile-nav-total) + var(--nexa-compare-drawer-height) +
+      var(--nexa-mobile-overlay-gap)
+  );
+  --nexa-floating-bottom-with-product-actions: calc(
+    var(--nexa-mobile-nav-total) + var(--nexa-product-actions-height) +
+      var(--nexa-mobile-overlay-gap)
+  );
+  --nexa-floating-bottom-with-product-actions-and-compare: calc(
+    var(--nexa-mobile-nav-total) + var(--nexa-product-actions-height) +
+      var(--nexa-compare-drawer-height) + var(--nexa-mobile-overlay-gap)
   );
 }
 
@@ -46,6 +60,43 @@ html {
 
 .nexa-cookie-banner {
   bottom: var(--nexa-mobile-nav-total);
+}
+
+@media (max-width: 767px) {
+  [data-product-purchase-actions] {
+    bottom: var(--nexa-mobile-nav-total) !important;
+    min-height: var(--nexa-product-actions-height);
+  }
+
+  body:has([data-ai-chat-layer][data-compare-active='true'])
+    [data-product-purchase-actions] {
+    bottom: calc(
+      var(--nexa-mobile-nav-total) + var(--nexa-compare-drawer-height)
+    ) !important;
+  }
+
+  body:has([data-product-purchase-actions]) .nexa-floating-primary,
+  body:has([data-product-purchase-actions]) .nexa-floating-secondary,
+  body:has([data-product-purchase-actions]) .nexa-chat-panel,
+  body:has([data-product-purchase-actions])
+    [data-ai-chat-layer]
+    > .fixed {
+    bottom: var(--nexa-floating-bottom-with-product-actions) !important;
+  }
+
+  body:has([data-product-purchase-actions])
+    .nexa-floating-primary[data-compare-active='true'],
+  body:has([data-product-purchase-actions])
+    .nexa-floating-secondary[data-compare-active='true'],
+  body:has([data-product-purchase-actions])
+    .nexa-chat-panel[data-compare-active='true'],
+  body:has([data-product-purchase-actions])
+    [data-ai-chat-layer][data-compare-active='true']
+    > .fixed {
+    bottom: var(
+      --nexa-floating-bottom-with-product-actions-and-compare
+    ) !important;
+  }
 }
 
 @media (min-width: 768px) {
