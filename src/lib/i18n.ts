@@ -67,26 +67,6 @@ export function I18nProvider({
   }, []);
 
   useEffect(() => {
-    const hasLocaleCookie = document.cookie
-      .split(';')
-      .some((entry) => entry.trim().startsWith(`${LOCALE_COOKIE}=`));
-
-    if (!hasLocaleCookie) {
-      try {
-        const legacyLocale = localStorage.getItem(LOCALE_STORAGE_KEY);
-        if (legacyLocale) {
-          const normalized = normalizeLocale(legacyLocale);
-          if (normalized !== locale) {
-            setLocaleState(normalized);
-            persistLocale(normalized);
-            return;
-          }
-        }
-      } catch {
-        // Ignore legacy storage migration failures.
-      }
-    }
-
     persistLocale(locale);
   }, [locale]);
 
