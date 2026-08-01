@@ -29,6 +29,10 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   const transitionRoute = source(
     'src/app/api/orders/[id]/transition/route.ts',
   );
+  const fulfillmentRoute = source(
+    'src/app/api/seller/fulfillment/route.ts',
+  );
+  const security = source('src/lib/security.ts');
   const quickView = source('src/components/buyer/product-quick-view.tsx');
   const hero = source('src/components/buyer/home/hero-section.tsx');
 
@@ -74,6 +78,15 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(transitionRoute, /retrySerializableTransaction/);
   assert.match(transitionRoute, /P2034/);
   assert.match(transitionRoute, /ORDER_TRANSITION_CONFLICT/);
+  assert.match(fulfillmentRoute, /MAX_SERIALIZABLE_ATTEMPTS = 3/);
+  assert.match(fulfillmentRoute, /retrySerializableTransaction/);
+  assert.match(fulfillmentRoute, /P2034/);
+  assert.match(fulfillmentRoute, /FULFILLMENT_CONFLICT/);
+  assert.match(security, /process\.env\.CI !== 'true'/);
+  assert.match(security, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS/);
+  assert.match(security, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS/);
+  assert.match(security, /productionDefault/);
+  assert.match(security, /ciDefault/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
@@ -115,6 +128,24 @@ test('permanent CI runs browsers and preserves failure diagnostics', () => {
       join(
         process.cwd(),
         '.github/workflows/p3-browser-findings-fix.yml',
+      ),
+    ),
+    false,
+  );
+  assert.equal(
+    existsSync(
+      join(
+        process.cwd(),
+        '.github/workflows/p3-fulfillment-conflict-fix.yml',
+      ),
+    ),
+    false,
+  );
+  assert.equal(
+    existsSync(
+      join(
+        process.cwd(),
+        '.github/workflows/p3-fulfillment-conflict-runner.yml',
       ),
     ),
     false,

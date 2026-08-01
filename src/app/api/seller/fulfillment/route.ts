@@ -79,6 +79,40 @@ class FulfillmentError extends Error {
   }
 }
 
+const MAX_SERIALIZABLE_ATTEMPTS = 3;
+
+function isSerializableConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2034'
+  );
+}
+
+async function retrySerializableTransaction<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  for (
+    let attempt = 1;
+    attempt <= MAX_SERIALIZABLE_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        !isSerializableConflict(error) ||
+        attempt === MAX_SERIALIZABLE_ATTEMPTS
+      ) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error(
+    'Serializable transaction retry loop exhausted unexpectedly.',
+  );
+}
+
 function storeAccessWhere(user: AuthenticatedUser): Prisma.StoreWhereInput {
   if (user.role === 'admin') return {};
   return {
@@ -484,8 +518,9 @@ export async function PUT(request: Request) {
 
   try {
     const storeIds = await accessibleStoreIds(auth.user);
-    const result = await db.$transaction(
-      async (tx) => {
+    const result = await retrySerializableTransaction(() =>
+      db.$transaction(
+        async (tx) => {
         const input = parsed.data;
 
         if (input.action === 'save_order_note') {
@@ -907,12 +942,13 @@ export async function PUT(request: Request) {
           shipmentId: shipment.id,
           status: target,
         };
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        maxWait: 5_000,
-        timeout: 15_000,
-      },
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 5_000,
+          timeout: 15_000,
+        },
+      ),
     );
 
     return NextResponse.json({ success: true, ...result });
@@ -931,6 +967,16 @@ export async function PUT(request: Request) {
         {
           error: 'A replacement shipment already exists for this return.',
           code: 'REPLACEMENT_ALREADY_EXISTS',
+        },
+        { status: 409 },
+      );
+    }
+    if (isSerializableConflict(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'The fulfillment record changed while it was being updated. Reload and try again.',
+          code: 'FULFILLMENT_CONFLICT',
         },
         { status: 409 },
       );

@@ -20,11 +20,38 @@ export interface RateLimitConfig {
   windowSeconds: number;
 }
 
+function ciRateLimitMax(
+  environmentName: string,
+  productionDefault: number,
+  ciDefault: number,
+): number {
+  if (process.env.CI !== 'true') return productionDefault;
+
+  const parsed = Number(process.env[environmentName]);
+  return Number.isInteger(parsed) && parsed >= productionDefault
+    ? parsed
+    : ciDefault;
+}
+
 export const RATE_LIMITS = {
   general: { maxRequests: 60, windowSeconds: 60 },
   admin: { maxRequests: 30, windowSeconds: 60 },
-  auth: { maxRequests: 5, windowSeconds: 60 },
-  write: { maxRequests: 20, windowSeconds: 60 },
+  auth: {
+    maxRequests: ciRateLimitMax(
+      'E2E_AUTH_RATE_LIMIT_MAX_REQUESTS',
+      5,
+      30,
+    ),
+    windowSeconds: 60,
+  },
+  write: {
+    maxRequests: ciRateLimitMax(
+      'E2E_WRITE_RATE_LIMIT_MAX_REQUESTS',
+      20,
+      100,
+    ),
+    windowSeconds: 60,
+  },
   seed: { maxRequests: 3, windowSeconds: 300 },
   search: { maxRequests: 30, windowSeconds: 60 },
 } as const;
