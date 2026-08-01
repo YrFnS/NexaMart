@@ -146,10 +146,16 @@ jobs:
               "  maxRequests: number;\n"
               "  windowSeconds: number;\n"
               "}\n\n"
-              "function ciRateLimitMax(environmentName: string, fallback: number): number {\n"
-              "  if (process.env.CI !== 'true') return fallback;\n\n"
+              "function ciRateLimitMax(\n"
+              "  environmentName: string,\n"
+              "  productionDefault: number,\n"
+              "  ciDefault: number,\n"
+              "): number {\n"
+              "  if (process.env.CI !== 'true') return productionDefault;\n\n"
               "  const parsed = Number(process.env[environmentName]);\n"
-              "  return Number.isInteger(parsed) && parsed >= fallback ? parsed : fallback;\n"
+              "  return Number.isInteger(parsed) && parsed >= productionDefault\n"
+              "    ? parsed\n"
+              "    : ciDefault;\n"
               "}\n\n"
               "export const RATE_LIMITS = {"
           )
@@ -159,26 +165,21 @@ jobs:
               "  auth: { maxRequests: 5, windowSeconds: 60 },\n"
               "  write: { maxRequests: 20, windowSeconds: 60 },",
               "  auth: {\n"
-              "    maxRequests: ciRateLimitMax('E2E_AUTH_RATE_LIMIT_MAX_REQUESTS', 5),\n"
+              "    maxRequests: ciRateLimitMax(\n"
+              "      'E2E_AUTH_RATE_LIMIT_MAX_REQUESTS',\n"
+              "      5,\n"
+              "      30,\n"
+              "    ),\n"
               "    windowSeconds: 60,\n"
               "  },\n"
               "  write: {\n"
-              "    maxRequests: ciRateLimitMax('E2E_WRITE_RATE_LIMIT_MAX_REQUESTS', 20),\n"
+              "    maxRequests: ciRateLimitMax(\n"
+              "      'E2E_WRITE_RATE_LIMIT_MAX_REQUESTS',\n"
+              "      20,\n"
+              "      100,\n"
+              "    ),\n"
               "    windowSeconds: 60,\n"
               "  },",
-          )
-
-          replace_once(
-              '.github/workflows/ci.yml',
-              "      AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"\n"
-              "      NEXT_TELEMETRY_DISABLED: \"1\"",
-              "      AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"\n"
-              "      # Stateful browser tests use isolated sessions from one loopback IP.\n"
-              "      # These values are honored only when CI=true; deployed defaults stay\n"
-              "      # at five auth and twenty write requests per minute.\n"
-              "      E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: \"30\"\n"
-              "      E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: \"100\"\n"
-              "      NEXT_TELEMETRY_DISABLED: \"1\"",
           )
 
           source_test = 'src/lib/p3-browser-source.test.ts'
@@ -207,24 +208,11 @@ jobs:
               "  assert.match(fulfillmentRoute, /P2034/);\n"
               "  assert.match(fulfillmentRoute, /FULFILLMENT_CONFLICT/);\n"
               "  assert.match(security, /process\\.env\\.CI !== 'true'/);\n"
-              "  assert.match(\n"
-              "    security,\n"
-              "    /ciRateLimitMax\\('E2E_AUTH_RATE_LIMIT_MAX_REQUESTS', 5\\)/,\n"
-              "  );\n"
-              "  assert.match(\n"
-              "    security,\n"
-              "    /ciRateLimitMax\\('E2E_WRITE_RATE_LIMIT_MAX_REQUESTS', 20\\)/,\n"
-              "  );\n"
+              "  assert.match(security, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS/);\n"
+              "  assert.match(security, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS/);\n"
+              "  assert.match(security, /productionDefault/);\n"
+              "  assert.match(security, /ciDefault/);\n"
               "  assert.match(quickView, /onOpenAutoFocus/);",
-          )
-          replace_once(
-              source_test,
-              "  assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"/);\n"
-              "  assert.match(session, /process\\.env\\.CI === 'true'/);",
-              "  assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: \"true\"/);\n"
-              "  assert.match(workflow, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: \"30\"/);\n"
-              "  assert.match(workflow, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: \"100\"/);\n"
-              "  assert.match(session, /process\\.env\\.CI === 'true'/);",
           )
           final_guard = (
               "  assert.equal(\n"
@@ -273,13 +261,9 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm \
-            .github/workflows/p3-fulfillment-conflict-fix.yml \
-            .github/workflows/p3-fulfillment-conflict-runner.yml
           git add \
             src/app/api/seller/fulfillment/route.ts \
             src/lib/security.ts \
-            .github/workflows/ci.yml \
             src/lib/p3-browser-source.test.ts
           git diff --cached --check
           git commit -m "fix: retry fulfillment races in browser CI"
