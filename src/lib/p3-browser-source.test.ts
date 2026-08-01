@@ -55,6 +55,9 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(rtlMobile, /data-product-purchase-actions/);
   assert.match(rtlMobile, /data-product-primary-actions/);
   assert.match(rtlMobile, /stickyPurchaseBar/);
+  assert.match(rtlMobile, /isInViewport/);
+  assert.match(rtlMobile, /toBeInViewport/);
+  assert.match(rtlMobile, /window\.innerHeight/);
   assert.match(rtlMobile, /toHaveCount\(0\)/);
   assert.match(rtlMobile, /elementFromPoint/);
   assert.match(rtlMobile, /purchaseOverlapsComparison/);
