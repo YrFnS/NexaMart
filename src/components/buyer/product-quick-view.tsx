@@ -111,8 +111,11 @@ export function ProductQuickView({
   }, [hydrateWishlist, isHydrated, user?.id]);
 
   useEffect(() => {
-    setQuantity(1);
-    setImageFailed(false);
+    const timer = window.setTimeout(() => {
+      setQuantity(1);
+      setImageFailed(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, productId]);
 
   const images = useMemo(
@@ -348,13 +351,18 @@ export function ProductQuickView({
                       variant="ghost"
                       size="icon"
                       className="size-10 rounded-none"
-                      onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                      onClick={() =>
+                        setQuantity((current) => Math.max(1, current - 1))
+                      }
                       disabled={quantity <= 1}
                       aria-label={isRTL ? 'تقليل الكمية' : 'Decrease quantity'}
                     >
                       <Minus className="size-4" aria-hidden="true" />
                     </Button>
-                    <span className="w-10 text-center text-sm font-semibold" aria-live="polite">
+                    <span
+                      className="w-10 text-center text-sm font-semibold"
+                      aria-live="polite"
+                    >
                       {quantity}
                     </span>
                     <Button
