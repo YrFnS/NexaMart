@@ -16,7 +16,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     services:
       postgres:
@@ -37,8 +37,9 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexamart_test?schema=public
       AUTH_SECRET: ci-session-secret-with-at-least-32-characters
       NEXTAUTH_SECRET: ci-session-secret-with-at-least-32-characters
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
       ENABLE_DEMO_LOGIN: "false"
       SEED_DEMO_PASSWORD: ci-demo-password-with-at-least-12-characters
       AUTH_BOOTSTRAP_EMAIL: admin@nexamart.com
@@ -104,3 +105,20 @@ jobs:
 
       - name: Build production application
         run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Run P3 browser and accessibility tests
+        run: npx playwright test
+
+      - name: Upload P3 browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-playwright-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
