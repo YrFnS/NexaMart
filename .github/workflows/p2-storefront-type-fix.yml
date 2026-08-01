@@ -1,4 +1,4 @@
-name: Apply P2 storefront type fix
+name: Finalize P2 storefront type fix
 
 on:
   push:
@@ -41,19 +41,14 @@ jobs:
                 by: ['rating'],
                 where,
                 orderBy: { rating: 'desc' },
-                _count: { _all: true },
+                _count: { rating: true },
               }),"""
 
           old_map = """    const countByRating = new Map(
               groupedRatings.map((entry) => [entry.rating, entry._count._all]),
             );"""
           new_map = """    const countByRating = new Map<number, number>(
-              groupedRatings.map((entry) => [
-                entry.rating,
-                typeof entry._count === 'object' && entry._count
-                  ? entry._count._all || 0
-                  : 0,
-              ]),
+              groupedRatings.map((entry) => [entry.rating, entry._count.rating]),
             );"""
 
           if old_query not in content:
@@ -61,15 +56,28 @@ jobs:
           if old_map not in content:
               raise SystemExit('Missing grouped review count anchor')
 
-          content = content.replace(old_query, new_query, 1)
-          content = content.replace(old_map, new_map, 1)
-          path.write_text(content)
+          path.write_text(
+              content.replace(old_query, new_query, 1).replace(old_map, new_map, 1)
+          )
           PY
 
-      - name: Commit patch
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify strict TypeScript
+        run: npm run typecheck
+
+      - name: Commit verified patch and remove temporary workflow
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/storefront-data.ts
+          git rm .github/workflows/p2-storefront-type-fix.yml
           git commit -m "fix: type grouped store review counts"
           git push origin HEAD:agent/production-hardening-phase-1
