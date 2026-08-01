@@ -9,6 +9,7 @@ import {
 
 test.describe('P3 Arabic and mobile verification', () => {
   test.beforeEach(async ({ context, page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await primeBrowser(page);
     await context.addCookies([
       {
@@ -59,14 +60,11 @@ test.describe('P3 Arabic and mobile verification', () => {
     );
 
     await gotoAndExpectOk(page, '/product/WHP-001');
-    const addToCart = page
-      .getByRole('button', {
-        name: /أضف للسلة|أضف إلى السلة|Add to cart/i,
-      })
-      .first();
-    await addToCart.scrollIntoViewIfNeeded();
-    await expect(addToCart).toBeVisible();
+    const actionName = /أضف للسلة|أضف إلى السلة|Add to cart/i;
+    await expect(page.getByRole('button', { name: actionName }).first()).toBeVisible();
 
+    // Resolve the locator again after client hydration before measuring it.
+    const addToCart = page.getByRole('button', { name: actionName }).first();
     const box = await addToCart.boundingBox();
     const viewport = page.viewportSize();
     expect(box).not.toBeNull();
