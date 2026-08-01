@@ -25,7 +25,7 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   const criticalFlows = source('e2e/critical-flows.spec.ts');
 
   assert.match(helpers, /AxeBuilder/);
-  assert.match(helpers, /critical.*serious|serious.*critical/s);
+  assert.match(helpers, /critical[\s\S]*serious|serious[\s\S]*critical/);
   assert.match(publicSmoke, /restores trigger focus/);
   assert.match(publicSmoke, /\/product\/WHP-001/);
   assert.match(rtlMobile, /nexamart_locale/);
