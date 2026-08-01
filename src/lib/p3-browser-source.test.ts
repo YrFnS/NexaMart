@@ -99,6 +99,9 @@ test('P3 covers accessibility, RTL, focus, authentication, checkout, and printin
   assert.match(printDocuments, /gridColumnCount/);
   assert.match(printDocuments, /brandColor/);
   assert.match(printDocuments, /headingBackground/);
+  assert.match(printDocuments, /address bdi\[dir=\"ltr\"\]/);
+  assert.match(printDocuments, /RAW_ORDER_STATUSES/);
+  assert.match(printDocuments, /not\.toContainText\('-\$0\.00'\)/);
   assert.match(printDocuments, /not\.toContain\('\$'\)/);
   assert.match(checkoutRoute, /MAX_SERIALIZABLE_ATTEMPTS = 3/);
   assert.match(checkoutRoute, /retrySerializableTransaction/);
@@ -112,7 +115,14 @@ test('P3 covers accessibility, RTL, focus, authentication, checkout, and printin
   assert.match(fulfillmentRoute, /retrySerializableTransaction/);
   assert.match(fulfillmentRoute, /P2034/);
   assert.match(fulfillmentRoute, /FULFILLMENT_CONFLICT/);
+  assert.match(documentRoute, /@page \{ size: A4 portrait; margin: 12mm; \}/);
   assert.match(documentRoute, /@media print/);
+  assert.match(documentRoute, /page-break-inside: avoid/);
+  assert.match(documentRoute, /ORDER_STATUS_LABELS/);
+  assert.match(documentRoute, /function formatDiscount/);
+  assert.match(documentRoute, /<caption>/);
+  assert.match(documentRoute, /scope=\"col\"/);
+  assert.match(documentRoute, /<bdi dir=\"ltr\">/);
   assert.match(
     documentRoute,
     /typeRaw === 'packing-slip' && auth\.user\.role === 'buyer'/,
