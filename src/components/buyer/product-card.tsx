@@ -94,6 +94,7 @@ interface ProductCardProps {
   product: Product;
   onQuickView?: (product: Product) => void;
   onView?: (productId: string) => void;
+  preload?: boolean;
 }
 
 function parseImages(images: string): string[] {
@@ -140,6 +141,7 @@ export function ProductCard({
   product,
   onQuickView,
   onView,
+  preload = false,
 }: ProductCardProps) {
   const { t, locale } = useI18n();
   const isRTL = locale === 'ar';
@@ -282,7 +284,7 @@ export function ProductCard({
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-            loading="lazy"
+            {...(preload ? { preload: true } : { loading: 'lazy' as const })}
             onError={() => setImageFailed(true)}
           />
         </Link>
