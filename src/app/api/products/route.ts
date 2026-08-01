@@ -21,6 +21,12 @@ function parsePrice(value: string | null, max: number): number | undefined {
   return Math.min(max, Math.max(0, parsed));
 }
 
+function optionalId(value: string | null): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, 64);
+}
+
 const publicProductSelect = {
   id: true,
   name: true,
@@ -66,7 +72,9 @@ const publicProductSelect = {
   _count: { select: { variantSkus: { where: { isActive: true } } } },
 } satisfies Prisma.ProductSelect;
 
-function publicProduct(product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>) {
+function publicProduct(
+  product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>,
+) {
   return {
     ...product,
     price: Number(product.price),
@@ -80,11 +88,13 @@ function publicProduct(product: Prisma.ProductGetPayload<{ select: typeof public
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category');
+    const categoryId = optionalId(searchParams.get('category'));
+    const storeId = optionalId(searchParams.get('storeId'));
     const searchRaw = searchParams.get('search');
     const search = searchRaw ? validateSearchParam(searchRaw) : undefined;
     const sort =
-      validateEnum(searchParams.get('sort') || 'newest', VALID_SORTS) || 'newest';
+      validateEnum(searchParams.get('sort') || 'newest', VALID_SORTS) ||
+      'newest';
     const ids = (searchParams.get('ids') || '')
       .split(',')
       .map((id) => id.trim())
@@ -98,7 +108,11 @@ export async function GET(request: Request) {
       100,
     );
 
-    if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
+    if (
+      minPrice !== undefined &&
+      maxPrice !== undefined &&
+      minPrice > maxPrice
+    ) {
       return Response.json(
         { error: 'Minimum price cannot exceed maximum price.' },
         { status: 400 },
@@ -108,7 +122,8 @@ export async function GET(request: Request) {
     const where: Prisma.ProductWhereInput = {
       status: 'active',
       ...(ids.length > 0 ? { id: { in: ids } } : {}),
-      ...(category ? { categoryId: category } : {}),
+      ...(categoryId ? { categoryId } : {}),
+      ...(storeId ? { storeId } : {}),
       ...(searchParams.get('featured') === 'true' ? { isFeatured: true } : {}),
       ...(searchParams.get('sale') === 'true' ? { isSale: true } : {}),
       ...(searchParams.get('new') === 'true' ? { isNew: true } : {}),
