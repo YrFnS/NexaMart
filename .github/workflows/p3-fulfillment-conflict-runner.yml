@@ -1,0 +1,67 @@
+name: Run P3 fulfillment conflict patch
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+    paths:
+      - .github/workflows/p3-fulfillment-conflict-runner.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/p3-fulfillment-conflict-runner.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p3-fulfillment-conflict-runner
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: >-
+      github.ref_name == 'agent/production-hardening-phase-1' ||
+      github.head_ref == 'agent/production-hardening-phase-1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Execute reviewed patch and remove temporary workflows
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path(
+              '.github/workflows/p3-fulfillment-conflict-fix.yml'
+          ).read_text()
+          opener = "python3 - <<'PY'\n"
+          start = workflow.index(opener) + len(opener)
+          end = workflow.index('\n          PY\n', start)
+          patch_script = textwrap.dedent(workflow[start:end])
+          Path('/tmp/apply-p3-fulfillment-fix.py').write_text(patch_script)
+          PY
+
+          python3 /tmp/apply-p3-fulfillment-fix.py
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm \
+            .github/workflows/p3-fulfillment-conflict-fix.yml \
+            .github/workflows/p3-fulfillment-conflict-runner.yml
+          git add \
+            src/app/api/seller/fulfillment/route.ts \
+            src/lib/security.ts \
+            .github/workflows/ci.yml \
+            src/lib/p3-browser-source.test.ts
+          git diff --cached --check
+          git commit -m "fix: retry fulfillment races in browser CI"
+          git push origin HEAD:agent/production-hardening-phase-1
