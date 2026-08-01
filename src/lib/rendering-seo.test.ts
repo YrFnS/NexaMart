@@ -54,9 +54,15 @@ test('metadata, crawler files, structured data, and PWA branding are present', (
   assert.match(layout, /metadataBase: new URL\(APP_URL\)/);
   assert.match(layout, /export const viewport: Viewport/);
   assert.match(layout, /title: \{/);
+  assert.doesNotMatch(
+    layout,
+    /alternates:\s*\{\s*canonical:\s*['"]\/['"]\s*\}/,
+  );
   assert.match(robots, /sitemap\.xml/);
   assert.match(robots, /disallow/);
   assert.match(sitemap, /getSitemapStorefrontData/);
+  assert.match(sitemap, /MAX_SITEMAP_URLS = 50_000/);
+  assert.match(sitemap, /availableDynamicSlots/);
   assert.match(openGraphImage, /new ImageResponse/);
   assert.match(openGraphImage, /Pay on delivery/);
   assert.match(manifest, /Multi-Vendor Marketplace/);
