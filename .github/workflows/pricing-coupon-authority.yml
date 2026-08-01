@@ -10,6 +10,7 @@ on:
       - reopened
     paths:
       - scripts/apply-pricing-coupon-authority.py
+      - scripts/fix-pricing-consumers.py
       - .github/workflows/pricing-coupon-authority.yml
 
 permissions:
@@ -104,6 +105,9 @@ jobs:
           if 'readonly status =' in coupon_source or 'readonly code =' in coupon_source:
               raise SystemExit('Coupon error class still uses unsupported parameter properties')
           PY
+
+      - name: Normalize Decimal API consumers
+        run: python3 scripts/fix-pricing-consumers.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
