@@ -1,16 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle,
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
-  Loader2,
   MapPin,
   Package,
-  RefreshCw,
   RotateCcw,
   ShoppingBag,
   Star,
@@ -21,187 +17,32 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { type Product, ProductCard } from '@/components/buyer/product-card';
+import { ProductCard } from '@/components/buyer/product-card';
 import { StoreReviewsSection } from '@/components/buyer/store-reviews-section';
 import { useI18n } from '@/lib/i18n';
+import type {
+  StorefrontStoreSummary,
+  StorePageData,
+} from '@/lib/storefront-types';
 import { getLocale } from '@/lib/utils';
 
-interface PublicStore {
-  id: string;
-  name: string;
-  nameAr?: string | null;
-  description?: string | null;
-  descriptionAr?: string | null;
-  slug: string;
-  logo?: string | null;
-  banner?: string | null;
-  isVerified: boolean;
-  rating: number;
-  reviewCount: number;
-  productCount: number;
-  location?: string | null;
-  memberSince: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface StorePayload {
-  store?: PublicStore;
-  similarStores?: PublicStore[];
-  error?: string;
-}
-
-interface ProductsPayload {
-  products?: Product[];
-  error?: string;
-}
-
-function storeInitial(store: PublicStore): string {
+function storeInitial(store: StorefrontStoreSummary): string {
   return store.name.trim().charAt(0).toUpperCase() || 'N';
 }
 
-export function StoreProfilePage({ storeId }: { storeId?: string }) {
+export function StoreProfilePage({
+  initialData,
+}: {
+  initialData: StorePageData;
+}) {
   const { t, locale } = useI18n();
   const isRTL = locale === 'ar';
-  const [store, setStore] = useState<PublicStore | null>(null);
-  const [similarStores, setSimilarStores] = useState<PublicStore[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(Boolean(storeId));
-  const [error, setError] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    if (!storeId) return;
-    const currentStoreId: string = storeId;
-
-    const controller = new AbortController();
-
-    async function loadStore() {
-      setLoading(true);
-      setError('');
-      try {
-        const storeQuery = new URLSearchParams({ id: currentStoreId });
-        const productQuery = new URLSearchParams({
-          storeId: currentStoreId,
-          limit: '24',
-          sort: 'newest',
-        });
-        const [storeResponse, productResponse] = await Promise.all([
-          fetch(`/api/stores?${storeQuery.toString()}`, {
-            signal: controller.signal,
-            cache: 'no-store',
-          }),
-          fetch(`/api/products?${productQuery.toString()}`, {
-            signal: controller.signal,
-          }),
-        ]);
-
-        const storePayload = (await storeResponse
-          .json()
-          .catch(() => ({}))) as StorePayload;
-        if (!storeResponse.ok || !storePayload.store) {
-          throw new Error(storePayload.error || 'Store not found.');
-        }
-
-        const productPayload = (await productResponse
-          .json()
-          .catch(() => ({}))) as ProductsPayload;
-        if (!productResponse.ok) {
-          throw new Error(
-            productPayload.error || 'Failed to load this store’s products.',
-          );
-        }
-
-        setStore(storePayload.store);
-        setSimilarStores(storePayload.similarStores || []);
-        setProducts(productPayload.products || []);
-      } catch (loadError) {
-        if (loadError instanceof Error && loadError.name === 'AbortError') return;
-        setStore(null);
-        setSimilarStores([]);
-        setProducts([]);
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Failed to load store.',
-        );
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-
-    const timer = window.setTimeout(() => void loadStore(), 0);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [reloadKey, storeId]);
-
-  const displayName = useMemo(() => {
-    if (!store) return '';
-    return isRTL && store.nameAr ? store.nameAr : store.name;
-  }, [isRTL, store]);
-  const description = useMemo(() => {
-    if (!store) return '';
-    return isRTL && store.descriptionAr
+  const { store, products, similarStores, reviews } = initialData;
+  const displayName = isRTL && store.nameAr ? store.nameAr : store.name;
+  const description =
+    isRTL && store.descriptionAr
       ? store.descriptionAr
       : store.description || '';
-  }, [isRTL, store]);
-
-  if (loading && !store) {
-    return (
-      <div
-        className="container mx-auto flex min-h-[60vh] items-center justify-center px-4"
-        aria-busy="true"
-      >
-        <Loader2
-          className="size-9 animate-spin text-amber-600"
-          aria-hidden="true"
-        />
-      </div>
-    );
-  }
-
-  if (!store) {
-    return (
-      <div
-        className="container mx-auto px-4 py-16"
-        dir={isRTL ? 'rtl' : 'ltr'}
-      >
-        <Card className="mx-auto max-w-xl">
-          <CardContent className="flex min-h-72 flex-col items-center justify-center gap-4 text-center">
-            <AlertCircle className="size-12 text-red-500" aria-hidden="true" />
-            <h1 className="text-2xl font-bold">
-              {isRTL ? 'تعذر فتح المتجر' : 'Store unavailable'}
-            </h1>
-            <p className="text-sm text-muted-foreground" role="alert">
-              {error ||
-                (isRTL ? 'لم يتم العثور على المتجر.' : 'Store not found.')}
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setReloadKey((value) => value + 1)}
-              >
-                <RefreshCw className="me-2 size-4" aria-hidden="true" />
-                {isRTL ? 'إعادة المحاولة' : 'Try again'}
-              </Button>
-              <Button
-                asChild
-                className="bg-amber-600 text-white hover:bg-amber-700"
-              >
-                <Link href="/stores">
-                  {isRTL ? 'تصفح المتاجر' : 'Browse stores'}
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const joinedDate = new Date(store.memberSince);
   const joinedLabel = Number.isNaN(joinedDate.getTime())
     ? '—'
@@ -397,6 +238,7 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
               <StoreReviewsSection
                 storeId={store.id}
                 storeName={displayName}
+                initialData={reviews}
               />
             </TabsContent>
 
