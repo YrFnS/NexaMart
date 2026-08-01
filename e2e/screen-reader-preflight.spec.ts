@@ -29,8 +29,8 @@ test.describe('P3 keyboard and screen-reader preflight', () => {
     await expect(skipLink).toBeVisible();
 
     await page.keyboard.press('Enter');
-    const main = page.locator('#main-content');
-    await expect(main).toBeFocused();
+    const mainContent = page.locator('#main-content');
+    await expect(mainContent).toBeFocused();
 
     await expectNoHorizontalOverflow(page);
     await expectNoSeriousAccessibilityViolations(page);
@@ -51,12 +51,13 @@ test.describe('P3 keyboard and screen-reader preflight', () => {
     await expect(email).toHaveAccessibleName(/email/i);
     await expect(password).toHaveAccessibleName(/password/i);
 
-    const passwordToggle = loginForm.getByRole('button', {
-      name: 'Show password',
-    });
-    await passwordToggle.click();
+    await loginForm
+      .getByRole('button', { name: 'Show password' })
+      .click();
     await expect(password).toHaveAttribute('type', 'text');
-    await expect(passwordToggle).toHaveAccessibleName('Hide password');
+    await expect(
+      loginForm.getByRole('button', { name: 'Hide password' }),
+    ).toBeVisible();
 
     await email.fill('demo@nexamart.com');
     await password.fill('not-the-seeded-password');
@@ -96,11 +97,12 @@ test.describe('P3 keyboard and screen-reader preflight', () => {
       /كلمة المرور/,
     );
 
-    const passwordToggle = loginForm.getByRole('button', {
-      name: 'إظهار كلمة المرور',
-    });
-    await passwordToggle.click();
-    await expect(passwordToggle).toHaveAccessibleName('إخفاء كلمة المرور');
+    await loginForm
+      .getByRole('button', { name: 'إظهار كلمة المرور' })
+      .click();
+    await expect(
+      loginForm.getByRole('button', { name: 'إخفاء كلمة المرور' }),
+    ).toBeVisible();
     await expect(
       loginForm.getByRole('button', { name: 'تجربة حساب المشتري' }),
     ).toBeVisible();
