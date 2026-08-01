@@ -1,9 +1,13 @@
 name: Pricing and coupon authority generation
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/production-hardening-phase-1
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
     paths:
       - scripts/apply-pricing-coupon-authority.py
       - .github/workflows/pricing-coupon-authority.yml
@@ -12,11 +16,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: pricing-coupon-authority-${{ github.ref }}
+  group: pricing-coupon-authority-${{ github.event.pull_request.head.ref }}
   cancel-in-progress: true
 
 jobs:
   generate-and-verify:
+    if: ${{ github.event.pull_request.head.ref == 'agent/production-hardening-phase-1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
