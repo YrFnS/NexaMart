@@ -109,7 +109,7 @@ export function getSessionClaims(request: Request): SessionClaims | null {
   return verifySessionToken(token);
 }
 
-function useSecureSessionCookie(): boolean {
+function shouldUseSecureSessionCookie(): boolean {
   if (process.env.NODE_ENV !== 'production') return false;
 
   const explicitCiHttpOverride =
@@ -120,7 +120,7 @@ function useSecureSessionCookie(): boolean {
 }
 
 function secureCookieAttribute(): string {
-  return useSecureSessionCookie() ? '; Secure' : '';
+  return shouldUseSecureSessionCookie() ? '; Secure' : '';
 }
 
 export function serializeSessionCookie(
