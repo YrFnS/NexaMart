@@ -60,7 +60,9 @@ test.describe('P3 Arabic and mobile verification', () => {
 
     await gotoAndExpectOk(page, '/product/WHP-001');
     const addToCart = page
-      .getByRole('button', { name: /أضف إلى السلة|Add to cart/i })
+      .getByRole('button', {
+        name: /أضف للسلة|أضف إلى السلة|Add to cart/i,
+      })
       .first();
     await addToCart.scrollIntoViewIfNeeded();
     await expect(addToCart).toBeVisible();
