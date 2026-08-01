@@ -81,12 +81,20 @@ export function RelatedProducts({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setShowStickyPurchaseActions(!entry?.isIntersecting);
+        // Do not cover product options before the buyer reaches the complete
+        // purchase controls. The compact bar appears only after those controls
+        // have been scrolled safely above the viewport.
+        const passedPrimaryActions = Boolean(
+          entry &&
+            !entry.isIntersecting &&
+            entry.boundingClientRect.bottom < 0,
+        );
+        setShowStickyPurchaseActions(passedPrimaryActions);
       },
       {
-        // Hide the fixed layer before the complete controls reach the space
-        // occupied by the purchase bar and mobile navigation.
-        rootMargin: '0px 0px 160px 0px',
+        // Keep the fixed layer hidden while the full controls remain close to
+        // the top edge, avoiding duplicate or overlapping purchase targets.
+        rootMargin: '160px 0px 0px 0px',
         threshold: 0.01,
       },
     );
