@@ -19,6 +19,24 @@ stagingUrl.search = '';
 stagingUrl.hash = '';
 const baseURL = stagingUrl.origin;
 
+const authHeaderName = process.env.STAGING_AUTH_HEADER_NAME?.trim();
+const authHeaderValue = process.env.STAGING_AUTH_HEADER_VALUE?.trim();
+if (Boolean(authHeaderName) !== Boolean(authHeaderValue)) {
+  throw new Error(
+    'STAGING_AUTH_HEADER_NAME and STAGING_AUTH_HEADER_VALUE must be configured together.',
+  );
+}
+if (
+  /\r|\n/.test(authHeaderName || '') ||
+  /\r|\n/.test(authHeaderValue || '')
+) {
+  throw new Error('Staging authentication headers cannot contain newlines.');
+}
+const extraHTTPHeaders =
+  authHeaderName && authHeaderValue
+    ? { [authHeaderName]: authHeaderValue }
+    : undefined;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: /staging-deployment\.spec\.ts/,
@@ -43,6 +61,7 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    extraHTTPHeaders,
     actionTimeout: 15_000,
     navigationTimeout: 45_000,
     locale: 'en-US',
