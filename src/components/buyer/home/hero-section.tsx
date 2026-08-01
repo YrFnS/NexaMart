@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -33,6 +33,22 @@ interface HeroSectionProps {
   bestDiscount: number;
 }
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function subscribeToReducedMotion(callback: () => void) {
+  const media = window.matchMedia(REDUCED_MOTION_QUERY);
+  media.addEventListener('change', callback);
+  return () => media.removeEventListener('change', callback);
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getServerReducedMotionSnapshot() {
+  return false;
+}
+
 export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
   const { t, locale } = useI18n();
   const isRTL = locale === 'ar';
@@ -54,25 +70,22 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [paused, setPaused] = useState(false);
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotionSnapshot,
+    getServerReducedMotionSnapshot,
+  );
 
   useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (media.matches) setPaused(true);
-  }, []);
-
-  useEffect(() => {
-    if (paused || slides.length <= 1) return;
+    if (paused || prefersReducedMotion || slides.length <= 1) return;
     const timer = window.setInterval(() => {
       setCurrentSlide((current) => (current + 1) % slides.length);
     }, UI_CONFIG.carouselAutoAdvanceMs);
     return () => window.clearInterval(timer);
-  }, [paused, slides.length]);
+  }, [paused, prefersReducedMotion, slides.length]);
 
-  useEffect(() => {
-    if (currentSlide >= slides.length) setCurrentSlide(0);
-  }, [currentSlide, slides.length]);
-
-  const slide = slides[currentSlide] || slides[0];
+  const safeSlideIndex = currentSlide % slides.length;
+  const slide = slides[safeSlideIndex] || slides[0];
   const PreviousIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
 
@@ -123,13 +136,13 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
           </div>
 
           <div
-            key={currentSlide}
+            key={safeSlideIndex}
             role="group"
             aria-roledescription={isRTL ? 'شريحة' : 'slide'}
             aria-label={
               isRTL
-                ? `${currentSlide + 1} من ${slides.length}`
-                : `${currentSlide + 1} of ${slides.length}`
+                ? `${safeSlideIndex + 1} من ${slides.length}`
+                : `${safeSlideIndex + 1} of ${slides.length}`
             }
           >
             <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
@@ -236,11 +249,11 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
                       ? `الانتقال إلى الشريحة ${index + 1}`
                       : `Go to slide ${index + 1}`
                   }
-                  aria-current={index === currentSlide ? 'true' : undefined}
+                  aria-current={index === safeSlideIndex ? 'true' : undefined}
                 >
                   <span
                     className={`block rounded-full transition-all ${
-                      index === currentSlide
+                      index === safeSlideIndex
                         ? 'h-2.5 w-6 bg-amber-400'
                         : 'size-2.5 bg-white/50'
                     }`}
@@ -250,20 +263,25 @@ export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
               ))}
               <button
                 type="button"
-                className="flex size-11 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                className="flex size-11 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => setPaused((value) => !value)}
+                disabled={prefersReducedMotion}
                 aria-label={
-                  paused
+                  prefersReducedMotion
                     ? isRTL
-                      ? 'تشغيل العرض التلقائي'
-                      : 'Play automatic slides'
-                    : isRTL
-                      ? 'إيقاف العرض التلقائي'
-                      : 'Pause automatic slides'
+                      ? 'العرض التلقائي متوقف حسب تفضيل تقليل الحركة'
+                      : 'Automatic slides disabled by reduced-motion preference'
+                    : paused
+                      ? isRTL
+                        ? 'تشغيل العرض التلقائي'
+                        : 'Play automatic slides'
+                      : isRTL
+                        ? 'إيقاف العرض التلقائي'
+                        : 'Pause automatic slides'
                 }
-                aria-pressed={paused}
+                aria-pressed={paused || prefersReducedMotion}
               >
-                {paused ? (
+                {paused || prefersReducedMotion ? (
                   <CirclePlay className="size-5" aria-hidden="true" />
                 ) : (
                   <CirclePause className="size-5" aria-hidden="true" />
