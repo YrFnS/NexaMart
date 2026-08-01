@@ -33,6 +33,7 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
     'src/app/api/seller/fulfillment/route.ts',
   );
   const security = source('src/lib/security.ts');
+  const proxy = source('src/proxy.ts');
   const quickView = source('src/components/buyer/product-quick-view.tsx');
   const hero = source('src/components/buyer/home/hero-section.tsx');
 
@@ -91,6 +92,10 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(security, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS/);
   assert.match(security, /productionDefault/);
   assert.match(security, /ciDefault/);
+  assert.match(proxy, /browserHarnessAuthLimit/);
+  assert.match(proxy, /E2E_BROWSER_TEST_HARNESS/);
+  assert.match(proxy, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS/);
+  assert.match(proxy, /maxRequests: browserHarnessAuthLimit\(\)/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
