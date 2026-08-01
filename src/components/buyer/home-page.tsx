@@ -1,94 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { type Category } from '@/components/buyer/category-grid';
+import { useCallback, useMemo, useState } from 'react';
 import {
   CategorySection,
   DealsSection,
   FeaturedProductsSection,
   FeaturedStoresSectionWrapper,
-  FlashSaleBanner,
   HeroSection,
   RecentlyViewed,
   TrustStrip,
-  type FeaturedStore,
 } from '@/components/buyer/home';
 import { type Product } from '@/components/buyer/product-card';
 import { ProductQuickView } from '@/components/buyer/product-quick-view';
 import { useI18n } from '@/lib/i18n';
+import type { HomePageData } from '@/lib/storefront-types';
 
-interface HeroBanner {
-  id: string;
-  title: string;
-  titleAr: string | null;
-  description: string | null;
-  descriptionAr: string | null;
-  ctaText: string | null;
-  ctaTextAr: string | null;
-  ctaLink: string | null;
-  gradient: string | null;
-  icon: string | null;
-}
-
-export function HomePage() {
+export function HomePage({ initialData }: { initialData: HomePageData }) {
   const { t, locale } = useI18n();
   const isRTL = locale === 'ar';
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stores, setStores] = useState<FeaturedStore[]>([]);
-  const [heroBanners, setHeroBanners] = useState<HeroBanner[]>([]);
+  const { categories, products, stores, heroBanners } = initialData;
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(
     null,
   );
   const [quickViewOpen, setQuickViewOpen] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadHome() {
-      try {
-        const [categoryResponse, productResponse, storeResponse, bannerResponse] =
-          await Promise.all([
-            fetch('/api/categories', { signal: controller.signal }),
-            fetch('/api/products?limit=24', { signal: controller.signal }),
-            fetch('/api/stores?limit=12&sort=rating', {
-              signal: controller.signal,
-            }),
-            fetch('/api/banners?position=hero', { signal: controller.signal }),
-          ]);
-
-        if (categoryResponse.ok) {
-          const payload = (await categoryResponse.json()) as unknown;
-          if (Array.isArray(payload)) setCategories(payload as Category[]);
-        }
-        if (productResponse.ok) {
-          const payload = (await productResponse.json()) as {
-            products?: Product[];
-          };
-          setProducts(payload.products || []);
-        }
-        if (storeResponse.ok) {
-          const payload = (await storeResponse.json()) as {
-            stores?: FeaturedStore[];
-          };
-          setStores(payload.stores || []);
-        }
-        if (bannerResponse.ok) {
-          const payload = (await bannerResponse.json()) as {
-            banners?: HeroBanner[];
-          };
-          setHeroBanners(payload.banners || []);
-        }
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          console.error('Homepage data error:', error);
-        }
-      }
-    }
-
-    void loadHome();
-    return () => controller.abort();
-  }, []);
 
   const featuredProducts = useMemo(
     () => products.filter((product) => product.isFeatured).slice(0, 10),
@@ -173,13 +107,6 @@ export function HomePage() {
     );
   }, 0);
 
-  const platformStats = {
-    products: products.length,
-    sellers: stores.length,
-    users: 0,
-    countries: 0,
-  };
-
   const handleQuickView = useCallback((product: Product) => {
     setQuickViewProduct(product);
     setQuickViewOpen(true);
@@ -196,12 +123,6 @@ export function HomePage() {
         mostPopularProducts={popularProducts}
         onQuickView={handleQuickView}
       />
-      {saleProducts.length > 0 && (
-        <FlashSaleBanner
-          saleProducts={saleProducts}
-          platformStats={platformStats}
-        />
-      )}
       {featuredStores.length > 0 && (
         <FeaturedStoresSectionWrapper stores={featuredStores} />
       )}
