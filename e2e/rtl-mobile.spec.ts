@@ -86,17 +86,13 @@ test.describe('P3 Arabic and mobile verification', () => {
     );
     const assistant = page.locator('[data-ai-chat-layer] > .fixed');
 
-    await expect
-      .poll(
-        async () =>
-          (await isInViewport(stickyPurchaseBar)) ||
-          (await isInViewport(primaryPurchaseActions)),
-      )
-      .toBe(true);
-    const activePurchaseActions = (await isInViewport(stickyPurchaseBar))
-      ? stickyPurchaseBar
-      : primaryPurchaseActions;
-    const addToCart = activePurchaseActions.getByRole('button', {
+    // The compact bar must not appear before buyers reach the complete product
+    // options and primary controls, otherwise it can cover selectable variants.
+    await expect(stickyPurchaseBar).toHaveCount(0);
+    await primaryPurchaseActions.scrollIntoViewIfNeeded();
+    await expect(primaryPurchaseActions).toBeInViewport();
+
+    const addToCart = primaryPurchaseActions.getByRole('button', {
       name: actionName,
     });
 
@@ -179,6 +175,17 @@ test.describe('P3 Arabic and mobile verification', () => {
     expect(actionLayout.height).toBeGreaterThanOrEqual(44);
     expect(actionLayout.blockers).toEqual([]);
     expect(actionLayout.assistantOverlapsActionContainer).toBe(false);
+
+    const fulfillmentSection = page.locator('#fulfillment-details-title');
+    await fulfillmentSection.scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => isInViewport(stickyPurchaseBar))
+      .toBe(true);
+    const stickyAddToCart = stickyPurchaseBar.getByRole('button', {
+      name: actionName,
+    });
+    await expect(stickyAddToCart).toBeVisible();
+    await expect(stickyAddToCart).toBeInViewport();
 
     const compareToggle = page
       .getByRole('button', { name: /مقارنة|Compare/i })
