@@ -23,6 +23,7 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   const publicSmoke = source('e2e/public-smoke.spec.ts');
   const rtlMobile = source('e2e/rtl-mobile.spec.ts');
   const criticalFlows = source('e2e/critical-flows.spec.ts');
+  const inventoryRace = source('e2e/inventory-race.spec.ts');
   const quickView = source('src/components/buyer/product-quick-view.tsx');
   const hero = source('src/components/buyer/home/hero-section.tsx');
 
@@ -44,6 +45,12 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(criticalFlows, /\/api\/checkout/);
   assert.match(criticalFlows, /toHaveLength\(2\)/);
   assert.match(criticalFlows, /reducedMotion: 'reduce'/);
+  assert.match(inventoryRace, /UHC-004/);
+  assert.match(inventoryRace, /Promise\.all/);
+  assert.match(inventoryRace, /one competing checkout wins/);
+  assert.match(inventoryRace, /duplicatePost/);
+  assert.match(inventoryRace, /inventoryRestoredAt/);
+  assert.match(inventoryRace, /cancellationEventCount/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
