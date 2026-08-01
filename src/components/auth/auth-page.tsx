@@ -88,7 +88,9 @@ export function AuthPage() {
         await requestAuth('/api/auth/demo', { role });
       } catch (requestError) {
         setError(
-          requestError instanceof Error ? requestError.message : t('authFailedConnect'),
+          requestError instanceof Error
+            ? requestError.message
+            : t('authFailedConnect'),
         );
       } finally {
         setIsLoading(false);
@@ -126,7 +128,9 @@ export function AuthPage() {
       });
     } catch (requestError) {
       setError(
-        requestError instanceof Error ? requestError.message : t('authFailedConnect'),
+        requestError instanceof Error
+          ? requestError.message
+          : t('authFailedConnect'),
       );
     } finally {
       setIsLoading(false);
@@ -168,7 +172,9 @@ export function AuthPage() {
       });
     } catch (requestError) {
       setError(
-        requestError instanceof Error ? requestError.message : t('authFailedConnect'),
+        requestError instanceof Error
+          ? requestError.message
+          : t('authFailedConnect'),
       );
     } finally {
       setIsLoading(false);
@@ -187,7 +193,10 @@ export function AuthPage() {
           className="mb-4 gap-1.5"
           onClick={() => nav.setView('home')}
         >
-          <ArrowLeft className={`size-4 ${isRTL ? 'rotate-180' : ''}`} />
+          <ArrowLeft
+            className={`size-4 ${isRTL ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
           {t('back')}
         </Button>
 
@@ -195,7 +204,9 @@ export function AuthPage() {
           <CardContent className="p-0">
             <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-6 text-white text-center rounded-t-xl">
               <h1 className="text-2xl font-bold">{APP_NAME}</h1>
-              <p className="text-emerald-100 text-sm mt-1">{t('authTagline')}</p>
+              <p className="text-emerald-100 text-sm mt-1">
+                {t('authTagline')}
+              </p>
             </div>
 
             <div className="p-6">
@@ -216,7 +227,12 @@ export function AuthPage() {
                 </TabsList>
 
                 <TabsContent value="login">
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form
+                    onSubmit={handleLogin}
+                    className="space-y-4"
+                    aria-label={t('login')}
+                    aria-busy={isLoading}
+                  >
                     <Field
                       id="login-email"
                       label={t('email')}
@@ -269,7 +285,7 @@ export function AuthPage() {
                         onClick={() => void handleDemoLogin('buyer')}
                         disabled={isLoading}
                       >
-                        Buyer Demo
+                        {isRTL ? 'تجربة حساب المشتري' : 'Buyer Demo'}
                       </Button>
                       <Button
                         type="button"
@@ -278,7 +294,7 @@ export function AuthPage() {
                         onClick={() => void handleDemoLogin('seller')}
                         disabled={isLoading}
                       >
-                        Seller Demo
+                        {isRTL ? 'تجربة حساب البائع' : 'Seller Demo'}
                       </Button>
                     </div>
 
@@ -297,7 +313,12 @@ export function AuthPage() {
                 </TabsContent>
 
                 <TabsContent value="register">
-                  <form onSubmit={handleRegister} className="space-y-4">
+                  <form
+                    onSubmit={handleRegister}
+                    className="space-y-4"
+                    aria-label={t('signup')}
+                    aria-busy={isLoading}
+                  >
                     <Field
                       id="reg-name"
                       label={t('authFullName')}
@@ -382,14 +403,18 @@ export function AuthPage() {
                         type={showConfirmPassword ? 'text' : 'password'}
                         autoComplete="new-password"
                         value={regConfirmPassword}
-                        onChange={(event) => setRegConfirmPassword(event.target.value)}
+                        onChange={(event) =>
+                          setRegConfirmPassword(event.target.value)
+                        }
                         className={isRTL ? 'pr-10 pl-10' : 'pl-10 pr-10'}
                         required
                       />
                       <PasswordToggle
                         shown={showConfirmPassword}
                         isRTL={isRTL}
-                        onClick={() => setShowConfirmPassword((value) => !value)}
+                        onClick={() =>
+                          setShowConfirmPassword((value) => !value)
+                        }
                       />
                     </Field>
 
@@ -397,9 +422,14 @@ export function AuthPage() {
                       <Checkbox
                         id="terms"
                         checked={regTerms}
-                        onCheckedChange={(checked) => setRegTerms(checked === true)}
+                        onCheckedChange={(checked) =>
+                          setRegTerms(checked === true)
+                        }
                       />
-                      <Label htmlFor="terms" className="text-xs text-muted-foreground leading-tight">
+                      <Label
+                        htmlFor="terms"
+                        className="text-xs text-muted-foreground leading-tight"
+                      >
                         {t('authIAgreeTo')} {t('termsOfService')} {t('authAnd')}{' '}
                         {t('privacyPolicy')}
                       </Label>
@@ -470,6 +500,14 @@ function PasswordToggle({
   isRTL: boolean;
   onClick: () => void;
 }) {
+  const label = shown
+    ? isRTL
+      ? 'إخفاء كلمة المرور'
+      : 'Hide password'
+    : isRTL
+      ? 'إظهار كلمة المرور'
+      : 'Show password';
+
   return (
     <Button
       variant="ghost"
@@ -479,9 +517,13 @@ function PasswordToggle({
       }`}
       type="button"
       onClick={onClick}
-      aria-label={shown ? 'Hide password' : 'Show password'}
+      aria-label={label}
     >
-      {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+      {shown ? (
+        <EyeOff className="size-4" aria-hidden="true" />
+      ) : (
+        <Eye className="size-4" aria-hidden="true" />
+      )}
     </Button>
   );
 }
@@ -501,8 +543,11 @@ function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
       type="submit"
       className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white h-11 rounded-xl"
       disabled={loading}
+      aria-busy={loading}
     >
-      {loading ? <Loader2 className="size-4 animate-spin me-2" /> : null}
+      {loading ? (
+        <Loader2 className="size-4 animate-spin me-2" aria-hidden="true" />
+      ) : null}
       {label}
     </Button>
   );
