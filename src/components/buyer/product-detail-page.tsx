@@ -107,23 +107,19 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const similarScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!productId) {
-      setProduct(null);
-      setLoading(false);
-      setLoadError('');
-      return;
-    }
+    if (!productId) return;
 
     const controller = new AbortController();
-    setLoading(true);
-    setLoadError('');
-    setProduct(null);
-    setSimilarProducts([]);
-    setRelatedProducts([]);
-    setQuantity(1);
-    setVariantError('');
 
     async function loadProduct() {
+      setLoading(true);
+      setLoadError('');
+      setProduct(null);
+      setSimilarProducts([]);
+      setRelatedProducts([]);
+      setQuantity(1);
+      setVariantError('');
+
       try {
         const response = await fetch(
           `/api/products/${encodeURIComponent(productId)}`,
@@ -187,8 +183,11 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       }
     }
 
-    void loadProduct();
-    return () => controller.abort();
+    const timer = window.setTimeout(() => void loadProduct(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [addRecentlyViewed, productId]);
 
   useEffect(() => {
@@ -197,8 +196,8 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       .productIds.filter((id) => id !== productId)
       .slice(0, 6);
     if (ids.length === 0) {
-      setRecentlyViewedProducts([]);
-      return;
+      const timer = window.setTimeout(() => setRecentlyViewedProducts([]), 0);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();
@@ -359,7 +358,10 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
             )}
           </div>
           <h1 className="text-2xl font-bold">{t('productNotFound')}</h1>
-          <p className="max-w-md text-muted-foreground" role={loadError ? 'alert' : undefined}>
+          <p
+            className="max-w-md text-muted-foreground"
+            role={loadError ? 'alert' : undefined}
+          >
             {loadError || t('productNotFoundDesc')}
           </p>
           <Button asChild className="bg-amber-600 text-white hover:bg-amber-700">
@@ -391,7 +393,8 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
         .sort((left, right) => right.minQty - left.minQty)
         .find((tier) => quantity >= tier.minQty)
     : undefined;
-  const effectivePrice = selectedVariant?.price ?? eligibleTier?.price ?? product.price;
+  const effectivePrice =
+    selectedVariant?.price ?? eligibleTier?.price ?? product.price;
   const discount =
     displayProduct.originalPrice &&
     displayProduct.originalPrice > effectivePrice
@@ -424,7 +427,10 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
             className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1"
             aria-label={t('recentlyViewedTrail')}
           >
-            <Clock className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <Clock
+              className="size-3 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
             <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
               {t('recentlyViewedTrail')}:
             </span>
