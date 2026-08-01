@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
@@ -6,9 +7,9 @@ import {
   requireAdminAuth,
 } from '@/lib/security';
 
-const reportableOrderWhere = {
+const reportableOrderWhere: Prisma.OrderWhereInput = {
   status: { notIn: ['cancelled', 'rejected'] },
-} as const;
+};
 
 function emptyDashboard() {
   return {
@@ -144,9 +145,7 @@ export async function GET(request: Request) {
       orderNum: dispute.order.orderNumber,
       buyer: dispute.buyer.name || 'Unknown',
       seller:
-        dispute.seller.store?.[0]?.name ||
-        dispute.seller.name ||
-        'Unknown',
+        dispute.seller.store?.name || dispute.seller.name || 'Unknown',
       reason: dispute.reason,
       status: dispute.status,
     }));
