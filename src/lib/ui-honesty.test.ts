@@ -106,5 +106,5 @@ test('admin dashboard reports operations rather than invented revenue', () => {
   assert.match(dashboard, /href="\/admin\/users"/);
   assert.doesNotMatch(dashboard, /adminViewPayouts/);
   assert.doesNotMatch(dashboard, /<Wallet/);
-  assert.doesNotMatch(dashboard, /bg-emerald/);
+  assert.doesNotMatch(dashboard, /from-emerald/);
 });
