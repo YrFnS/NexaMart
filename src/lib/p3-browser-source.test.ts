@@ -27,14 +27,19 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   const hero = source('src/components/buyer/home/hero-section.tsx');
 
   assert.match(helpers, /AxeBuilder/);
+  assert.match(helpers, /credentials: 'same-origin'/);
+  assert.match(helpers, /fetch\('\/api\/auth\/login'/);
   assert.match(helpers, /critical[\s\S]*serious|serious[\s\S]*critical/);
   assert.match(publicSmoke, /restores trigger focus/);
   assert.match(publicSmoke, /\/product\/WHP-001/);
   assert.match(rtlMobile, /nexamart_locale/);
   assert.match(rtlMobile, /toHaveAttribute\('dir', 'rtl'\)/);
+  assert.match(rtlMobile, /reducedMotion: 'reduce'/);
   assert.match(criticalFlows, /\/api\/auth\/login/);
+  assert.match(criticalFlows, /\/api\/auth\/session/);
   assert.match(criticalFlows, /\/api\/checkout/);
   assert.match(criticalFlows, /toHaveLength\(2\)/);
+  assert.match(criticalFlows, /reducedMotion: 'reduce'/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
@@ -48,6 +53,7 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
 
 test('permanent CI runs browsers and preserves failure diagnostics', () => {
   const workflow = source('.github/workflows/ci.yml');
+  const session = source('src/lib/session.ts');
   const packageJson = JSON.parse(source('package.json')) as {
     devDependencies?: Record<string, string>;
   };
@@ -57,6 +63,9 @@ test('permanent CI runs browsers and preserves failure diagnostics', () => {
   assert.match(workflow, /playwright install --with-deps chromium firefox/);
   assert.match(workflow, /npx playwright test/);
   assert.match(workflow, /RATE_LIMIT_ALLOW_MEMORY_FALLBACK: "true"/);
+  assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: "true"/);
+  assert.match(session, /process\.env\.CI === 'true'/);
+  assert.match(session, /AUTH_COOKIE_INSECURE_FOR_TESTS === 'true'/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.equal(
     existsSync(
