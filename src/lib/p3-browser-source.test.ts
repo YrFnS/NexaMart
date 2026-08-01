@@ -82,7 +82,11 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(fulfillmentRoute, /retrySerializableTransaction/);
   assert.match(fulfillmentRoute, /P2034/);
   assert.match(fulfillmentRoute, /FULFILLMENT_CONFLICT/);
-  assert.match(security, /process\.env\.CI !== 'true'/);
+  assert.match(security, /E2E_BROWSER_TEST_HARNESS/);
+  assert.match(
+    security,
+    /process\.env\.E2E_BROWSER_TEST_HARNESS !== 'true'/,
+  );
   assert.match(security, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS/);
   assert.match(security, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS/);
   assert.match(security, /productionDefault/);
@@ -111,6 +115,9 @@ test('permanent CI runs browsers and preserves failure diagnostics', () => {
   assert.match(workflow, /npx playwright test/);
   assert.match(workflow, /RATE_LIMIT_ALLOW_MEMORY_FALLBACK: "true"/);
   assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: "true"/);
+  assert.match(workflow, /E2E_BROWSER_TEST_HARNESS: "true"/);
+  assert.match(workflow, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: "30"/);
+  assert.match(workflow, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: "100"/);
   assert.match(session, /process\.env\.CI === 'true'/);
   assert.match(session, /AUTH_COOKIE_INSECURE_FOR_TESTS === 'true'/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
