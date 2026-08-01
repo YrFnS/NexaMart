@@ -14,7 +14,6 @@ import {
   RotateCcw,
   ShoppingBag,
   Star,
-  Store,
   Truck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -72,20 +71,13 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!storeId) {
-      setStore(null);
-      setProducts([]);
-      setSimilarStores([]);
-      setLoading(false);
-      setError('');
-      return;
-    }
+    if (!storeId) return;
 
     const controller = new AbortController();
-    setLoading(true);
-    setError('');
 
     async function loadStore() {
+      setLoading(true);
+      setError('');
       try {
         const storeQuery = new URLSearchParams({ id: storeId });
         const productQuery = new URLSearchParams({
@@ -137,8 +129,11 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
       }
     }
 
-    void loadStore();
-    return () => controller.abort();
+    const timer = window.setTimeout(() => void loadStore(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [reloadKey, storeId]);
 
   const displayName = useMemo(() => {
@@ -158,14 +153,20 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
         className="container mx-auto flex min-h-[60vh] items-center justify-center px-4"
         aria-busy="true"
       >
-        <Loader2 className="size-9 animate-spin text-amber-600" aria-hidden="true" />
+        <Loader2
+          className="size-9 animate-spin text-amber-600"
+          aria-hidden="true"
+        />
       </div>
     );
   }
 
   if (!store) {
     return (
-      <div className="container mx-auto px-4 py-16" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div
+        className="container mx-auto px-4 py-16"
+        dir={isRTL ? 'rtl' : 'ltr'}
+      >
         <Card className="mx-auto max-w-xl">
           <CardContent className="flex min-h-72 flex-col items-center justify-center gap-4 text-center">
             <AlertCircle className="size-12 text-red-500" aria-hidden="true" />
@@ -173,7 +174,8 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
               {isRTL ? 'تعذر فتح المتجر' : 'Store unavailable'}
             </h1>
             <p className="text-sm text-muted-foreground" role="alert">
-              {error || (isRTL ? 'لم يتم العثور على المتجر.' : 'Store not found.')}
+              {error ||
+                (isRTL ? 'لم يتم العثور على المتجر.' : 'Store not found.')}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button
@@ -184,7 +186,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
                 <RefreshCw className="me-2 size-4" aria-hidden="true" />
                 {isRTL ? 'إعادة المحاولة' : 'Try again'}
               </Button>
-              <Button asChild className="bg-amber-600 text-white hover:bg-amber-700">
+              <Button
+                asChild
+                className="bg-amber-600 text-white hover:bg-amber-700"
+              >
                 <Link href="/stores">
                   {isRTL ? 'تصفح المتاجر' : 'Browse stores'}
                 </Link>
@@ -246,7 +251,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 id="store-title" className="text-2xl font-bold md:text-3xl">
+                  <h1
+                    id="store-title"
+                    className="text-2xl font-bold md:text-3xl"
+                  >
                     {displayName}
                   </h1>
                   {store.isVerified && (
@@ -259,13 +267,17 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
 
                 <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1.5">
-                    <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+                    <Star
+                      className="size-4 fill-amber-400 text-amber-400"
+                      aria-hidden="true"
+                    />
                     {store.rating.toFixed(1)} · {store.reviewCount}{' '}
                     {t('reviews')}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Package className="size-4" aria-hidden="true" />
-                    {store.productCount} {isRTL ? 'منتج نشط' : 'active products'}
+                    {store.productCount}{' '}
+                    {isRTL ? 'منتج نشط' : 'active products'}
                   </span>
                   {store.location && (
                     <span className="flex items-center gap-1.5">
@@ -291,7 +303,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             <Card>
               <CardContent className="flex items-start gap-3 p-4">
-                <ShoppingBag className="mt-0.5 size-5 text-amber-600" aria-hidden="true" />
+                <ShoppingBag
+                  className="mt-0.5 size-5 text-amber-600"
+                  aria-hidden="true"
+                />
                 <div>
                   <h2 className="font-semibold">
                     {isRTL ? 'الدفع عند الاستلام' : 'Pay on delivery'}
@@ -306,7 +321,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
             </Card>
             <Card>
               <CardContent className="flex items-start gap-3 p-4">
-                <Truck className="mt-0.5 size-5 text-amber-600" aria-hidden="true" />
+                <Truck
+                  className="mt-0.5 size-5 text-amber-600"
+                  aria-hidden="true"
+                />
                 <div>
                   <h2 className="font-semibold">
                     {isRTL ? 'تتبع مسجل' : 'Recorded tracking'}
@@ -321,7 +339,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
             </Card>
             <Card>
               <CardContent className="flex items-start gap-3 p-4">
-                <RotateCcw className="mt-0.5 size-5 text-amber-600" aria-hidden="true" />
+                <RotateCcw
+                  className="mt-0.5 size-5 text-amber-600"
+                  aria-hidden="true"
+                />
                 <div>
                   <h2 className="font-semibold">
                     {isRTL ? 'إرجاع مرتبط بالطلب' : 'Order-linked returns'}
@@ -353,7 +374,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
               {products.length === 0 ? (
                 <Card>
                   <CardContent className="flex min-h-56 flex-col items-center justify-center text-center text-muted-foreground">
-                    <Package className="mb-3 size-11 opacity-40" aria-hidden="true" />
+                    <Package
+                      className="mb-3 size-11 opacity-40"
+                      aria-hidden="true"
+                    />
                     {isRTL
                       ? 'لا توجد منتجات نشطة في هذا المتجر.'
                       : 'This store has no active products.'}
@@ -369,7 +393,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
             </TabsContent>
 
             <TabsContent value="reviews" className="mt-5">
-              <StoreReviewsSection storeId={store.id} storeName={displayName} />
+              <StoreReviewsSection
+                storeId={store.id}
+                storeName={displayName}
+              />
             </TabsContent>
 
             <TabsContent value="about" className="mt-5">
@@ -411,7 +438,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3">
                             <Avatar className="size-11 shrink-0">
-                              <AvatarImage src={similarStore.logo || undefined} alt="" />
+                              <AvatarImage
+                                src={similarStore.logo || undefined}
+                                alt=""
+                              />
                               <AvatarFallback className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
                                 {storeInitial(similarStore)}
                               </AvatarFallback>
@@ -421,7 +451,10 @@ export function StoreProfilePage({ storeId }: { storeId?: string }) {
                                 {similarName}
                               </p>
                               <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                                <Star
+                                  className="size-3 fill-amber-400 text-amber-400"
+                                  aria-hidden="true"
+                                />
                                 {similarStore.rating.toFixed(1)} ·{' '}
                                 {similarStore.productCount}{' '}
                                 {isRTL ? 'منتج' : 'products'}
