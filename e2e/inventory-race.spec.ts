@@ -151,6 +151,8 @@ function cancellationEventCount(order: OrderSnapshot): number {
   ).length;
 }
 
+test.describe.configure({ retries: 0 });
+
 test.describe('P3 exact-SKU concurrency and restoration', () => {
   test('one competing checkout wins and cancellation restores stock once', async ({
     browser,
