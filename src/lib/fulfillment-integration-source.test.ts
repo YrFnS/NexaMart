@@ -24,7 +24,15 @@ test('buyers receive replacement shipment history without seller-private notes',
   assert.match(route, /trackingNumber/);
 });
 
-test('seller order route exposes the operational workspace', () => {
-  const page = source('src/app/seller/dashboard/orders/page.tsx');
-  assert.match(page, /FulfillmentOperations/);
+test('seller and buyer order screens expose secure printable documents', () => {
+  const sellerRoute = source('src/app/seller/dashboard/orders/page.tsx');
+  const sellerWorkspace = source(
+    'src/components/seller/fulfillment-operations.tsx',
+  );
+  const buyerOrders = source('src/components/buyer/orders-page.tsx');
+  assert.match(sellerRoute, /FulfillmentOperations/);
+  assert.match(sellerWorkspace, /Open packing slip/);
+  assert.match(sellerWorkspace, /opened\.opener = null/);
+  assert.match(buyerOrders, /Open order document/);
+  assert.match(buyerOrders, /opened\.opener = null/);
 });
