@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { isSearchIndexingAllowed } from './src/lib/deployment';
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -8,6 +9,14 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=(self)',
   },
+  ...(!isSearchIndexingAllowed()
+    ? [
+        {
+          key: 'X-Robots-Tag',
+          value: 'noindex, nofollow, noarchive',
+        },
+      ]
+    : []),
 ];
 
 const nextConfig: NextConfig = {
