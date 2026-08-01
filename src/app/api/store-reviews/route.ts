@@ -32,32 +32,32 @@ export async function GET(request: Request) {
     }
 
     const where = { storeId };
-    const [reviews, aggregate, five, four, three, two, one] =
-      await db.$transaction([
-        db.storeReview.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-          select: {
-            id: true,
-            userId: true,
-            rating: true,
-            comment: true,
-            createdAt: true,
-          },
-        }),
-        db.storeReview.aggregate({
-          where,
-          _avg: { rating: true },
-          _count: { _all: true },
-        }),
-        db.storeReview.count({ where: { storeId, rating: 5 } }),
-        db.storeReview.count({ where: { storeId, rating: 4 } }),
-        db.storeReview.count({ where: { storeId, rating: 3 } }),
-        db.storeReview.count({ where: { storeId, rating: 2 } }),
-        db.storeReview.count({ where: { storeId, rating: 1 } }),
-      ]);
+    const [reviews, aggregate, groupedRatings] = await Promise.all([
+      db.storeReview.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          userId: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      }),
+      db.storeReview.aggregate({
+        where,
+        _avg: { rating: true },
+        _count: { _all: true },
+      }),
+      db.storeReview.groupBy({
+        by: ['rating'],
+        where,
+        orderBy: { rating: 'desc' },
+        _count: { rating: true },
+      }),
+    ]);
 
     const userIds = [...new Set(reviews.map((review) => review.userId))];
     const users = userIds.length
@@ -68,13 +68,14 @@ export async function GET(request: Request) {
       : [];
     const userById = new Map(users.map((user) => [user.id, user]));
     const total = aggregate._count._all;
-    const counts = new Map<number, number>([
-      [5, five],
-      [4, four],
-      [3, three],
-      [2, two],
-      [1, one],
-    ]);
+    const counts = new Map<number, number>(
+      groupedRatings.map((entry) => [
+        entry.rating,
+        typeof entry._count === 'object' && entry._count
+          ? entry._count.rating || 0
+          : 0,
+      ]),
+    );
     const distribution = Object.fromEntries(
       [5, 4, 3, 2, 1].map((rating) => {
         const count = counts.get(rating) || 0;
