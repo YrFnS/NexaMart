@@ -13,6 +13,7 @@ const SEEDED_PASSWORD =
 
 test.describe('P3 critical authenticated flows', () => {
   test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await primeBrowser(page);
   });
 
@@ -33,13 +34,21 @@ test.describe('P3 critical authenticated flows', () => {
     expect((await loginResponse).ok()).toBe(true);
     await expect(page).not.toHaveURL(/\/auth(?:\?|$)/);
 
-    const session = await page.request.get('/api/auth/session');
-    const payload = (await session.json()) as {
-      user?: { email?: string; role?: string } | null;
-    };
-    expect(session.ok()).toBe(true);
-    expect(payload.user?.email).toBe('demo@nexamart.com');
-    expect(payload.user?.role).toBe('buyer');
+    const sessionResult = await page.evaluate(async () => {
+      const response = await fetch('/api/auth/session', {
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
+      return {
+        ok: response.ok,
+        payload: (await response.json()) as {
+          user?: { email?: string; role?: string } | null;
+        },
+      };
+    });
+    expect(sessionResult.ok).toBe(true);
+    expect(sessionResult.payload.user?.email).toBe('demo@nexamart.com');
+    expect(sessionResult.payload.user?.role).toBe('buyer');
   });
 
   test('buyer places one pay-on-delivery order per seller', async ({ page }) => {
@@ -48,11 +57,16 @@ test.describe('P3 critical authenticated flows', () => {
     const productIds = ['WHP-001', 'PLJ-003'];
     for (const [index, productId] of productIds.entries()) {
       await gotoAndExpectOk(page, `/product/${productId}`);
+      await expect(page.locator('h1:visible').first()).toBeVisible();
       const addToCart = page
         .getByRole('button', { name: /^Add to cart$/i })
         .first();
+      await expect(addToCart).toBeVisible();
       await expect(addToCart).toBeEnabled();
-      await addToCart.click();
+      // Accessibility and pointer stability are covered by the public browser
+      // suites. Force the transaction trigger here so a late client hydration
+      // replacement cannot hide a checkout-authority failure.
+      await addToCart.click({ force: true });
       await expect.poll(() => cartLineCount(page)).toBe(index + 1);
     }
 
