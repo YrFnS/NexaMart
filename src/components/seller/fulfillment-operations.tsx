@@ -283,7 +283,6 @@ export function FulfillmentOperations() {
     const opened = window.open(
       `/api/orders/${encodeURIComponent(order.id)}/document?${query.toString()}`,
       '_blank',
-      'noopener,noreferrer',
     );
     if (!opened) {
       toast.error(
@@ -293,6 +292,7 @@ export function FulfillmentOperations() {
       );
       return;
     }
+    opened.opener = null;
 
     if (type === 'packing-slip') {
       void runAction(

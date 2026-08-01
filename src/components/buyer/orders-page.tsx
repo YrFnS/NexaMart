@@ -393,7 +393,6 @@ export function OrdersPage() {
                           const opened = window.open(
                             `/api/orders/${encodeURIComponent(order.id)}/document?${query.toString()}`,
                             '_blank',
-                            'noopener,noreferrer',
                           );
                           if (!opened) {
                             setError(
@@ -401,6 +400,8 @@ export function OrdersPage() {
                                 ? 'تعذر فتح مستند الطلب. تحقق من حظر النوافذ المنبثقة.'
                                 : 'The order document could not open. Check the popup blocker.',
                             );
+                          } else {
+                            opened.opener = null;
                           }
                         }}
                       >
