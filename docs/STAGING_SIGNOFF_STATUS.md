@@ -1,6 +1,6 @@
 # Staging sign-off status
 
-This status file tracks the repository-controlled portion of the release gate. Human and environment-dependent results belong in the dedicated GitHub sign-off issue and must include evidence.
+This status file tracks the repository-controlled portion of the release gate. Human and environment-dependent results belong in GitHub issue #3 and must include evidence.
 
 ## Repository-controlled preparation
 
@@ -14,9 +14,10 @@ This status file tracks the repository-controlled portion of the release gate. H
 - [x] Desktop Chromium, Pixel 7 Chromium, and Firefox staging projects.
 - [x] Responsive screenshots and runtime metrics retained as evidence.
 - [x] Manual-dispatch staging workflow.
-- [x] Optional automatic PR staging workflow through `STAGING_BASE_URL`.
+- [x] Optional automatic PR staging workflow through `STAGING_BASE_URL`, restricted to trusted same-repository branches.
 - [x] Detailed manual release checklist.
 - [x] Reusable staging sign-off issue template.
+- [x] Repository CI verified the staging-gate implementation.
 
 ## External staging state
 
@@ -28,4 +29,6 @@ This status file tracks the repository-controlled portion of the release gate. H
 - [ ] Performance, cache, Redis, scheduler, and PostgreSQL evidence is recorded.
 - [ ] Launch scope is decided.
 
-The production-hardening pull request must remain a draft until all external staging items are complete and linked from the sign-off issue.
+The deployed staging workflow is intentionally skipped while no `STAGING_BASE_URL` repository variable or manually supplied staging URL exists. A skipped deployed gate is not release approval.
+
+The production-hardening pull request must remain a draft until all external staging items are complete and linked from issue #3.
