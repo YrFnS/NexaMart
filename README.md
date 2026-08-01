@@ -67,6 +67,8 @@ Do not use `prisma db push` for production deployments. It bypasses the reviewed
 Required production variables:
 
 ```env
+DEPLOYMENT_ENV="production"
+RELEASE_SHA="<deployed commit SHA>"
 DATABASE_URL="postgresql://..."
 AUTH_SECRET="a-long-random-secret-with-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="https://your-domain.example"
@@ -75,6 +77,8 @@ UPSTASH_REDIS_REST_URL="https://your-database.upstash.io"
 UPSTASH_REDIS_REST_TOKEN="your-server-only-rest-token"
 RATE_LIMIT_ALLOW_MEMORY_FALLBACK="false"
 ```
+
+`RELEASE_SHA` is optional when the hosting platform exposes one of the supported provider commit variables. The deployment health endpoint reports the resolved environment, release SHA, PostgreSQL readiness, rate-limit mode, and indexing policy without exposing credentials.
 
 The API limiter uses an atomic Redis script so all application instances share the same counters. Production requests fail closed with `503` if the distributed limiter is missing or unavailable. `RATE_LIMIT_ALLOW_MEMORY_FALLBACK=true` is intended only for isolated development or preview environments.
 
@@ -87,6 +91,25 @@ AUTH_BOOTSTRAP_EMAIL="admin@nexamart.com" \
 AUTH_BOOTSTRAP_PASSWORD_FILE="/run/secrets/nexamart-admin-password" \
 npm run auth:set-password
 ```
+
+## Staging release gate
+
+Shared staging must use resources isolated from production and set:
+
+```env
+DEPLOYMENT_ENV="staging"
+RELEASE_SHA="<pull-request head SHA>"
+RATE_LIMIT_ALLOW_MEMORY_FALLBACK="false"
+ENABLE_DEMO_LOGIN="false"
+```
+
+`GET /api/health` returns `200` only when PostgreSQL is reachable and the configured rate-limit mode is available. Non-production deployments block indexing through both `robots.txt` and an `X-Robots-Tag` header.
+
+The `Staging verification` GitHub Actions workflow can run automatically when the repository variable `STAGING_BASE_URL` is configured, or manually with a staging URL and expected release SHA. It performs only public read operations, verifies release identity, Redis configuration, indexing protection and security headers, then runs desktop Chromium, Pixel 7 Chromium and Firefox checks. The retained evidence includes responsive screenshots, navigation/resource metrics, Axe results, traces, videos and the HTML report.
+
+Protected staging environments can configure optional `STAGING_AUTH_HEADER_NAME` and `STAGING_AUTH_HEADER_VALUE` repository secrets.
+
+The complete deployment, physical-print, assistive-technology, performance, cache, Redis, scheduler, PostgreSQL and launch-scope checklist is in [`docs/STAGING_RELEASE_CHECKLIST.md`](docs/STAGING_RELEASE_CHECKLIST.md).
 
 ## Product and SKU model
 
@@ -135,15 +158,15 @@ The CI workflow also starts a clean PostgreSQL service, applies all migrations, 
 
 ## Security model
 
-- Browser identity is hydrated from a signed HTTP-only cookie; roles and balances are not trusted from local storage.
+- Browser identity is hydrated from a signed HTTP-only cookie; roles and account data are not trusted from local storage.
 - User APIs derive ownership from the authenticated session rather than caller-provided IDs.
 - Administrative writes require an administrator session and same-origin request validation.
 - Seller product and variant writes require an authorized seller-store relationship or an administrator role.
 - API rate limits are enforced through shared Redis counters rather than process-local memory in production.
 - Rate-limit identifiers are SHA-256 hashed before they are used as Redis keys.
-- Checkout recalculates SKU prices, variant inventory, coupon discounts, tax, per-seller shipping, invoices, and wallet deductions inside one serializable database transaction.
+- Checkout recalculates SKU prices, variant inventory, coupon discounts, tax, per-seller shipping and invoices inside one serializable database transaction.
 - Order items preserve both an immutable option snapshot and an optional relational SKU reference.
-- Payout completion is transactional and idempotent.
+- Order, cancellation, return disposition and replacement inventory transitions are transactional and idempotent.
 - Unsupported payment methods are not presented as successful payments.
 
 ## Project structure
