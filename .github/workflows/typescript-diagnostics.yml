@@ -1,0 +1,69 @@
+name: TypeScript diagnostics
+
+on:
+  push:
+    branches:
+      - agent/production-hardening-phase-1
+    paths:
+      - .github/workflows/typescript-diagnostics.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: typescript-diagnostics
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexamart_diagnostics?schema=public
+      AUTH_SECRET: diagnostics-secret-with-at-least-32-characters
+      NEXTAUTH_SECRET: diagnostics-secret-with-at-least-32-characters
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      ENABLE_DEMO_LOGIN: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/production-hardening-phase-1
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Capture TypeScript errors
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > "$RUNNER_TEMP/tsc.log" 2>&1
+          status=$?
+          set -e
+          {
+            echo "TypeScript exit status: $status"
+            grep -E "error TS|Found [0-9]+ error" "$RUNNER_TEMP/tsc.log" || true
+          } > typescript-diagnostics.txt
+          cat typescript-diagnostics.txt
+
+      - name: Commit diagnostics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add typescript-diagnostics.txt
+          if git diff --cached --quiet; then
+            echo "No diagnostics change"
+          else
+            git commit -m "chore: record TypeScript diagnostics"
+            git push origin HEAD:agent/production-hardening-phase-1
+          fi
