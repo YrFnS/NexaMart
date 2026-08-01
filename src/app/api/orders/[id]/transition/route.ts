@@ -22,6 +22,34 @@ const transitionSchema = z
   })
   .strict();
 
+const MAX_SERIALIZABLE_ATTEMPTS = 3;
+
+function isSerializableConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2034'
+  );
+}
+
+async function retrySerializableTransaction<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        !isSerializableConflict(error) ||
+        attempt === MAX_SERIALIZABLE_ATTEMPTS
+      ) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Serializable transaction retry loop exhausted unexpectedly.');
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -51,36 +79,38 @@ export async function POST(
 
   const { id } = await params;
   try {
-    const updated = await db.$transaction(
-      async (tx) => {
-        const order = await tx.order.findFirst({
-          where: {
-            id,
-            ...(auth.user.role === 'admin'
-              ? {}
-              : { userId: auth.user.id }),
-          },
-          include: lifecycleOrderInclude,
-        });
-        if (!order) {
-          throw new OrderLifecycleError('Order not found.', 404);
-        }
-        return applyOrderTransition(tx, order, {
-          targetStatus: parsed.data.targetStatus,
-          actorId: auth.user.id,
-          actorRole: auth.user.role === 'admin' ? 'admin' : 'buyer',
-          note:
-            parsed.data.reason ||
-            (auth.user.role === 'admin'
-              ? 'Cancelled by administrator'
-              : 'Cancelled by buyer'),
-        });
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        maxWait: 5_000,
-        timeout: 15_000,
-      },
+    const updated = await retrySerializableTransaction(() =>
+      db.$transaction(
+        async (tx) => {
+          const order = await tx.order.findFirst({
+            where: {
+              id,
+              ...(auth.user.role === 'admin'
+                ? {}
+                : { userId: auth.user.id }),
+            },
+            include: lifecycleOrderInclude,
+          });
+          if (!order) {
+            throw new OrderLifecycleError('Order not found.', 404);
+          }
+          return applyOrderTransition(tx, order, {
+            targetStatus: parsed.data.targetStatus,
+            actorId: auth.user.id,
+            actorRole: auth.user.role === 'admin' ? 'admin' : 'buyer',
+            note:
+              parsed.data.reason ||
+              (auth.user.role === 'admin'
+                ? 'Cancelled by administrator'
+                : 'Cancelled by buyer'),
+          });
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 5_000,
+          timeout: 15_000,
+        },
+      ),
     );
 
     return NextResponse.json({
@@ -95,6 +125,16 @@ export async function POST(
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: error.status },
+      );
+    }
+    if (isSerializableConflict(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'The order changed while it was being updated. Reload and try again.',
+          code: 'ORDER_TRANSITION_CONFLICT',
+        },
+        { status: 409 },
       );
     }
     console.error('Buyer order transition error:', error);
