@@ -65,6 +65,7 @@ test('staging workflow and manual sign-off remain connected', () => {
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /vars\.STAGING_BASE_URL/);
+  assert.match(workflow, /head\.repo\.full_name == github\.repository/);
   assert.match(workflow, /EXPECTED_RELEASE_SHA/);
   assert.match(workflow, /scripts\/verify-staging-deployment\.ts/);
   assert.match(workflow, /playwright\.staging\.config\.ts/);
