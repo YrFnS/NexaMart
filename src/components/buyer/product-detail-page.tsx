@@ -16,6 +16,7 @@ import { type Product } from '@/components/buyer/product-card';
 import { canonicalizeVariation } from '@/lib/checkout-authority';
 import { APP_NAME } from '@/lib/config';
 import { useI18n } from '@/lib/i18n';
+import type { ProductDetailData } from '@/lib/storefront-types';
 import { useAppNavigation } from '@/lib/use-app-navigation';
 import { useCartStore } from '@/stores/cart-store';
 import { useRecentlyViewedStore } from '@/stores/recently-viewed-store';
@@ -74,7 +75,43 @@ function parseTieredPricing(value: string): TierPrice[] {
   }
 }
 
-export function ProductDetailPage({ productId }: { productId?: string }) {
+function initialVariationSelection(product: Product): Record<string, string> {
+  const activeVariants =
+    product.variantSkus?.filter((variant) => variant.isActive) || [];
+  const initialVariant =
+    activeVariants.find((variant) => variant.stock > 0) || activeVariants[0];
+
+  if (initialVariant) {
+    try {
+      const attributes = JSON.parse(initialVariant.attributes) as unknown;
+      if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
+        return Object.fromEntries(
+          Object.entries(attributes).map(([key, value]) => [key, String(value)]),
+        );
+      }
+    } catch {
+      return {};
+    }
+  }
+
+  const defaults: Record<string, string> = {};
+  for (const [key, values] of Object.entries(
+    parseVariations(product.variations || '{}'),
+  )) {
+    if (values[0]) defaults[key] = values[0];
+  }
+  return defaults;
+}
+
+interface ProductDetailPageProps {
+  productId?: string;
+  initialData?: ProductDetailData;
+}
+
+export function ProductDetailPage({
+  productId,
+  initialData,
+}: ProductDetailPageProps) {
   const { t: translate, locale } = useI18n();
   const t = translate as (
     key: string,
@@ -87,18 +124,26 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
     (state) => state.addProduct,
   );
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [product, setProduct] = useState<Product | null>(
+    initialData?.product ?? null,
+  );
+  const [similarProducts, setSimilarProducts] = useState<Product[]>(
+    initialData?.similarProducts ?? [],
+  );
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>(
+    initialData?.relatedProducts ?? [],
+  );
   const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<
     Product[]
   >([]);
-  const [loading, setLoading] = useState(Boolean(productId));
+  const [loading, setLoading] = useState(Boolean(productId && !initialData));
   const [loadError, setLoadError] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [selectedVariations, setSelectedVariations] = useState<
     Record<string, string>
-  >({});
+  >(() =>
+    initialData ? initialVariationSelection(initialData.product) : {},
+  );
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareWebSuccess, setShareWebSuccess] = useState(false);
@@ -107,9 +152,23 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const similarScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (initialData) {
+      const timer = window.setTimeout(() => {
+        setProduct(initialData.product);
+        setSimilarProducts(initialData.similarProducts.slice(0, 8));
+        setRelatedProducts(initialData.relatedProducts.slice(0, 8));
+        setSelectedVariations(initialVariationSelection(initialData.product));
+        setQuantity(1);
+        setVariantError('');
+        setLoadError('');
+        setLoading(false);
+        addRecentlyViewed(initialData.product.id);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
     if (!productId) return;
     const currentProductId: string = productId;
-
     const controller = new AbortController();
 
     async function loadProduct() {
@@ -140,40 +199,8 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
         setProduct(found);
         setSimilarProducts((payload.similarProducts || []).slice(0, 8));
         setRelatedProducts((payload.relatedProducts || []).slice(0, 8));
+        setSelectedVariations(initialVariationSelection(found));
         addRecentlyViewed(found.id);
-
-        const activeVariants =
-          found.variantSkus?.filter((variant) => variant.isActive) || [];
-        const initialVariant =
-          activeVariants.find((variant) => variant.stock > 0) ||
-          activeVariants[0];
-        if (initialVariant) {
-          try {
-            const attributes = JSON.parse(initialVariant.attributes) as unknown;
-            setSelectedVariations(
-              attributes &&
-                typeof attributes === 'object' &&
-                !Array.isArray(attributes)
-                ? Object.fromEntries(
-                    Object.entries(attributes).map(([key, value]) => [
-                      key,
-                      String(value),
-                    ]),
-                  )
-                : {},
-            );
-          } catch {
-            setSelectedVariations({});
-          }
-        } else {
-          const defaults: Record<string, string> = {};
-          for (const [key, values] of Object.entries(
-            parseVariations(found.variations || '{}'),
-          )) {
-            if (values[0]) defaults[key] = values[0];
-          }
-          setSelectedVariations(defaults);
-        }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') return;
         setLoadError(
@@ -189,7 +216,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [addRecentlyViewed, productId]);
+  }, [addRecentlyViewed, initialData, productId]);
 
   useEffect(() => {
     const ids = useRecentlyViewedStore
