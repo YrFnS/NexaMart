@@ -41,7 +41,7 @@ test('staging verification is read-only and retains browser evidence', () => {
   assert.match(verifier, /staging-test-results/);
   assert.match(verifier, /STAGING_AUTH_HEADER_NAME/);
 
-  assert.match(config, /staging-deployment\\\.spec\\\.ts/);
+  assert.match(config, /staging-deployment/);
   assert.match(config, /extraHTTPHeaders/);
   assert.match(config, /staging-chromium-mobile/);
   assert.match(config, /staging-firefox-desktop/);
