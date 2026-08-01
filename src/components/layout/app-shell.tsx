@@ -8,6 +8,7 @@ import { Footer } from '@/components/layout/footer';
 import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { useI18n } from '@/lib/i18n';
+import { useAppStore } from '@/stores/app-store';
 
 const AIChatWidget = dynamic(
   () =>
@@ -63,6 +64,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { dir } = useI18n();
+  const compareActive = useAppStore((state) => state.compareIds.length > 0);
 
   return (
     <div
@@ -80,7 +82,12 @@ export function AppShell({ children }: AppShellProps) {
 
         <Footer />
         <MobileNav />
-        <AIChatWidget />
+        <div
+          data-ai-chat-layer
+          data-compare-active={compareActive ? 'true' : 'false'}
+        >
+          <AIChatWidget />
+        </div>
         <CompareDrawer />
         <BackToTop />
         <SearchCommand />
