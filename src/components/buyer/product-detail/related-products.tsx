@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   ChevronLeft,
@@ -62,6 +62,8 @@ export function RelatedProducts({
   isRTL,
   t,
 }: RelatedProductsProps) {
+  const [showStickyPurchaseActions, setShowStickyPurchaseActions] =
+    useState(false);
   const suggestions = useMemo(() => {
     const seen = new Set<string>([product.id]);
     return [...similarProducts, ...relatedProducts].filter((item) => {
@@ -70,6 +72,27 @@ export function RelatedProducts({
       return true;
     });
   }, [product.id, relatedProducts, similarProducts]);
+
+  useEffect(() => {
+    const primaryActions = document.querySelector<HTMLElement>(
+      '[data-product-primary-actions]',
+    );
+    if (!primaryActions || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyPurchaseActions(!entry?.isIntersecting);
+      },
+      {
+        // Hide the fixed layer before the complete controls reach the space
+        // occupied by the purchase bar and mobile navigation.
+        rootMargin: '0px 0px 160px 0px',
+        threshold: 0.01,
+      },
+    );
+    observer.observe(primaryActions);
+    return () => observer.disconnect();
+  }, [product.id]);
 
   return (
     <>
@@ -257,7 +280,7 @@ export function RelatedProducts({
         </section>
       )}
 
-      {product.stock > 0 && (
+      {product.stock > 0 && showStickyPurchaseActions && (
         <div
           data-product-purchase-actions
           className="nexa-product-purchase-actions fixed inset-x-0 z-40 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur-sm md:hidden"
