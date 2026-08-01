@@ -61,22 +61,42 @@ test.describe('P3 Arabic and mobile verification', () => {
 
     await gotoAndExpectOk(page, '/product/WHP-001');
     const actionName = /أضف للسلة|أضف إلى السلة|Add to cart/i;
-    const purchaseBar = page.locator('[data-product-purchase-actions]');
-    const addToCart = purchaseBar.getByRole('button', { name: actionName });
+    const stickyPurchaseBar = page.locator(
+      '[data-product-purchase-actions]',
+    );
+    const primaryPurchaseActions = page.locator(
+      '[data-product-primary-actions]',
+    );
     const assistant = page.locator('[data-ai-chat-layer] > .fixed');
 
-    await expect(purchaseBar).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          (await stickyPurchaseBar.isVisible()) ||
+          (await primaryPurchaseActions.isVisible()),
+      )
+      .toBe(true);
+    const activePurchaseActions = (await stickyPurchaseBar.isVisible())
+      ? stickyPurchaseBar
+      : primaryPurchaseActions;
+    const addToCart = activePurchaseActions.getByRole('button', {
+      name: actionName,
+    });
+
     await expect(addToCart).toBeVisible();
     await expect(assistant).toBeVisible();
 
     const actionLayout = await addToCart.evaluate((element) => {
       const button = element as HTMLElement;
       const rect = button.getBoundingClientRect();
-      const bar = button.closest<HTMLElement>('[data-product-purchase-actions]');
+      const actionContainer = button.closest<HTMLElement>(
+        '[data-product-purchase-actions], [data-product-primary-actions]',
+      );
       const assistantElement = document.querySelector<HTMLElement>(
         '[data-ai-chat-layer] > .fixed',
       );
-      const barRect = bar?.getBoundingClientRect() || null;
+      const actionContainerRect =
+        actionContainer?.getBoundingClientRect() || null;
       const assistantRect = assistantElement?.getBoundingClientRect() || null;
       const horizontalInset = Math.min(12, rect.width / 4);
       const centerY = rect.top + rect.height / 2;
@@ -122,7 +142,10 @@ test.describe('P3 Arabic and mobile verification', () => {
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
         blockers,
-        assistantOverlapsPurchaseBar: intersects(barRect, assistantRect),
+        assistantOverlapsActionContainer: intersects(
+          actionContainerRect,
+          assistantRect,
+        ),
       };
     });
 
@@ -137,12 +160,14 @@ test.describe('P3 Arabic and mobile verification', () => {
     );
     expect(actionLayout.height).toBeGreaterThanOrEqual(44);
     expect(actionLayout.blockers).toEqual([]);
-    expect(actionLayout.assistantOverlapsPurchaseBar).toBe(false);
+    expect(actionLayout.assistantOverlapsActionContainer).toBe(false);
 
     const compareToggle = page
       .getByRole('button', { name: /مقارنة|Compare/i })
       .first();
     await compareToggle.scrollIntoViewIfNeeded();
+    await expect(primaryPurchaseActions).toBeVisible();
+    await expect(stickyPurchaseBar).toHaveCount(0);
     await compareToggle.click();
 
     const compareDrawer = page.getByRole('region', {
@@ -176,11 +201,13 @@ test.describe('P3 Arabic and mobile verification', () => {
         );
 
       const purchase = rectangle('[data-product-purchase-actions]');
+      const primaryPurchase = rectangle('[data-product-primary-actions]');
       const comparison = rectangle('.nexa-compare-drawer');
       const chat = rectangle('[data-ai-chat-layer] > .fixed');
 
       return {
         purchase,
+        primaryPurchase,
         comparison,
         chat,
         purchaseOverlapsComparison: intersects(purchase, comparison),
@@ -189,7 +216,8 @@ test.describe('P3 Arabic and mobile verification', () => {
       };
     });
 
-    expect(stackedLayout.purchase).not.toBeNull();
+    expect(stackedLayout.purchase).toBeNull();
+    expect(stackedLayout.primaryPurchase).not.toBeNull();
     expect(stackedLayout.comparison).not.toBeNull();
     expect(stackedLayout.chat).not.toBeNull();
     expect(stackedLayout.purchaseOverlapsComparison).toBe(false);
