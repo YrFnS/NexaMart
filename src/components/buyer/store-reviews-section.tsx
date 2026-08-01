@@ -100,8 +100,14 @@ export function StoreReviewsSection({
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadReviews(controller.signal);
-    return () => controller.abort();
+    const timer = window.setTimeout(
+      () => void loadReviews(controller.signal),
+      0,
+    );
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [loadReviews]);
 
   const sortedReviews = useMemo(() => {
@@ -135,7 +141,10 @@ export function StoreReviewsSection({
   if (loading && reviews.length === 0) {
     return (
       <div className="flex min-h-56 items-center justify-center" aria-busy="true">
-        <Loader2 className="size-8 animate-spin text-amber-600" aria-hidden="true" />
+        <Loader2
+          className="size-8 animate-spin text-amber-600"
+          aria-hidden="true"
+        />
       </div>
     );
   }
@@ -266,7 +275,9 @@ export function StoreReviewsSection({
           <CardContent className="flex min-h-48 flex-col items-center justify-center text-center text-muted-foreground">
             <Star className="mb-3 size-10 opacity-40" aria-hidden="true" />
             <p className="font-medium">
-              {isRTL ? 'لا توجد تقييمات لهذا المتجر.' : 'No reviews for this store yet.'}
+              {isRTL
+                ? 'لا توجد تقييمات لهذا المتجر.'
+                : 'No reviews for this store yet.'}
             </p>
           </CardContent>
         </Card>
