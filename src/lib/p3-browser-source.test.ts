@@ -94,6 +94,11 @@ test('P3 covers accessibility, RTL, focus, authentication, checkout, and printin
   assert.match(printDocuments, /preferCSSPageSize: true/);
   assert.match(printDocuments, /type=packing-slip&lang=ar/);
   assert.match(printDocuments, /forbiddenPackingSlip\.status\(\)\)\.toBe\(403\)/);
+  assert.match(printDocuments, /style-src 'unsafe-inline'/);
+  assert.match(printDocuments, /headerDisplay/);
+  assert.match(printDocuments, /gridColumnCount/);
+  assert.match(printDocuments, /brandColor/);
+  assert.match(printDocuments, /headingBackground/);
   assert.match(printDocuments, /not\.toContain\('\$'\)/);
   assert.match(checkoutRoute, /MAX_SERIALIZABLE_ATTEMPTS = 3/);
   assert.match(checkoutRoute, /retrySerializableTransaction/);
@@ -116,6 +121,7 @@ test('P3 covers accessibility, RTL, focus, authentication, checkout, and printin
   assert.match(documentRoute, /dir=\"\$\{isRTL \? 'rtl' : 'ltr'\}\"/);
   assert.match(documentRoute, /NexaMart does not process payment/);
   assert.match(documentRoute, /Cache-Control': 'private, no-store'/);
+  assert.match(documentRoute, /style-src 'unsafe-inline'/);
   assert.match(security, /E2E_BROWSER_TEST_HARNESS/);
   assert.match(
     security,
@@ -129,6 +135,8 @@ test('P3 covers accessibility, RTL, focus, authentication, checkout, and printin
   assert.match(proxy, /E2E_BROWSER_TEST_HARNESS/);
   assert.match(proxy, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS/);
   assert.match(proxy, /maxRequests: browserHarnessAuthLimit\(\)/);
+  assert.match(proxy, /function isPrintableOrderDocument/);
+  assert.match(proxy, /!isPrintableOrderDocument\(pathname\)/);
   assert.match(productActions, /data-product-primary-actions/);
   assert.match(relatedProducts, /IntersectionObserver/);
   assert.match(relatedProducts, /showStickyPurchaseActions/);
