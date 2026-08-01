@@ -18,19 +18,23 @@ test('P3 browser projects exercise desktop, mobile, and Firefox', () => {
   assert.match(config, /retain-on-failure/);
 });
 
-test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => {
+test('P3 covers accessibility, RTL, focus, authentication, checkout, and printing', () => {
   const helpers = source('e2e/helpers.ts');
   const publicSmoke = source('e2e/public-smoke.spec.ts');
   const rtlMobile = source('e2e/rtl-mobile.spec.ts');
   const criticalFlows = source('e2e/critical-flows.spec.ts');
   const fulfillmentRace = source('e2e/fulfillment-race.spec.ts');
   const inventoryRace = source('e2e/inventory-race.spec.ts');
+  const printDocuments = source('e2e/print-documents.spec.ts');
   const checkoutRoute = source('src/app/api/checkout/route.ts');
   const transitionRoute = source(
     'src/app/api/orders/[id]/transition/route.ts',
   );
   const fulfillmentRoute = source(
     'src/app/api/seller/fulfillment/route.ts',
+  );
+  const documentRoute = source(
+    'src/app/api/orders/[id]/document/route.ts',
   );
   const security = source('src/lib/security.ts');
   const proxy = source('src/proxy.ts');
@@ -83,6 +87,14 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(inventoryRace, /inventoryRestoredAt/);
   assert.match(inventoryRace, /cancellationEventCount/);
   assert.match(inventoryRace, /describe\.configure\(\{ retries: 0 \}\)/);
+  assert.match(printDocuments, /buyer order document is private/);
+  assert.match(printDocuments, /seller packing slip is Arabic RTL/);
+  assert.match(printDocuments, /page\.pdf/);
+  assert.match(printDocuments, /format: 'A4'/);
+  assert.match(printDocuments, /preferCSSPageSize: true/);
+  assert.match(printDocuments, /type=packing-slip&lang=ar/);
+  assert.match(printDocuments, /forbiddenPackingSlip\.status\(\)\)\.toBe\(403\)/);
+  assert.match(printDocuments, /not\.toContain\('\$'\)/);
   assert.match(checkoutRoute, /MAX_SERIALIZABLE_ATTEMPTS = 3/);
   assert.match(checkoutRoute, /retrySerializableTransaction/);
   assert.match(checkoutRoute, /P2034/);
@@ -95,6 +107,15 @@ test('P3 covers accessibility, RTL, focus, authentication, and checkout', () => 
   assert.match(fulfillmentRoute, /retrySerializableTransaction/);
   assert.match(fulfillmentRoute, /P2034/);
   assert.match(fulfillmentRoute, /FULFILLMENT_CONFLICT/);
+  assert.match(documentRoute, /@media print/);
+  assert.match(
+    documentRoute,
+    /typeRaw === 'packing-slip' && auth\.user\.role === 'buyer'/,
+  );
+  assert.match(documentRoute, /lang=\"\$\{isRTL \? 'ar' : 'en'\}\"/);
+  assert.match(documentRoute, /dir=\"\$\{isRTL \? 'rtl' : 'ltr'\}\"/);
+  assert.match(documentRoute, /NexaMart does not process payment/);
+  assert.match(documentRoute, /Cache-Control': 'private, no-store'/);
   assert.match(security, /E2E_BROWSER_TEST_HARNESS/);
   assert.match(
     security,
