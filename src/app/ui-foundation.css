@@ -28,14 +28,16 @@ html {
 
 .nexa-floating-primary,
 .nexa-floating-secondary,
-.nexa-chat-panel {
-  bottom: var(--nexa-floating-bottom);
+.nexa-chat-panel,
+[data-ai-chat-layer] > .fixed {
+  bottom: var(--nexa-floating-bottom) !important;
 }
 
 .nexa-floating-primary[data-compare-active='true'],
 .nexa-floating-secondary[data-compare-active='true'],
-.nexa-chat-panel[data-compare-active='true'] {
-  bottom: var(--nexa-floating-bottom-with-compare);
+.nexa-chat-panel[data-compare-active='true'],
+[data-ai-chat-layer][data-compare-active='true'] > .fixed {
+  bottom: var(--nexa-floating-bottom-with-compare) !important;
 }
 
 .nexa-compare-drawer {
@@ -57,14 +59,16 @@ html {
 
   .nexa-floating-primary,
   .nexa-floating-secondary,
-  .nexa-chat-panel {
-    bottom: 1.5rem;
+  .nexa-chat-panel,
+  [data-ai-chat-layer] > .fixed {
+    bottom: 1.5rem !important;
   }
 
   .nexa-floating-primary[data-compare-active='true'],
   .nexa-floating-secondary[data-compare-active='true'],
-  .nexa-chat-panel[data-compare-active='true'] {
-    bottom: 6.5rem;
+  .nexa-chat-panel[data-compare-active='true'],
+  [data-ai-chat-layer][data-compare-active='true'] > .fixed {
+    bottom: 6.5rem !important;
   }
 
   .nexa-compare-drawer,
