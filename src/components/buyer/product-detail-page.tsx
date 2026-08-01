@@ -107,7 +107,8 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
   const similarScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!productId) return;
+    const currentProductId = productId;
+    if (!currentProductId) return;
 
     const controller = new AbortController();
 
@@ -122,7 +123,7 @@ export function ProductDetailPage({ productId }: { productId?: string }) {
 
       try {
         const response = await fetch(
-          `/api/products/${encodeURIComponent(productId)}`,
+          `/api/products/${encodeURIComponent(currentProductId)}`,
           { signal: controller.signal },
         );
         const payload = (await response.json().catch(() => ({}))) as {
