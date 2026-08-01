@@ -49,6 +49,10 @@ jobs:
       # explicitly opts into the existing single-process fallback so real API
       # flows can be exercised without external infrastructure.
       RATE_LIMIT_ALLOW_MEMORY_FALLBACK: "true"
+      # The production build is served over loopback HTTP in Playwright. This
+      # override is honored only when both CI=true and this flag are present;
+      # normal production cookies remain Secure by default.
+      AUTH_COOKIE_INSECURE_FOR_TESTS: "true"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
