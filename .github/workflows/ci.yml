@@ -53,6 +53,12 @@ jobs:
       # override is honored only when both CI=true and this flag are present;
       # normal production cookies remain Secure by default.
       AUTH_COOKIE_INSECURE_FOR_TESTS: "true"
+      # Server-only marker for the loopback Playwright harness. Production
+      # deployments must not set this value. It raises only the browser suite's
+      # per-IP ceilings because isolated test contexts share 127.0.0.1.
+      E2E_BROWSER_TEST_HARNESS: "true"
+      E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: "30"
+      E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: "100"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
