@@ -150,7 +150,8 @@ test('P3 covers accessibility, RTL, focus, authentication, checkout, and printin
   assert.match(productActions, /data-product-primary-actions/);
   assert.match(relatedProducts, /IntersectionObserver/);
   assert.match(relatedProducts, /showStickyPurchaseActions/);
-  assert.match(relatedProducts, /rootMargin: '0px 0px 160px 0px'/);
+  assert.match(relatedProducts, /entry\.boundingClientRect\.bottom < 0/);
+  assert.match(relatedProducts, /rootMargin: '160px 0px 0px 0px'/);
   assert.match(quickView, /onOpenAutoFocus/);
   assert.match(quickView, /onCloseAutoFocus/);
   assert.match(hero, /Previous slide/);
