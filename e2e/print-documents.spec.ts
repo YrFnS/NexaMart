@@ -6,6 +6,8 @@ interface OrderListPayload {
   error?: string;
 }
 
+const RAW_ORDER_STATUSES = /^(pending|confirmed|preparing|processing|shipped|delivered|rejected|cancelled|disputed|returned)$/;
+
 async function firstAuthenticatedOrderId(
   page: Page,
   endpoint: '/api/orders?limit=1' | '/api/seller/orders?limit=1',
@@ -139,6 +141,11 @@ test.describe('P3 authenticated print documents', () => {
     await expect(page.locator('body')).toContainText(
       'NexaMart does not process payment for this order.',
     );
+    await expect(page.locator('table caption')).toHaveText('Order items');
+    await expect(page.locator('thead th[scope="col"]')).toHaveCount(6);
+    await expect(page.locator('body')).not.toContainText('-$0.00');
+    const buyerPhone = page.locator('address bdi[dir="ltr"]').last();
+    await expect(buyerPhone).toHaveText(/^\+/);
 
     const layout = await expectA4PrintLayout(
       page,
@@ -177,6 +184,13 @@ test.describe('P3 authenticated print documents', () => {
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.getByRole('heading', { name: 'قائمة تجهيز الطلب' })).toBeVisible();
     await expect(page.locator('body')).toContainText('الدفع للبائع عند الاستلام');
+    await expect(page.locator('table caption')).toHaveText('عناصر الطلب');
+    await expect(page.locator('thead th[scope="col"]')).toHaveCount(4);
+
+    const sellerPhone = page.locator('address bdi[dir="ltr"]').last();
+    await expect(sellerPhone).toHaveText(/^\+/);
+    const localizedStatus = page.locator('.meta dd').nth(2);
+    await expect(localizedStatus).not.toHaveText(RAW_ORDER_STATUSES);
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).not.toContain('$');
