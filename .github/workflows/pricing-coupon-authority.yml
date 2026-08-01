@@ -163,7 +163,7 @@ jobs:
 
       - name: Commit verified pricing authority
         run: |
-          git checkout -- .github/workflows/pricing-coupon-authority.yml
+          git checkout -- .github/workflows/pricing-coupon-authority.yml .github/workflows/ci.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
