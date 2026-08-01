@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import {
   APP_URL,
   expectNoHorizontalOverflow,
@@ -6,6 +6,23 @@ import {
   gotoAndExpectOk,
   primeBrowser,
 } from './helpers';
+
+async function isInViewport(locator: Locator): Promise<boolean> {
+  try {
+    if (!(await locator.isVisible())) return false;
+    return await locator.evaluate((element) => {
+      const rect = (element as HTMLElement).getBoundingClientRect();
+      return (
+        rect.bottom > 0 &&
+        rect.top < window.innerHeight &&
+        rect.right > 0 &&
+        rect.left < window.innerWidth
+      );
+    });
+  } catch {
+    return false;
+  }
+}
 
 test.describe('P3 Arabic and mobile verification', () => {
   test.beforeEach(async ({ context, page }) => {
@@ -72,11 +89,11 @@ test.describe('P3 Arabic and mobile verification', () => {
     await expect
       .poll(
         async () =>
-          (await stickyPurchaseBar.isVisible()) ||
-          (await primaryPurchaseActions.isVisible()),
+          (await isInViewport(stickyPurchaseBar)) ||
+          (await isInViewport(primaryPurchaseActions)),
       )
       .toBe(true);
-    const activePurchaseActions = (await stickyPurchaseBar.isVisible())
+    const activePurchaseActions = (await isInViewport(stickyPurchaseBar))
       ? stickyPurchaseBar
       : primaryPurchaseActions;
     const addToCart = activePurchaseActions.getByRole('button', {
@@ -84,6 +101,7 @@ test.describe('P3 Arabic and mobile verification', () => {
     });
 
     await expect(addToCart).toBeVisible();
+    await expect(addToCart).toBeInViewport();
     await expect(assistant).toBeVisible();
 
     const actionLayout = await addToCart.evaluate((element) => {
@@ -166,7 +184,7 @@ test.describe('P3 Arabic and mobile verification', () => {
       .getByRole('button', { name: /مقارنة|Compare/i })
       .first();
     await compareToggle.scrollIntoViewIfNeeded();
-    await expect(primaryPurchaseActions).toBeVisible();
+    await expect(primaryPurchaseActions).toBeInViewport();
     await expect(stickyPurchaseBar).toHaveCount(0);
     await compareToggle.click();
 
