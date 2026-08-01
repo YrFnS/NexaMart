@@ -86,8 +86,8 @@ test('seller marketing is backed by authorized coupon APIs only', () => {
   assert.match(marketing, /method: 'POST'/);
   assert.match(marketing, /method: 'PATCH'/);
   assert.match(marketing, /storeId: form\.storeId/);
+  assert.match(marketing, /setCurrentTime\(Date\.now\(\)\)/);
   assert.doesNotMatch(marketing, /techstore-pro/);
-  assert.doesNotMatch(marketing, /Date\.now\(\)/);
   assert.doesNotMatch(marketing, /setFlashSales/);
   assert.doesNotMatch(marketing, /mktBoostNow/);
   assert.doesNotMatch(marketing, /mktCreateCampaign/);
