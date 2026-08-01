@@ -51,7 +51,6 @@ export const metadata: Metadata = {
     'order tracking',
     'Iraq marketplace',
   ],
-  alternates: { canonical: '/' },
   manifest: '/manifest.json',
   icons: {
     icon: '/logo.svg',
