@@ -9,6 +9,8 @@ const SEEDED_PASSWORD =
   process.env.SEED_DEMO_PASSWORD ||
   'ci-demo-password-with-at-least-12-characters';
 
+type AxeBuilderOptions = ConstructorParameters<typeof AxeBuilder>[0];
+
 export async function primeBrowser(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('nexamart_onboarding_dismissed', 'true');
@@ -44,7 +46,12 @@ export async function expectNoHorizontalOverflow(page: Page) {
 }
 
 export async function expectNoSeriousAccessibilityViolations(page: Page) {
-  const results = await new AxeBuilder({ page })
+  // @axe-core/playwright and @playwright/test may resolve their structurally
+  // identical Page type through separate transitive playwright-core paths.
+  // Narrow the adapter boundary here so the browser suites remain strictly
+  // typed everywhere else.
+  const axePage = page as unknown as AxeBuilderOptions['page'];
+  const results = await new AxeBuilder({ page: axePage })
     .withTags([
       'wcag2a',
       'wcag2aa',
