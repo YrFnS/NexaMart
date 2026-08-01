@@ -111,12 +111,6 @@ export function ProductQuickView({
     void hydrateWishlist(user?.id || null);
   }, [hydrateWishlist, isHydrated, user?.id]);
 
-  useEffect(() => {
-    if (!open) return;
-    setQuantity(1);
-    setImageFailed(false);
-  }, [open, productId]);
-
   const images = useMemo(
     () => (product ? parseImages(product.images) : []),
     [product],
@@ -218,6 +212,8 @@ export function ProductQuickView({
           const activeElement = document.activeElement;
           returnFocusRef.current =
             activeElement instanceof HTMLElement ? activeElement : null;
+          setQuantity(1);
+          setImageFailed(false);
         }}
         onCloseAutoFocus={(event) => {
           const target = returnFocusRef.current;
