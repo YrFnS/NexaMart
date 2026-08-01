@@ -180,7 +180,9 @@ test('permanent CI runs browsers and preserves failure diagnostics', () => {
   assert.match(workflow, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: "100"/);
   assert.match(session, /process\.env\.CI === 'true'/);
   assert.match(session, /AUTH_COOKIE_INSECURE_FOR_TESTS === 'true'/);
-  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /actions\/checkout@v6/);
+  assert.match(workflow, /actions\/setup-node@v6/);
+  assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.equal(
     existsSync(
       join(
