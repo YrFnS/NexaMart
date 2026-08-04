@@ -1,67 +1,65 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ErrorBoundary } from '@/components/common/error-boundary';
 import { useI18n } from '@/lib/i18n';
+import { useUserStore } from '@/stores/user-store';
 
-// Dynamic imports for all heavy components to reduce initial compilation load
+// Dynamic imports keep optional interactive chrome out of the critical bundle.
 const Header = dynamic(
   () => import('@/components/layout/header').then(mod => ({ default: mod.Header })),
-  { 
-    ssr: false,
-    loading: () => <div className="h-16 bg-background border-b animate-pulse" />
-  }
+  {
+    loading: () => <div className="h-16 bg-background border-b animate-pulse" />,
+  },
 );
 
 const Footer = dynamic(
   () => import('@/components/layout/footer').then(mod => ({ default: mod.Footer })),
-  { ssr: false }
 );
 
 const MobileNav = dynamic(
   () => import('@/components/layout/mobile-nav').then(mod => ({ default: mod.MobileNav })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const AIChatWidget = dynamic(
   () => import('@/components/common/ai-chat-widget').then(mod => ({ default: mod.AIChatWidget })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const BreadcrumbNav = dynamic(
   () => import('@/components/common/breadcrumb-nav').then(mod => ({ default: mod.BreadcrumbNav })),
-  { ssr: false }
 );
 
 const SearchCommand = dynamic(
   () => import('@/components/common/search-command').then(mod => ({ default: mod.SearchCommand })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const BackToTop = dynamic(
   () => import('@/components/common/back-to-top').then(mod => ({ default: mod.BackToTop })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const OfflineBanner = dynamic(
   () => import('@/components/common/offline-banner').then(mod => ({ default: mod.OfflineBanner })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const SocialProofToast = dynamic(
   () => import('@/components/common/social-proof-toast').then(mod => ({ default: mod.SocialProofToast })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const CookieConsentBanner = dynamic(
   () => import('@/components/common/cookie-consent-banner').then(mod => ({ default: mod.CookieConsentBanner })),
-  { ssr: false }
+  { ssr: false },
 );
 
 const CompareDrawer = dynamic(
   () => import('@/components/buyer/compare-drawer').then(mod => ({ default: mod.CompareDrawer })),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface AppShellProps {
@@ -70,6 +68,11 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { dir } = useI18n();
+  const refreshSession = useUserStore(state => state.refreshSession);
+
+  useEffect(() => {
+    void refreshSession();
+  }, [refreshSession]);
 
   return (
     <div
@@ -80,7 +83,6 @@ export function AppShell({ children }: AppShellProps) {
         <OfflineBanner />
         <Header />
 
-        {/* Breadcrumb Navigation */}
         <BreadcrumbNav />
 
         <main className="flex-1 w-full max-w-full">
@@ -88,26 +90,12 @@ export function AppShell({ children }: AppShellProps) {
         </main>
 
         <Footer />
-
-        {/* Mobile Bottom Navigation */}
         <MobileNav />
-
-        {/* AI Chat Widget */}
         <AIChatWidget />
-
-        {/* Compare Drawer */}
         <CompareDrawer />
-
-        {/* Social Proof Toast */}
         <SocialProofToast />
-
-        {/* Back to Top Button */}
         <BackToTop />
-
-        {/* Search Command Palette */}
         <SearchCommand />
-
-        {/* Cookie Consent Banner */}
         <CookieConsentBanner />
       </ErrorBoundary>
     </div>

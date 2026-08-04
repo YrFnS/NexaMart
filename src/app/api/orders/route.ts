@@ -1,20 +1,39 @@
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { validateEnum } from '@/lib/security';
+import { requireAuthenticatedUser } from '@/lib/auth';
+import { checkApiRateLimit, RATE_LIMITS, validateEnum } from '@/lib/security';
 
-const VALID_ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
+const VALID_ORDER_STATUSES = [
+  'pending',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'refunded',
+] as const;
 
 export async function GET(request: Request) {
+  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
+  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+  const currentUser = auth.user;
+
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const requestedUserId = searchParams.get('userId') || currentUser.id;
     const statusRaw = searchParams.get('status');
     const status = statusRaw ? validateEnum(statusRaw, [...VALID_ORDER_STATUSES]) : undefined;
 
-    if (!userId) {
-      return Response.json({ error: 'userId is required' }, { status: 400 });
+    if (statusRaw && !status) {
+      return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
+    }
+    if (requestedUserId !== currentUser.id && currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const where: Record<string, unknown> = { userId };
+    const where: Record<string, unknown> = { userId: requestedUserId };
     if (status) where.status = status;
 
     const orders = await db.order.findMany({
@@ -24,11 +43,14 @@ export async function GET(request: Request) {
         store: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
 
-    return Response.json(orders);
+    const response = NextResponse.json(orders);
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
   } catch (error) {
     console.error('Orders API error:', error);
-    return Response.json({ error: 'Failed to fetch orders' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }
