@@ -1,15 +1,8 @@
-import { randomBytes, scryptSync } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
+import { hashPassword } from '../src/lib/password.ts';
 
 const db = new PrismaClient();
-const PASSWORD_PREFIX = 'scrypt';
 const VALID_ROLES = new Set(['buyer', 'seller', 'admin']);
-
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex');
-  const derived = scryptSync(password, salt, 64).toString('hex');
-  return `${PASSWORD_PREFIX}$${salt}$${derived}`;
-}
 
 async function main() {
   const [, , emailInput, password, roleInput = 'buyer', ...nameParts] = process.argv;
@@ -19,7 +12,7 @@ async function main() {
 
   if (!email || !email.includes('@')) {
     throw new Error(
-      'Usage: bun run auth:provision -- user@example.com "strong-password" [buyer|seller|admin] [Display Name]',
+      'Usage: npm run auth:provision -- user@example.com "strong-password" [buyer|seller|admin] [Display Name]',
     );
   }
   if (!password || password.length < 12 || password.length > 128) {
@@ -29,40 +22,31 @@ async function main() {
     throw new Error('Role must be buyer, seller, or admin.');
   }
 
-  const passwordHash = hashPassword(password);
-  const result = await db.$transaction(async tx => {
-    const user = await tx.user.upsert({
-      where: { email },
-      update: {
-        role,
-        isBanned: false,
-      },
-      create: {
-        email,
-        name,
-        role,
-        loyaltyTier: 'bronze',
-        loyaltyPoints: 0,
-        walletBalance: 0,
-        aiCredits: 10,
-        isVerified: role === 'admin',
-        isBanned: false,
-      },
-    });
-
-    await tx.platformSettings.upsert({
-      where: { key: `auth.password.${user.id}` },
-      update: { value: passwordHash },
-      create: {
-        key: `auth.password.${user.id}`,
-        value: passwordHash,
-      },
-    });
-
-    return { id: user.id, email: user.email, role: user.role };
+  // Credentials live on User.passwordHash, which is what the session login path reads.
+  const passwordHash = await hashPassword(password);
+  const user = await db.user.upsert({
+    where: { email },
+    update: {
+      role,
+      isBanned: false,
+      passwordHash,
+    },
+    create: {
+      email,
+      name,
+      role,
+      passwordHash,
+      loyaltyTier: 'bronze',
+      loyaltyPoints: 0,
+      walletBalance: 0,
+      aiCredits: 10,
+      isVerified: role === 'admin',
+      isBanned: false,
+    },
+    select: { id: true, email: true, role: true },
   });
 
-  console.log(`Provisioned ${result.email} as ${result.role} (${result.id}).`);
+  console.log(`Provisioned ${user.email} as ${user.role} (${user.id}).`);
 }
 
 main()

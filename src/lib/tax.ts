@@ -1,5 +1,5 @@
-import type { CurrencyCode } from './currency';
-import { convertCurrency } from './currency';
+import type { CurrencyCode } from './currency.ts';
+import { convertCurrency } from './currency.ts';
 
 export interface TaxResult {
   taxRate: number;

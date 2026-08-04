@@ -1,10 +1,9 @@
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import {
+  validateEnum,
   validatePagination,
   validateSearchParam,
-  validateEnum,
-  checkApiRateLimit,
-  RATE_LIMITS,
 } from '@/lib/security';
 
 const VALID_SORTS = [
@@ -15,103 +14,182 @@ const VALID_SORTS = [
   'popular',
 ] as const;
 
-export async function GET(request: Request) {
-  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
-  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+function parsePrice(value: string | null, max: number): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Math.min(max, Math.max(0, parsed));
+}
 
+function optionalId(value: string | null): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, 64);
+}
+
+const publicProductSelect = {
+  id: true,
+  name: true,
+  nameAr: true,
+  description: true,
+  descriptionAr: true,
+  price: true,
+  originalPrice: true,
+  images: true,
+  categoryId: true,
+  storeId: true,
+  sku: true,
+  stock: true,
+  rating: true,
+  reviewCount: true,
+  soldCount: true,
+  views: true,
+  isFeatured: true,
+  isNew: true,
+  isSale: true,
+  isB2b: true,
+  hasFreeShipping: true,
+  variations: true,
+  tieredPricing: true,
+  tags: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  category: {
+    select: { id: true, name: true, nameAr: true, slug: true },
+  },
+  store: {
+    select: {
+      id: true,
+      name: true,
+      nameAr: true,
+      rating: true,
+      isVerified: true,
+      location: true,
+      productCount: true,
+    },
+  },
+  _count: { select: { variantSkus: { where: { isActive: true } } } },
+} satisfies Prisma.ProductSelect;
+
+function publicProduct(
+  product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>,
+) {
+  return {
+    ...product,
+    price: Number(product.price),
+    originalPrice:
+      product.originalPrice === null ? null : Number(product.originalPrice),
+    hasVariants: product._count.variantSkus > 0,
+    _count: undefined,
+  };
+}
+
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category');
+    const categoryId = optionalId(searchParams.get('category'));
+    const storeId = optionalId(searchParams.get('storeId'));
     const searchRaw = searchParams.get('search');
     const search = searchRaw ? validateSearchParam(searchRaw) : undefined;
-    const sortRaw = searchParams.get('sort') || 'newest';
-    const sort = validateEnum(sortRaw, [...VALID_SORTS]) || 'newest';
-    const featured = searchParams.get('featured');
-    const onSale = searchParams.get('sale');
-    const isNew = searchParams.get('new');
-    const b2b = searchParams.get('b2b');
-    const freeShipping = searchParams.get('freeShipping');
-    const minPrice = searchParams.get('minPrice');
-    const maxPrice = searchParams.get('maxPrice');
-    const idsRaw = searchParams.get('ids');
+    const sort =
+      validateEnum(searchParams.get('sort') || 'newest', VALID_SORTS) ||
+      'newest';
+    const ids = (searchParams.get('ids') || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    const minPrice = parsePrice(searchParams.get('minPrice'), 10_000_000);
+    const maxPrice = parsePrice(searchParams.get('maxPrice'), 10_000_000);
     const { page, limit } = validatePagination(
       searchParams.get('page'),
       searchParams.get('limit'),
       100,
     );
 
-    // Public catalog access must never expose draft or archived products.
-    const where: Record<string, unknown> = { status: 'active' };
-
-    if (idsRaw) {
-      const ids = idsRaw.split(',').map(id => id.trim()).filter(Boolean).slice(0, 20);
-      if (ids.length > 0) where.id = { in: ids };
-    }
-    if (category) where.categoryId = category;
-    if (featured === 'true') where.isFeatured = true;
-    if (onSale === 'true') where.isSale = true;
-    if (isNew === 'true') where.isNew = true;
-    if (b2b === 'true') where.isB2b = true;
-    if (freeShipping === 'true') where.hasFreeShipping = true;
-
-    if (minPrice || maxPrice) {
-      where.price = {};
-      const min = minPrice ? Math.max(0, parseFloat(minPrice)) : undefined;
-      const max = maxPrice ? Math.min(10_000_000, parseFloat(maxPrice)) : undefined;
-      if (min !== undefined && !Number.isNaN(min)) {
-        (where.price as Record<string, number>).gte = min;
-      }
-      if (max !== undefined && !Number.isNaN(max)) {
-        (where.price as Record<string, number>).lte = max;
-      }
+    if (
+      minPrice !== undefined &&
+      maxPrice !== undefined &&
+      minPrice > maxPrice
+    ) {
+      return Response.json(
+        { error: 'Minimum price cannot exceed maximum price.' },
+        { status: 400 },
+      );
     }
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { nameAr: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { tags: { contains: search, mode: 'insensitive' } },
-      ];
-    }
+    const where: Prisma.ProductWhereInput = {
+      status: 'active',
+      ...(ids.length > 0 ? { id: { in: ids } } : {}),
+      ...(categoryId ? { categoryId } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...(searchParams.get('featured') === 'true' ? { isFeatured: true } : {}),
+      ...(searchParams.get('sale') === 'true' ? { isSale: true } : {}),
+      ...(searchParams.get('new') === 'true' ? { isNew: true } : {}),
+      ...(searchParams.get('b2b') === 'true' ? { isB2b: true } : {}),
+      ...(searchParams.get('freeShipping') === 'true'
+        ? { hasFreeShipping: true }
+        : {}),
+      ...(minPrice !== undefined || maxPrice !== undefined
+        ? {
+            price: {
+              ...(minPrice !== undefined ? { gte: minPrice } : {}),
+              ...(maxPrice !== undefined ? { lte: maxPrice } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { nameAr: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+              { tags: { contains: search, mode: 'insensitive' } },
+              { sku: { contains: search, mode: 'insensitive' } },
+              {
+                variantSkus: {
+                  some: { sku: { contains: search, mode: 'insensitive' } },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
 
-    const orderBy: Record<string, string> = {};
-    switch (sort) {
-      case 'price-asc':
-        orderBy.price = 'asc';
-        break;
-      case 'price-desc':
-        orderBy.price = 'desc';
-        break;
-      case 'rating':
-        orderBy.rating = 'desc';
-        break;
-      case 'popular':
-        orderBy.soldCount = 'desc';
-        break;
-      default:
-        orderBy.createdAt = 'desc';
-    }
+    const orderBy: Prisma.ProductOrderByWithRelationInput =
+      sort === 'price-asc'
+        ? { price: 'asc' }
+        : sort === 'price-desc'
+          ? { price: 'desc' }
+          : sort === 'rating'
+            ? { rating: 'desc' }
+            : sort === 'popular'
+              ? { soldCount: 'desc' }
+              : { createdAt: 'desc' };
 
-    const [products, total] = await Promise.all([
+    const [products, total] = await db.$transaction([
       db.product.findMany({
         where,
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: { category: true, store: true },
+        select: publicProductSelect,
       }),
       db.product.count({ where }),
     ]);
 
     return Response.json({
-      products,
+      products: products.map(publicProduct),
       total,
       page,
       pages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error('Products API error:', error);
-    return Response.json({ error: 'Failed to fetch products' }, { status: 500 });
+    return Response.json(
+      { error: 'Failed to fetch products.' },
+      { status: 500 },
+    );
   }
 }

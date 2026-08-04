@@ -1,114 +1,78 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { AlertCircle, Loader2, LogIn, LogOut, Shield } from 'lucide-react';
+import React from 'react';
+import { AlertCircle, LogIn, LogOut, Shield } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useUserStore } from '@/stores/user-store';
 
 export function AdminLoginGate({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const user = useUserStore(state => state.user);
-  const hydrated = useUserStore(state => state.hydrated);
-  const isHydrating = useUserStore(state => state.isHydrating);
-  const refreshSession = useUserStore(state => state.refreshSession);
-  const logout = useUserStore(state => state.logout);
+  const user = useUserStore((state) => state.user);
+  const isHydrated = useUserStore((state) => state.isHydrated);
+  const logout = useUserStore((state) => state.logout);
 
-  useEffect(() => {
-    if (!hydrated) void refreshSession();
-  }, [hydrated, refreshSession]);
-
-  if (!hydrated || isHydrating) {
+  if (!isHydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" />
-          Verifying admin session...
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="h-10 w-10 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (user?.role === 'admin') {
+    return (
+      <div className="h-screen flex flex-col bg-background">
+        <div className="flex justify-end p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground hover:text-rose-600"
+            onClick={() => {
+              void logout().then(() => window.location.assign('/'));
+            }}
+          >
+            <LogOut className="h-3.5 w-3.5 me-1" />
+            Logout
+          </Button>
         </div>
+        <div className="flex-1 overflow-hidden">{children}</div>
       </div>
     );
   }
 
-  if (!user) {
-    return (
-      <GateCard
-        title="Admin sign-in required"
-        description="Sign in with an administrator account to continue. Shared browser keys are no longer accepted."
-        actionLabel="Go to secure sign-in"
-        onAction={() => router.push('/auth?next=/admin')}
-      />
-    );
-  }
-
-  if (user.role !== 'admin') {
-    return (
-      <GateCard
-        title="Administrator access required"
-        description={`The signed-in account ${user.email} does not have the admin role.`}
-        actionLabel="Sign in with another account"
-        destructive
-        onAction={async () => {
-          await logout();
-          router.push('/auth?next=/admin');
-        }}
-      />
-    );
-  }
-
-  return (
-    <div className="h-screen flex flex-col bg-background">
-      <div className="flex items-center justify-end gap-3 border-b px-3 py-2 text-xs text-muted-foreground">
-        <span>{user.email}</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-xs hover:text-rose-600"
-          onClick={async () => {
-            await logout();
-            router.replace('/auth?next=/admin');
-          }}
-        >
-          <LogOut className="size-3.5 me-1" />
-          Logout
-        </Button>
-      </div>
-      <div className="flex-1 overflow-hidden">{children}</div>
-    </div>
-  );
-}
-
-function GateCard({
-  title,
-  description,
-  actionLabel,
-  onAction,
-  destructive = false,
-}: {
-  title: string;
-  description: string;
-  actionLabel: string;
-  onAction: () => void | Promise<void>;
-  destructive?: boolean;
-}) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-background to-teal-50 dark:from-emerald-950/30 dark:via-background dark:to-teal-950/30 p-4">
       <Card className="w-full max-w-md shadow-xl border-emerald-200 dark:border-emerald-800">
-        <CardHeader className="text-center space-y-3">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg">
-            {destructive ? <AlertCircle className="size-6" /> : <Shield className="size-6" />}
+        <CardHeader className="text-center space-y-3 pb-4">
+          <div className="flex items-center justify-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+              <Shield className="h-6 w-6 text-white" />
+            </div>
+            <CardTitle className="text-xl font-bold">NexaMart Admin</CardTitle>
           </div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          <CardDescription className="text-sm">
+            Sign in with an administrator account to continue.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {user && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="text-xs text-amber-700 dark:text-amber-300">
+                The signed-in account does not have administrator access.
+              </span>
+            </div>
+          )}
           <Button
             className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => void onAction()}
+            onClick={() => window.location.assign('/auth?redirect=/admin')}
           >
-            <LogIn className="size-4 me-2" />
-            {actionLabel}
+            <LogIn className="h-4 w-4 me-2" />
+            Sign in as administrator
           </Button>
+          <p className="text-[11px] text-muted-foreground text-center">
+            Admin secrets are no longer stored in this browser.
+          </p>
         </CardContent>
       </Card>
     </div>

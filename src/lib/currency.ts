@@ -1,5 +1,6 @@
 export type CurrencyCode = 'USD' | 'EUR' | 'AED' | 'SAR' | 'KWD' | 'IQD' | 'JOD' | 'QAR' | 'OMR' | 'EGP';
-import { LS_KEYS } from '@/lib/config';
+import { LS_KEYS } from './config.ts';
+import { BASE_CURRENCY, moneyNumber, type MoneyLike } from './money.ts';
 
 export interface CurrencyInfo {
   code: CurrencyCode;
@@ -140,12 +141,12 @@ export const COUNTRY_CURRENCY_MAP: Record<string, CurrencyCode> = {
 export function convertCurrency(
   amount: number,
   from: CurrencyCode,
-  to: CurrencyCode
+  to: CurrencyCode,
 ): number {
-  if (from === to) return amount;
-  // Convert to USD first, then to target
-  const amountInUsd = amount / CURRENCIES[from].exchangeRate;
-  return amountInUsd * CURRENCIES[to].exchangeRate;
+  if (from !== BASE_CURRENCY || to !== BASE_CURRENCY) {
+    throw new Error(`Currency conversion is disabled in this release. Prices use ${BASE_CURRENCY}.`);
+  }
+  return moneyNumber(amount);
 }
 
 /**
@@ -157,50 +158,29 @@ export function convertCurrency(
  * @param locale - Locale for formatting ('en' or 'ar')
  */
 export function formatPrice(
-  amount: number,
-  currency: CurrencyCode = 'USD',
-  locale?: 'en' | 'ar'
+  amount: MoneyLike,
+  _currency: CurrencyCode = BASE_CURRENCY,
+  locale?: 'en' | 'ar',
 ): string {
-  // Guard against null/undefined amounts that would crash .toFixed()
-  const safeAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
-  const info = CURRENCIES[currency];
-  if (!info) return `$${safeAmount.toFixed(2)}`;
-
-  // Try to get locale from i18n store if not provided
-  const effectiveLocale = locale || (typeof window !== 'undefined' ? getStoredLocale() : 'en');
-
-  // Convert amount from USD to target currency
-  const converted = convertCurrency(safeAmount, 'USD', currency);
-
-  const symbol = effectiveLocale === 'ar' ? info.symbolAr : info.symbol;
-  const formattedAmount = formatNumber(converted, info.decimals, effectiveLocale);
-
-  if (info.symbolPosition === 'after') {
-    return `${formattedAmount} ${symbol}`;
-  }
-  return `${symbol}${formattedAmount}`;
+  const effectiveLocale =
+    locale || (typeof window !== 'undefined' ? getStoredLocale() : 'en');
+  return new Intl.NumberFormat(effectiveLocale === 'ar' ? 'ar-IQ' : 'en-US', {
+    style: 'currency',
+    currency: BASE_CURRENCY,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(moneyNumber(amount));
 }
 
 /**
  * Format price without conversion (amount already in the target currency)
  */
 export function formatPriceLocal(
-  amount: number,
-  currency: CurrencyCode = 'USD',
-  locale?: 'en' | 'ar'
+  amount: MoneyLike,
+  _currency: CurrencyCode = BASE_CURRENCY,
+  locale?: 'en' | 'ar',
 ): string {
-  const safeAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
-  const info = CURRENCIES[currency];
-  if (!info) return `$${safeAmount.toFixed(2)}`;
-
-  const effectiveLocale = locale || (typeof window !== 'undefined' ? getStoredLocale() : 'en');
-  const symbol = effectiveLocale === 'ar' ? info.symbolAr : info.symbol;
-  const formattedAmount = formatNumber(safeAmount, info.decimals, effectiveLocale);
-
-  if (info.symbolPosition === 'after') {
-    return `${formattedAmount} ${symbol}`;
-  }
-  return `${symbol}${formattedAmount}`;
+  return formatPrice(amount, BASE_CURRENCY, locale);
 }
 
 /**
@@ -246,12 +226,12 @@ export function getCurrencySymbol(currency: CurrencyCode, locale?: 'en' | 'ar'):
  * Get all currency codes as an array
  */
 export function getCurrencyList(): CurrencyInfo[] {
-  return Object.values(CURRENCIES);
+  return [CURRENCIES[BASE_CURRENCY]];
 }
 
 /**
  * Get the default currency for a country code
  */
-export function getCurrencyForCountry(countryCode: string): CurrencyCode {
-  return COUNTRY_CURRENCY_MAP[countryCode.toLowerCase()] || 'USD';
+export function getCurrencyForCountry(_countryCode: string): CurrencyCode {
+  return BASE_CURRENCY;
 }

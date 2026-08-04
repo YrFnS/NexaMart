@@ -1,28 +1,38 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Search,
-  Plus,
-  Filter,
+  AlertCircle,
+  Archive,
   Download,
-  Upload,
-  Trash2,
   Edit3,
-  MoreHorizontal,
-  Package,
   Loader2,
-  Image as ImageIcon,
-  X,
-  Check,
-  Copy,
+  Package,
+  Plus,
+  Search,
+  Trash2,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -31,387 +41,553 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useI18n } from '@/lib/i18n';
 import { formatPrice } from '@/lib/currency';
+import { useI18n } from '@/lib/i18n';
 
-interface Product {
+interface CategoryOption {
   id: string;
   name: string;
-  price: number;
-  originalPrice?: number;
-  stock: number;
-  status: string;
-  images: string;
-  rating: number;
-  soldCount: number;
-  categoryId: string;
-  description?: string;
-  tags: string;
-  variations: string;
-  tieredPricing: string;
+  nameAr?: string | null;
 }
 
-type FilterStatus = 'all' | 'active' | 'draft' | 'archived';
-
-function StatusBadge({ status, t }: { status: string; t: (key: string, params?: Record<string, string | number>) => string }) {
-  const styles: Record<string, string> = {
-    active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-    draft: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    archived: 'bg-gray-100 text-gray-600 dark:bg-gray-800/30 dark:text-gray-400',
-  };
-  const statusLabels: Record<string, string> = {
-    active: t('adminActive'),
-    draft: t('pmDraft'),
-    archived: t('pmArchive'),
-  };
-  return (
-    <Badge variant="secondary" className={`text-[11px] ${styles[status] || ''}`}>
-      {statusLabels[status] || status}
-    </Badge>
-  );
-}
-
-function StockBadge({ stock, t }: { stock: number; t: (key: string, params?: Record<string, string | number>) => string }) {
-  if (stock === 0) return <Badge variant="secondary" className="text-[11px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">{t('outOfStock')}</Badge>;
-  if (stock < 20) return <Badge variant="secondary" className="text-[11px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">{t('pmLowStock')} ({stock})</Badge>;
-  return <Badge variant="secondary" className="text-[11px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{stock} {t('inStock')}</Badge>;
-}
-
-interface ProductFormData {
+interface StoreOption {
+  id: string;
   name: string;
-  description: string;
+}
+
+interface VariantSku {
+  id?: string;
+  sku: string;
+  attributes: Record<string, string>;
+  price: number;
+  originalPrice?: number | null;
+  stock: number;
+  isActive: boolean;
+}
+
+interface SellerProduct {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  description?: string | null;
+  price: number;
+  originalPrice?: number | null;
+  stock: number;
+  status: 'active' | 'draft' | 'archived';
+  sku?: string | null;
+  categoryId: string;
+  storeId: string;
+  images: string[];
+  tags: string[];
+  hasFreeShipping: boolean;
+  isB2b: boolean;
+  soldCount: number;
+  updatedAt: string;
+  category: CategoryOption;
+  store: StoreOption;
+  variantSkus: VariantSku[];
+}
+
+interface VariantDraft {
+  id?: string;
+  sku: string;
+  attributesText: string;
   price: string;
   originalPrice: string;
-  categoryId: string;
   stock: string;
-  status: string;
-  tags: string;
+  isActive: boolean;
 }
 
-const emptyForm: ProductFormData = {
+interface ProductDraft {
+  storeId: string;
+  name: string;
+  nameAr: string;
+  description: string;
+  categoryId: string;
+  imagesText: string;
+  tagsText: string;
+  status: 'active' | 'draft' | 'archived';
+  hasFreeShipping: boolean;
+  isB2b: boolean;
+  sku: string;
+  price: string;
+  originalPrice: string;
+  stock: string;
+  variants: VariantDraft[];
+}
+
+const emptyDraft: ProductDraft = {
+  storeId: '',
   name: '',
+  nameAr: '',
   description: '',
+  categoryId: '',
+  imagesText: '',
+  tagsText: '',
+  status: 'draft',
+  hasFreeShipping: false,
+  isB2b: false,
+  sku: '',
   price: '',
   originalPrice: '',
-  categoryId: '',
   stock: '',
-  status: 'draft',
-  tags: '',
+  variants: [],
 };
 
-export function ProductManagement() {
-  const { t, dir } = useI18n();
-  const isRTL = dir() === 'rtl';
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [formData, setFormData] = useState<ProductFormData>(emptyForm);
-  const [editId, setEditId] = useState<string | null>(null);
+function attributesToText(attributes: Record<string, string>): string {
+  return Object.entries(attributes)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(', ');
+}
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const res = await fetch('/api/products?storeId=techstore-pro&limit=50');
-        if (res.ok) {
-          const json = await res.json();
-          setProducts(json.products || []);
-        }
-      } catch {
-        // API not available — leave empty
-      } finally {
-        setLoading(false);
+function parseAttributes(value: string): Record<string, string> {
+  const entries = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const separator = part.indexOf('=');
+      if (separator <= 0 || separator === part.length - 1) {
+        throw new Error('Use option=value pairs, for example color=Black, size=M.');
       }
+      return [part.slice(0, separator).trim(), part.slice(separator + 1).trim()] as const;
+    });
+  const attributes = Object.fromEntries(entries);
+  if (Object.keys(attributes).length === 0) {
+    throw new Error('Every SKU needs at least one option.');
+  }
+  return attributes;
+}
+
+function productToDraft(product: SellerProduct): ProductDraft {
+  return {
+    storeId: product.storeId,
+    name: product.name,
+    nameAr: product.nameAr || '',
+    description: product.description || '',
+    categoryId: product.categoryId,
+    imagesText: product.images.join(String.fromCharCode(10)),
+    tagsText: product.tags.join(', '),
+    status: product.status,
+    hasFreeShipping: product.hasFreeShipping,
+    isB2b: product.isB2b,
+    sku: product.sku || '',
+    price: String(product.price),
+    originalPrice: product.originalPrice == null ? '' : String(product.originalPrice),
+    stock: String(product.stock),
+    variants: product.variantSkus.map((variant) => ({
+      id: variant.id,
+      sku: variant.sku,
+      attributesText: attributesToText(variant.attributes),
+      price: String(variant.price),
+      originalPrice:
+        variant.originalPrice == null ? '' : String(variant.originalPrice),
+      stock: String(variant.stock),
+      isActive: variant.isActive,
+    })),
+  };
+}
+
+function StatusBadge({ status }: { status: SellerProduct['status'] }) {
+  const classes =
+    status === 'active'
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+      : status === 'draft'
+        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+        : 'bg-muted text-muted-foreground';
+  return <Badge className={classes}>{status}</Badge>;
+}
+
+export function ProductManagement() {
+  const { locale } = useI18n();
+  const isRTL = locale === 'ar';
+  const [products, setProducts] = useState<SellerProduct[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
+
+  const copy = isRTL
+    ? {
+        title: 'المنتجات والمخزون',
+        subtitle: 'إدارة المنتجات ووحدات SKU والأسعار والمخزون الحقيقي.',
+        add: 'إضافة منتج',
+        search: 'ابحث بالمنتج أو SKU',
+        all: 'كل الحالات',
+        name: 'المنتج',
+        price: 'السعر',
+        stock: 'المخزون',
+        variants: 'وحدات SKU',
+        status: 'الحالة',
+        actions: 'الإجراءات',
+        noProducts: 'لا توجد منتجات مطابقة.',
+        edit: 'تعديل',
+        archive: 'أرشفة',
+        export: 'تصدير CSV',
+        createTitle: 'إضافة منتج',
+        editTitle: 'تعديل المنتج ووحدات SKU',
+        save: 'حفظ',
+        cancel: 'إلغاء',
+        optionsHint: 'استخدم صيغة الخيار=القيمة، مثال: color=Black, size=M',
+      }
+    : {
+        title: 'Products & inventory',
+        subtitle: 'Manage persistent products, SKUs, prices, and real inventory.',
+        add: 'Add product',
+        search: 'Search product or SKU',
+        all: 'All statuses',
+        name: 'Product',
+        price: 'Price',
+        stock: 'Stock',
+        variants: 'SKUs',
+        status: 'Status',
+        actions: 'Actions',
+        noProducts: 'No matching products.',
+        edit: 'Edit',
+        archive: 'Archive',
+        export: 'Export CSV',
+        createTitle: 'Add product',
+        editTitle: 'Edit product & SKUs',
+        save: 'Save',
+        cancel: 'Cancel',
+        optionsHint: 'Use option=value pairs, for example color=Black, size=M',
+      };
+
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [productsResponse, categoriesResponse] = await Promise.all([
+        fetch('/api/seller/products?limit=100', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+        }),
+        fetch('/api/categories', { cache: 'no-store' }),
+      ]);
+      const productPayload = await productsResponse.json();
+      const categoryPayload = await categoriesResponse.json();
+      if (!productsResponse.ok) {
+        throw new Error(productPayload.error || 'Failed to load products.');
+      }
+      setProducts(productPayload.products || []);
+      setStores(productPayload.stores || []);
+      setCategories(Array.isArray(categoryPayload) ? categoryPayload : []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load products.');
+    } finally {
+      setLoading(false);
     }
-    fetchProducts();
   }, []);
 
-  const filtered = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadProducts();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadProducts]);
 
-  const allSelected = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
-
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map(p => p.id)));
-    }
-  };
-
-  const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
-  };
-
-  const handleAddProduct = () => {
-    const newProduct: Product = {
-      id: `p-${Date.now()}`,
-      name: formData.name,
-      description: formData.description,
-      price: parseFloat(formData.price) || 0,
-      originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
-      stock: parseInt(formData.stock) || 0,
-      status: formData.status,
-      categoryId: formData.categoryId || 'cat1',
-      images: '[]',
-      rating: 0,
-      soldCount: 0,
-      tags: JSON.stringify(formData.tags.split(',').map(t => t.trim()).filter(Boolean)),
-      variations: '{}',
-      tieredPricing: '[]',
-    };
-    setProducts([newProduct, ...products]);
-    setShowAddDialog(false);
-    setFormData(emptyForm);
-  };
-
-  const handleEditProduct = () => {
-    if (!editId) return;
-    setProducts(products.map(p => {
-      if (p.id !== editId) return p;
-      return {
-        ...p,
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price) || p.price,
-        originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
-        stock: parseInt(formData.stock) || 0,
-        status: formData.status,
-        categoryId: formData.categoryId || p.categoryId,
-        tags: JSON.stringify(formData.tags.split(',').map(t => t.trim()).filter(Boolean)),
-      };
-    }));
-    setShowEditDialog(false);
-    setEditId(null);
-    setFormData(emptyForm);
-  };
-
-  const openEdit = (product: Product) => {
-    setEditId(product.id);
-    let tagsStr = '';
-    try {
-      const parsed = JSON.parse(product.tags);
-      if (Array.isArray(parsed)) tagsStr = parsed.join(', ');
-    } catch { /* ignore */ }
-    setFormData({
-      name: product.name,
-      description: product.description || '',
-      price: product.price.toString(),
-      originalPrice: product.originalPrice?.toString() || '',
-      categoryId: product.categoryId,
-      stock: product.stock.toString(),
-      status: product.status,
-      tags: tagsStr,
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return products.filter((product) => {
+      const matchesStatus = status === 'all' || product.status === status;
+      const matchesSearch =
+        !query ||
+        product.name.toLowerCase().includes(query) ||
+        (product.sku || '').toLowerCase().includes(query) ||
+        product.variantSkus.some((variant) =>
+          variant.sku.toLowerCase().includes(query),
+        );
+      return matchesStatus && matchesSearch;
     });
-    setShowEditDialog(true);
-  };
+  }, [products, search, status]);
 
-  const handleDelete = () => {
-    if (deleteTarget) {
-      setProducts(products.filter(p => p.id !== deleteTarget));
+  function openCreate() {
+    setEditingId(null);
+    setDraft({
+      ...emptyDraft,
+      storeId: stores.length === 1 ? stores[0].id : '',
+      categoryId: categories[0]?.id || '',
+    });
+    setError('');
+    setDialogOpen(true);
+  }
+
+  function openEdit(product: SellerProduct) {
+    setEditingId(product.id);
+    setDraft(productToDraft(product));
+    setError('');
+    setDialogOpen(true);
+  }
+
+  function addVariant() {
+    setDraft((current) => ({
+      ...current,
+      variants: [
+        ...current.variants,
+        {
+          sku: '',
+          attributesText: '',
+          price: current.price || '',
+          originalPrice: current.originalPrice,
+          stock: '0',
+          isActive: true,
+        },
+      ],
+    }));
+  }
+
+  function updateVariant(index: number, patch: Partial<VariantDraft>) {
+    setDraft((current) => ({
+      ...current,
+      variants: current.variants.map((variant, variantIndex) =>
+        variantIndex === index ? { ...variant, ...patch } : variant,
+      ),
+    }));
+  }
+
+  function removeVariant(index: number) {
+    setDraft((current) => ({
+      ...current,
+      variants: current.variants.filter((_, variantIndex) => variantIndex !== index),
+    }));
+  }
+
+  function buildPayload() {
+    const variants = draft.variants.map((variant) => ({
+      id: variant.id,
+      sku: variant.sku,
+      attributes: parseAttributes(variant.attributesText),
+      price: Number(variant.price),
+      originalPrice: variant.originalPrice ? Number(variant.originalPrice) : null,
+      stock: Number(variant.stock),
+      isActive: variant.isActive,
+    }));
+    return {
+      ...(editingId ? { productId: editingId } : {}),
+      storeId: draft.storeId || undefined,
+      name: draft.name,
+      nameAr: draft.nameAr || null,
+      description: draft.description || null,
+      categoryId: draft.categoryId,
+      images: draft.imagesText
+        .split(',')
+        .flatMap((value) => value.split(String.fromCharCode(10)))
+        .map((value) => value.trim())
+        .filter(Boolean),
+      tags: draft.tagsText
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
+      status: draft.status,
+      hasFreeShipping: draft.hasFreeShipping,
+      isB2b: draft.isB2b,
+      sku: variants.length > 0 ? null : draft.sku,
+      price: variants.length > 0 ? undefined : Number(draft.price),
+      originalPrice:
+        variants.length > 0 || !draft.originalPrice
+          ? null
+          : Number(draft.originalPrice),
+      stock: variants.length > 0 ? undefined : Number(draft.stock),
+      variants,
+    };
+  }
+
+  async function saveProduct() {
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch('/api/seller/products', {
+        method: editingId ? 'PUT' : 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Failed to save product.');
+      setDialogOpen(false);
+      await loadProducts();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save product.');
+    } finally {
+      setSaving(false);
     }
-    setDeleteTarget(null);
-    setShowDeleteDialog(false);
-  };
+  }
 
-  const handleBulkDelete = () => {
-    setProducts(products.filter(p => !selectedIds.has(p.id)));
-    setSelectedIds(new Set());
-  };
+  async function archiveProduct(productId: string) {
+    setError('');
+    try {
+      const response = await fetch(`/api/seller/products?id=${encodeURIComponent(productId)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Failed to archive product.');
+      await loadProducts();
+    } catch (archiveError) {
+      setError(
+        archiveError instanceof Error
+          ? archiveError.message
+          : 'Failed to archive product.',
+      );
+    }
+  }
 
-  const handleBulkStatusChange = (status: string) => {
-    setProducts(products.map(p => selectedIds.has(p.id) ? { ...p, status } : p));
-    setSelectedIds(new Set());
-  };
+  function exportCsv() {
+    const rows = [
+      ['Product', 'Store', 'Status', 'Parent stock', 'SKU', 'Options', 'Price', 'SKU stock'],
+      ...products.flatMap((product) =>
+        product.variantSkus.length > 0
+          ? product.variantSkus.map((variant) => [
+              product.name,
+              product.store.name,
+              product.status,
+              String(product.stock),
+              variant.sku,
+              attributesToText(variant.attributes),
+              String(variant.price),
+              String(variant.stock),
+            ])
+          : [[
+              product.name,
+              product.store.name,
+              product.status,
+              String(product.stock),
+              product.sku || '',
+              '',
+              String(product.price),
+              String(product.stock),
+            ]],
+      ),
+    ];
+    const csv = rows
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .join(String.fromCharCode(10));
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'nexamart-products.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-amber-600" />
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-5 p-4 md:p-6" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold">{t('productList')}</h2>
-          <p className="text-sm text-muted-foreground">{products.length} {t('sellerProductsTotal')}</p>
+          <h2 className="text-xl font-bold">{copy.title}</h2>
+          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            <Upload className="h-3.5 w-3.5 me-1.5" />
-            {t('sellerImport')}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCsv}>
+            <Download className="me-2 size-4" />
+            {copy.export}
           </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            <Download className="h-3.5 w-3.5 me-1.5" />
-            {t('sellerExport')}
-          </Button>
-          <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { setFormData(emptyForm); setShowAddDialog(true); }}>
-            <Plus className="h-3.5 w-3.5 me-1.5" />
-            {t('addProduct')}
+          <Button onClick={openCreate} className="bg-amber-600 text-white hover:bg-amber-700">
+            <Plus className="me-2 size-4" />
+            {copy.add}
           </Button>
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <Card>
-        <CardContent className="p-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground start-3" />
-              <Input
-                placeholder={t('sellerSearchProducts')}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="ps-9 h-9 text-sm"
-              />
-            </div>
-            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
-              <SelectTrigger className="w-full sm:w-[140px] h-9 text-sm">
-                <Filter className="h-3.5 w-3.5 me-1.5" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('pmAllStatus')}</SelectItem>
-                <SelectItem value="active">{t('adminActive')}</SelectItem>
-                <SelectItem value="draft">{t('pmDraft')}</SelectItem>
-                <SelectItem value="archived">{t('pmArchive')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Bulk Actions */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
-          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">{selectedIds.size} {t('pmSelected')}</span>
-          <Button variant="ghost" size="sm" className="h-7 text-xs text-red-600 hover:text-red-700" onClick={handleBulkDelete}>
-            <Trash2 className="h-3 w-3 me-1" /> {t('delete')}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleBulkStatusChange('active')}>
-            <Check className="h-3 w-3 me-1" /> {t('pmSetActive')}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleBulkStatusChange('draft')}>
-            {t('pmSetDraft')}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleBulkStatusChange('archived')}>
-            {t('pmArchive')}
-          </Button>
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300" role="alert">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          {error}
         </div>
       )}
 
-      {/* Product Table */}
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={copy.search}
+              className="ps-9"
+            />
+          </div>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{copy.all}</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
-                  </TableHead>
-                  <TableHead className="text-xs">{t('sellerProductImage')}</TableHead>
-                  <TableHead className="text-xs min-w-[160px]">{t('pmName')}</TableHead>
-                  <TableHead className="text-xs">{t('price')}</TableHead>
-                  <TableHead className="text-xs">{t('pmStock')}</TableHead>
-                  <TableHead className="text-xs">{t('pmStatus')}</TableHead>
-                  <TableHead className="text-xs">{t('pmSold')}</TableHead>
-                  <TableHead className="text-xs text-end">{t('adminActions')}</TableHead>
+                  <TableHead>{copy.name}</TableHead>
+                  <TableHead>{copy.price}</TableHead>
+                  <TableHead>{copy.stock}</TableHead>
+                  <TableHead>{copy.variants}</TableHead>
+                  <TableHead>{copy.status}</TableHead>
+                  <TableHead className="text-end">{copy.actions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center">
-                      <Package className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
-                      <p className="text-sm text-muted-foreground">{t('noResults')}</p>
+                    <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                      <Package className="mx-auto mb-2 size-8 opacity-40" />
+                      {copy.noProducts}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((product) => (
-                    <TableRow key={product.id} className={selectedIds.has(product.id) ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''}>
+                    <TableRow key={product.id}>
                       <TableCell>
-                        <Checkbox checked={selectedIds.has(product.id)} onCheckedChange={() => toggleSelect(product.id)} />
+                        <p className="font-medium">{isRTL && product.nameAr ? product.nameAr : product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.store.name}</p>
                       </TableCell>
+                      <TableCell>{formatPrice(product.price)}</TableCell>
+                      <TableCell>{product.stock}</TableCell>
                       <TableCell>
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                        <Badge variant="outline">
+                          {product.variantSkus.length || 1}
+                        </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm font-medium truncate max-w-[200px]">{product.name}</p>
-                          {product.originalPrice && product.originalPrice > product.price && (
-                            <p className="text-[11px] text-muted-foreground line-through">{formatPrice(product.originalPrice)}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm font-semibold">{formatPrice(product.price)}</TableCell>
-                      <TableCell><StockBadge stock={product.stock} t={t} /></TableCell>
-                      <TableCell><StatusBadge status={product.status} t={t} /></TableCell>
-                      <TableCell className="text-sm">{product.soldCount}</TableCell>
+                      <TableCell><StatusBadge status={product.status} /></TableCell>
                       <TableCell className="text-end">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align={isRTL ? 'start' : 'end'}>
-                            <DropdownMenuItem onClick={() => openEdit(product)}>
-                              <Edit3 className="h-3.5 w-3.5 me-2" /> {t('edit')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Copy className="h-3.5 w-3.5 me-2" /> {t('pmDuplicate')}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600 dark:text-red-400"
-                              onClick={() => { setDeleteTarget(product.id); setShowDeleteDialog(true); }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 me-2" /> {t('delete')}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(product)} aria-label={copy.edit}>
+                          <Edit3 className="size-4" />
+                        </Button>
+                        {product.status !== 'archived' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600"
+                            onClick={() => void archiveProduct(product.id)}
+                            aria-label={copy.archive}
+                          >
+                            <Archive className="size-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -422,172 +598,137 @@ export function ProductManagement() {
         </CardContent>
       </Card>
 
-      {/* Add Product Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t('addProduct')}</DialogTitle>
-            <DialogDescription>{t('sellerAddProductDesc')}</DialogDescription>
+            <DialogTitle>{editingId ? copy.editTitle : copy.createTitle}</DialogTitle>
+            <DialogDescription>{copy.subtitle}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          <div className="grid gap-5 py-3">
+            {stores.length > 1 && (
               <div className="space-y-2">
-                <Label className="text-sm">{t('pmProductName')} *</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Wireless Earbuds Pro" className="h-9" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmCategory')}</Label>
-                <Select value={formData.categoryId} onValueChange={(v) => setFormData({ ...formData, categoryId: v })}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder={t('pmSelectCategory')} /></SelectTrigger>
+                <Label>Store</Label>
+                <Select value={draft.storeId} onValueChange={(value) => setDraft({ ...draft, storeId: value })}>
+                  <SelectTrigger><SelectValue placeholder="Select store" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cat1">{t('pmCatElectronics')}</SelectItem>
-                    <SelectItem value="cat2">{t('pmCatAccessories')}</SelectItem>
-                    <SelectItem value="cat3">{t('pmCatPhoneCases')}</SelectItem>
-                    <SelectItem value="cat4">{t('pmCatAudio')}</SelectItem>
+                    {stores.map((store) => (
+                      <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Product name</Label>
+                <Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Arabic name</Label>
+                <Input value={draft.nameAr} onChange={(event) => setDraft({ ...draft, nameAr: event.target.value })} dir="rtl" />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label className="text-sm">{t('description')}</Label>
-              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder={t('description') + '...'} rows={3} />
+              <Label>Description</Label>
+              <Textarea rows={3} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+            <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label className="text-sm">{t('price')} *</Label>
-                <Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="0.00" className="h-9" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmOriginalPrice')}</Label>
-                <Input type="number" value={formData.originalPrice} onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })} placeholder="0.00" className="h-9" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmStock')} *</Label>
-                <Input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} placeholder="0" className="h-9" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmStatus')}</Label>
-                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <Label>Category</Label>
+                <Select value={draft.categoryId} onValueChange={(value) => setDraft({ ...draft, categoryId: value })}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">{t('adminActive')}</SelectItem>
-                    <SelectItem value="draft">{t('pmDraft')}</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {isRTL && category.nameAr ? category.nameAr : category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">{t('pmTags')}</Label>
-                <Input value={formData.tags} onChange={(e) => setFormData({ ...formData, tags: e.target.value })} placeholder="wireless, audio, premium" className="h-9" />
+                <Label>Status</Label>
+                <Select value={draft.status} onValueChange={(value) => setDraft({ ...draft, status: value as ProductDraft['status'] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <Input value={draft.tagsText} onChange={(event) => setDraft({ ...draft, tagsText: event.target.value })} placeholder="wireless, premium" />
               </div>
             </div>
+
             <div className="space-y-2">
-              <Label className="text-sm">{t('pmProductImages')}</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-emerald-400 dark:hover:border-emerald-600 transition-colors cursor-pointer">
-                <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">{t('pmUploadImages')}</p>
-                <p className="text-xs text-muted-foreground mt-1">{t('pmImageHint')}</p>
+              <Label>Image URLs (one per line)</Label>
+              <Textarea rows={2} value={draft.imagesText} onChange={(event) => setDraft({ ...draft, imagesText: event.target.value })} />
+            </div>
+
+            <div className="flex flex-wrap gap-5 rounded-xl border p-4">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={draft.hasFreeShipping} onCheckedChange={(checked) => setDraft({ ...draft, hasFreeShipping: checked === true })} />
+                Free shipping
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={draft.isB2b} onCheckedChange={(checked) => setDraft({ ...draft, isB2b: checked === true })} />
+                B2B product
+              </label>
+            </div>
+
+            {draft.variants.length === 0 ? (
+              <div className="grid gap-4 rounded-xl border p-4 md:grid-cols-4">
+                <div className="space-y-2"><Label>SKU</Label><Input value={draft.sku} onChange={(event) => setDraft({ ...draft, sku: event.target.value })} /></div>
+                <div className="space-y-2"><Label>Price</Label><Input type="number" min="0" step="0.01" value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></div>
+                <div className="space-y-2"><Label>Original price</Label><Input type="number" min="0" step="0.01" value={draft.originalPrice} onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></div>
+                <div className="space-y-2"><Label>Stock</Label><Input type="number" min="0" value={draft.stock} onChange={(event) => setDraft({ ...draft, stock: event.target.value })} /></div>
               </div>
+            ) : null}
+
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">Variant SKUs</h3>
+                  <p className="text-xs text-muted-foreground">{copy.optionsHint}</p>
+                </div>
+                <Button type="button" variant="outline" onClick={addVariant}>
+                  <Plus className="me-2 size-4" /> Add SKU
+                </Button>
+              </div>
+
+              {draft.variants.map((variant, index) => (
+                <div key={variant.id || index} className="grid gap-3 rounded-xl bg-muted/40 p-3 lg:grid-cols-[1fr_1.5fr_0.8fr_0.8fr_auto_auto]">
+                  <div className="space-y-1"><Label className="text-xs">SKU</Label><Input value={variant.sku} onChange={(event) => updateVariant(index, { sku: event.target.value })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Options</Label><Input value={variant.attributesText} onChange={(event) => updateVariant(index, { attributesText: event.target.value })} placeholder="color=Black, size=M" /></div>
+                  <div className="space-y-1"><Label className="text-xs">Price</Label><Input type="number" min="0" step="0.01" value={variant.price} onChange={(event) => updateVariant(index, { price: event.target.value })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Stock</Label><Input type="number" min="0" value={variant.stock} onChange={(event) => updateVariant(index, { stock: event.target.value })} /></div>
+                  <label className="flex items-center gap-2 self-end pb-2 text-xs"><Checkbox checked={variant.isActive} onCheckedChange={(checked) => updateVariant(index, { isActive: checked === true })} /> Active</label>
+                  <Button type="button" variant="ghost" size="icon" className="self-end text-red-600" onClick={() => removeVariant(index)} aria-label="Remove SKU"><Trash2 className="size-4" /></Button>
+                </div>
+              ))}
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="h-9">{t('cancel')}</Button>
-            <Button onClick={handleAddProduct} disabled={!formData.name || !formData.price} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white">
-              {t('add')} {t('pmName')}
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{copy.cancel}</Button>
+            <Button
+              onClick={() => void saveProduct()}
+              disabled={saving || !draft.name || !draft.categoryId || (stores.length > 1 && !draft.storeId)}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {saving && <Loader2 className="me-2 size-4 animate-spin" />}
+              {copy.save}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Edit Product Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t('editProduct')}</DialogTitle>
-            <DialogDescription>{t('pmUpdateProductInfo')}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmProductName')} *</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="h-9" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmCategory')}</Label>
-                <Select value={formData.categoryId} onValueChange={(v) => setFormData({ ...formData, categoryId: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cat1">{t('pmCatElectronics')}</SelectItem>
-                    <SelectItem value="cat2">{t('pmCatAccessories')}</SelectItem>
-                    <SelectItem value="cat3">{t('pmCatPhoneCases')}</SelectItem>
-                    <SelectItem value="cat4">{t('pmCatAudio')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm">{t('description')}</Label>
-              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">{t('price')} *</Label>
-                <Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="h-9" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmOriginalPrice')}</Label>
-                <Input type="number" value={formData.originalPrice} onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })} className="h-9" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmStock')}</Label>
-                <Input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="h-9" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmStatus')}</Label>
-                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">{t('adminActive')}</SelectItem>
-                    <SelectItem value="draft">{t('pmDraft')}</SelectItem>
-                    <SelectItem value="archived">{t('pmArchive')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm">{t('pmTags')}</Label>
-                <Input value={formData.tags} onChange={(e) => setFormData({ ...formData, tags: e.target.value })} className="h-9" />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="h-9">{t('cancel')}</Button>
-            <Button onClick={handleEditProduct} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white">
-              {t('save')} {t('pmChanges')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('delete')} {t('pmDeleteProduct')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('pmDeleteProductDesc')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              {t('delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

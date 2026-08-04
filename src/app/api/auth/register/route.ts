@@ -1,22 +1,26 @@
+import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
+import { toAuthenticatedUser } from '@/lib/auth';
+import { hashPassword } from '@/lib/password';
 import {
-  attachSessionCookie,
+  checkApiRateLimit,
+  RATE_LIMITS,
+  validateCsrf,
+} from '@/lib/security';
+import {
   createSessionToken,
-  hashPassword,
-  passwordCredentialKey,
-  toPublicUser,
-} from '@/lib/auth';
-import { checkApiRateLimit, RATE_LIMITS, validateCsrf } from '@/lib/security';
+  serializeSessionCookie,
+  type SessionRole,
+} from '@/lib/session';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function cleanText(value: unknown, maxLength: number): string {
-  return String(value ?? '')
-    .replace(/[\u0000-\u001F\u007F]/g, '')
-    .trim()
-    .slice(0, maxLength);
-}
+const registerSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email: z.string().trim().email().max(254),
+  phone: z.string().trim().max(30).optional().or(z.literal('')),
+  password: z.string().min(8).max(128),
+});
 
 export async function POST(request: Request) {
   const rateLimit = checkApiRateLimit(request, RATE_LIMITS.auth);
@@ -28,68 +32,61 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
-    const name = cleanText(body.name, 80);
-    const email = cleanText(body.email, 254).toLowerCase();
-    const phone = cleanText(body.phone, 30);
-    const password = String(body.password ?? '');
-
-    if (name.length < 2) {
-      return NextResponse.json({ error: 'Name must be at least 2 characters.' }, { status: 400 });
-    }
-    if (!EMAIL_PATTERN.test(email)) {
-      return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
-    }
-    if (password.length < 8 || password.length > 128) {
+    const parsed = registerSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Password must be between 8 and 128 characters.' },
+        { error: 'Please check the registration details and try again.' },
         { status: 400 },
       );
     }
 
-    const existing = await db.user.findUnique({ where: { email }, select: { id: true } });
-    if (existing) {
-      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
-    }
+    const email = parsed.data.email.toLowerCase();
+    const passwordHash = await hashPassword(parsed.data.password);
 
-    const passwordHash = hashPassword(password);
-    const user = await db.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          email,
-          name,
-          phone: phone || null,
-          role: 'buyer',
-          loyaltyTier: 'bronze',
-          loyaltyPoints: 0,
-          walletBalance: 0,
-          aiCredits: 10,
-          isVerified: false,
-        },
-      });
-
-      await tx.platformSettings.create({
-        data: {
-          key: passwordCredentialKey(created.id),
-          value: passwordHash,
-        },
-      });
-
-      return created;
+    const user = await db.user.create({
+      data: {
+        name: parsed.data.name,
+        email,
+        phone: parsed.data.phone || null,
+        passwordHash,
+        role: 'buyer',
+        loyaltyTier: 'bronze',
+        loyaltyPoints: 0,
+        walletBalance: 0,
+        aiCredits: 5,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        role: true,
+        loyaltyTier: true,
+        loyaltyPoints: true,
+        walletBalance: true,
+        aiCredits: true,
+        isVerified: true,
+      },
     });
 
-    const publicUser = toPublicUser(user);
+    const publicUser = toAuthenticatedUser(user);
+    const token = createSessionToken({
+      id: user.id,
+      role: user.role as SessionRole,
+    });
+
     const response = NextResponse.json({ user: publicUser }, { status: 201 });
-    response.headers.set('Cache-Control', 'no-store');
-    return attachSessionCookie(response, createSessionToken(publicUser));
+    response.headers.set('Set-Cookie', serializeSessionCookie(token));
+    return response;
   } catch (error) {
-    const code =
-      error && typeof error === 'object' && 'code' in error
-        ? String((error as { code?: unknown }).code)
-        : '';
-    if (code === 'P2002') {
-      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'An account with this email already exists.' },
+        { status: 409 },
+      );
     }
+
     console.error('Registration error:', error);
     return NextResponse.json({ error: 'Registration failed.' }, { status: 500 });
   }

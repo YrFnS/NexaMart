@@ -1,254 +1,128 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
-import {
-  checkApiRateLimit,
-  RATE_LIMITS,
-  validateAdminRequest,
-  validateCsrf,
-} from '@/lib/security';
+import { validateAdminRequest } from '@/lib/security';
 
-const VALID_POSITIONS = ['hero', 'sidebar', 'footer', 'popup', 'category'] as const;
+const positions = ['hero', 'sidebar', 'footer', 'popup', 'category'] as const;
+const bannerSchema = z.object({
+  title: z.string().trim().min(1).max(150),
+  titleAr: z.string().trim().max(150).optional().nullable(),
+  description: z.string().trim().max(500).optional().nullable(),
+  descriptionAr: z.string().trim().max(500).optional().nullable(),
+  image: z.string().trim().max(2000).optional().nullable(),
+  link: z.string().trim().max(2000).optional().nullable(),
+  ctaText: z.string().trim().max(80).optional().nullable(),
+  ctaTextAr: z.string().trim().max(80).optional().nullable(),
+  ctaLink: z.string().trim().max(2000).optional().nullable(),
+  gradient: z.string().trim().max(300).optional().nullable(),
+  icon: z.string().trim().max(80).optional().nullable(),
+  position: z.enum(positions).default('hero'),
+  sortOrder: z.number().int().min(-10000).max(10000).default(0),
+  isActive: z.boolean().default(true),
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
+});
 
-type BannerPosition = (typeof VALID_POSITIONS)[number];
-
-function cleanText(value: unknown, maxLength: number): string | null {
-  if (value === undefined || value === null || value === '') return null;
-  return String(value)
-    .replace(/[\u0000-\u001F\u007F]/g, '')
-    .trim()
-    .slice(0, maxLength);
+function datesAreValid(startDate?: Date | null, endDate?: Date | null) {
+  return !startDate || !endDate || startDate <= endDate;
 }
 
-function parsePosition(value: unknown): BannerPosition | null {
-  return VALID_POSITIONS.includes(value as BannerPosition)
-    ? (value as BannerPosition)
-    : null;
-}
-
-function parseDate(value: unknown): Date | null {
-  if (!value) return null;
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function validateWriteRequest(request: Request): NextResponse | null {
-  const adminError = validateAdminRequest(request);
-  if (adminError) return adminError;
-  const csrf = validateCsrf(request);
-  if (!csrf.valid) {
-    return NextResponse.json({ error: csrf.error || 'Invalid request origin' }, { status: 403 });
-  }
-  return null;
-}
-
-// Public endpoint for storefront banner reads.
 export async function GET(request: Request) {
-  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
-  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
-
   try {
     const { searchParams } = new URL(request.url);
-    const position = parsePosition(searchParams.get('position') || 'hero') || 'hero';
-    const activeOnly = searchParams.get('isActive') === 'true';
-    const now = new Date();
-
-    const where: Record<string, unknown> = { position };
-    if (activeOnly) {
-      where.isActive = true;
-      where.OR = [
-        { startDate: null, endDate: null },
-        { startDate: { lte: now }, endDate: null },
-        { startDate: null, endDate: { gte: now } },
-        { startDate: { lte: now }, endDate: { gte: now } },
-      ];
+    const position = searchParams.get('position') || 'hero';
+    if (!positions.includes(position as (typeof positions)[number])) {
+      return NextResponse.json({ error: 'Invalid banner position.' }, { status: 400 });
     }
 
+    const now = new Date();
+    const activeOnly = searchParams.get('isActive') !== 'false';
     const banners = await db.banner.findMany({
-      where,
-      orderBy: { sortOrder: 'asc' },
-      take: 100,
+      where: {
+        position,
+        ...(activeOnly
+          ? {
+              isActive: true,
+              AND: [
+                { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+                { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      take: 50,
     });
 
-    const result = banners.map(banner => ({
-      id: banner.id,
-      title: banner.title,
-      titleAr: banner.titleAr,
-      description: banner.description,
-      descriptionAr: banner.descriptionAr,
-      image: banner.image,
-      link: banner.link,
-      ctaText: banner.ctaText,
-      ctaTextAr: banner.ctaTextAr,
-      ctaLink: banner.ctaLink,
-      gradient: banner.gradient,
-      icon: banner.icon,
-      position: banner.position,
-      sortOrder: banner.sortOrder,
-      isActive: banner.isActive,
-      startDate: banner.startDate?.toISOString() || null,
-      endDate: banner.endDate?.toISOString() || null,
-    }));
-
-    return NextResponse.json({ banners: result, total: result.length });
+    return NextResponse.json({ banners, total: banners.length });
   } catch (error) {
-    console.error('Public banners GET error:', error);
+    console.error('Banners GET error:', error);
     return NextResponse.json({ banners: [], total: 0 }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
-  const validationError = validateWriteRequest(request);
-  if (validationError) return validationError;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const parsed = bannerSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success || !datesAreValid(parsed.data?.startDate, parsed.data?.endDate)) {
+    return NextResponse.json({ error: 'Invalid banner details.' }, { status: 400 });
+  }
 
   try {
-    const body = await request.json();
-    const title = cleanText(body.title, 160);
-    const position = parsePosition(body.position || 'hero');
-    if (!title) {
-      return NextResponse.json({ error: 'Missing title' }, { status: 400 });
-    }
-    if (!position) {
-      return NextResponse.json({ error: 'Invalid position value' }, { status: 400 });
-    }
-
-    const startDate = parseDate(body.startDate);
-    const endDate = parseDate(body.endDate);
-    if (body.startDate && !startDate) {
-      return NextResponse.json({ error: 'Invalid start date' }, { status: 400 });
-    }
-    if (body.endDate && !endDate) {
-      return NextResponse.json({ error: 'Invalid end date' }, { status: 400 });
-    }
-    if (startDate && endDate && endDate < startDate) {
-      return NextResponse.json({ error: 'End date must be after start date' }, { status: 400 });
-    }
-
-    const banner = await db.banner.create({
-      data: {
-        title,
-        titleAr: cleanText(body.titleAr, 160),
-        description: cleanText(body.description, 1000),
-        descriptionAr: cleanText(body.descriptionAr, 1000),
-        image: cleanText(body.image, 2048),
-        link: cleanText(body.link, 2048),
-        ctaText: cleanText(body.ctaText, 80),
-        ctaTextAr: cleanText(body.ctaTextAr, 80),
-        ctaLink: cleanText(body.ctaLink, 2048),
-        gradient: cleanText(body.gradient, 240),
-        icon: cleanText(body.icon, 80),
-        position,
-        sortOrder: Number.isFinite(Number(body.sortOrder))
-          ? Math.trunc(Number(body.sortOrder))
-          : 0,
-        isActive: body.isActive !== false,
-        startDate,
-        endDate,
-      },
-    });
-
+    const banner = await db.banner.create({ data: parsed.data });
     return NextResponse.json({ success: true, banner }, { status: 201 });
   } catch (error) {
     console.error('Banners POST error:', error);
-    return NextResponse.json({ error: 'Failed to create banner' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create banner.' }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
-  const validationError = validateWriteRequest(request);
-  if (validationError) return validationError;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const body = await request.json().catch(() => null);
+  const parsed = bannerSchema.partial().extend({ id: z.string().min(1).max(64) }).safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid banner update.' }, { status: 400 });
+  }
 
   try {
-    const body = await request.json();
-    const id = cleanText(body.id, 80);
-    if (!id) {
-      return NextResponse.json({ error: 'Missing banner id' }, { status: 400 });
-    }
-
+    const { id, ...changes } = parsed.data;
     const existing = await db.banner.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
+    if (!existing) return NextResponse.json({ error: 'Banner not found.' }, { status: 404 });
+
+    const startDate = changes.startDate === undefined ? existing.startDate : changes.startDate;
+    const endDate = changes.endDate === undefined ? existing.endDate : changes.endDate;
+    if (!datesAreValid(startDate, endDate)) {
+      return NextResponse.json({ error: 'Invalid banner date range.' }, { status: 400 });
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (body.title !== undefined) {
-      const title = cleanText(body.title, 160);
-      if (!title) return NextResponse.json({ error: 'Title cannot be empty' }, { status: 400 });
-      updateData.title = title;
-    }
-
-    const textFields: Array<[string, number]> = [
-      ['titleAr', 160],
-      ['description', 1000],
-      ['descriptionAr', 1000],
-      ['image', 2048],
-      ['link', 2048],
-      ['ctaText', 80],
-      ['ctaTextAr', 80],
-      ['ctaLink', 2048],
-      ['gradient', 240],
-      ['icon', 80],
-    ];
-    for (const [field, maxLength] of textFields) {
-      if (body[field] !== undefined) updateData[field] = cleanText(body[field], maxLength);
-    }
-
-    if (body.position !== undefined) {
-      const position = parsePosition(body.position);
-      if (!position) {
-        return NextResponse.json({ error: 'Invalid position value' }, { status: 400 });
-      }
-      updateData.position = position;
-    }
-    if (body.sortOrder !== undefined) {
-      const sortOrder = Number(body.sortOrder);
-      if (!Number.isFinite(sortOrder)) {
-        return NextResponse.json({ error: 'Invalid sort order' }, { status: 400 });
-      }
-      updateData.sortOrder = Math.trunc(sortOrder);
-    }
-    if (body.isActive !== undefined) updateData.isActive = body.isActive === true;
-
-    const startDate = body.startDate !== undefined ? parseDate(body.startDate) : existing.startDate;
-    const endDate = body.endDate !== undefined ? parseDate(body.endDate) : existing.endDate;
-    if (body.startDate && !startDate) {
-      return NextResponse.json({ error: 'Invalid start date' }, { status: 400 });
-    }
-    if (body.endDate && !endDate) {
-      return NextResponse.json({ error: 'Invalid end date' }, { status: 400 });
-    }
-    if (startDate && endDate && endDate < startDate) {
-      return NextResponse.json({ error: 'End date must be after start date' }, { status: 400 });
-    }
-    if (body.startDate !== undefined) updateData.startDate = startDate;
-    if (body.endDate !== undefined) updateData.endDate = endDate;
-
-    const banner = await db.banner.update({ where: { id }, data: updateData });
+    const banner = await db.banner.update({ where: { id }, data: changes });
     return NextResponse.json({ success: true, banner });
   } catch (error) {
     console.error('Banners PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update banner' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update banner.' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
-  const validationError = validateWriteRequest(request);
-  if (validationError) return validationError;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const id = new URL(request.url).searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'Banner id is required.' }, { status: 400 });
 
   try {
-    const id = cleanText(new URL(request.url).searchParams.get('id'), 80);
-    if (!id) {
-      return NextResponse.json({ error: 'Missing banner id' }, { status: 400 });
+    const deleted = await db.banner.deleteMany({ where: { id } });
+    if (deleted.count !== 1) {
+      return NextResponse.json({ error: 'Banner not found.' }, { status: 404 });
     }
-
-    const existing = await db.banner.findUnique({ where: { id }, select: { id: true } });
-    if (!existing) {
-      return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
-    }
-
-    await db.banner.delete({ where: { id } });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Banners DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete banner' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete banner.' }, { status: 500 });
   }
 }

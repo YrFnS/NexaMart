@@ -1,37 +1,35 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
-  Package,
-  ShoppingBag,
+  AlertCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Truck,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  XCircle,
-  RotateCcw,
-  RefreshCcw,
-  MessageSquareWarning,
-  PackageCheck,
-  PackageOpen,
-  ArrowRight,
-  ArrowLeft,
-  Search,
-  Download,
-  Calendar,
+  Clock3,
   FileText,
-  Zap,
-  FileText as InvoiceIcon,
-  Eye,
+  Loader2,
+  Package,
+  RefreshCw,
+  Search,
+  ShoppingBag,
+  Truck,
+  XCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -39,627 +37,446 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useI18n } from '@/lib/i18n';
-import { getLocale } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { formatPrice } from '@/lib/currency';
-import { useAppStore } from '@/stores/app-store';
+import { useI18n } from '@/lib/i18n';
+import {
+  addressLines,
+  formatOrderAttributes,
+  formatOrderDate,
+  type LifecycleOrderDto,
+  ORDER_STATUS_VALUES,
+  statusBadgeClass,
+  statusLabel,
+} from '@/lib/order-client';
 import { useAppNavigation } from '@/lib/use-app-navigation';
 import { useCartStore } from '@/stores/cart-store';
 import { useUserStore } from '@/stores/user-store';
-import { toast } from 'sonner';
-import { InvoiceViewer } from '@/components/common/invoice-viewer';
-import { getPlaceholderImage } from '@/lib/placeholder-image';
 
-type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'disputed';
-
-interface OrderItem {
-  productId: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
-  variation?: string;
+function statusIcon(status: string) {
+  if (status === 'delivered') return CheckCircle2;
+  if (status === 'shipped') return Truck;
+  if (status === 'cancelled' || status === 'rejected') return XCircle;
+  if (status === 'pending') return Clock3;
+  return Package;
 }
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  status: OrderStatus;
-  total: number;
-  subtotal: number;
-  shipping: number;
-  tax: number;
-  itemCount: number;
-  storeName: string;
-  storeId: string;
-  items: OrderItem[];
-  shippingAddress: {
-    name: string;
-    address1: string;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-    phone: string;
-  };
-  trackingNumber?: string;
-  carrier?: string;
-  createdAt: string;
-  updatedAt: string;
-  estimatedDelivery?: string;
-  timeline: { status: string; date: string; completed: boolean; icon?: React.ElementType }[];
-}
-
-type DateRange = '30' | '90' | '180' | 'all';
-
-const STATUS_CONFIG: Record<OrderStatus, { color: string; bgColor: string; icon: React.ElementType; iconColor: string }> = {
-  pending: { color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900', icon: Clock, iconColor: 'text-amber-500' },
-  processing: { color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-100 dark:bg-blue-900', icon: PackageOpen, iconColor: 'text-blue-500' },
-  shipped: { color: 'text-purple-700 dark:text-purple-300', bgColor: 'bg-purple-100 dark:bg-purple-900', icon: Truck, iconColor: 'text-purple-500' },
-  delivered: { color: 'text-emerald-700 dark:text-emerald-300', bgColor: 'bg-emerald-100 dark:bg-emerald-900', icon: PackageCheck, iconColor: 'text-emerald-500' },
-  cancelled: { color: 'text-red-700 dark:text-red-300', bgColor: 'bg-red-100 dark:bg-red-900', icon: XCircle, iconColor: 'text-red-500' },
-  disputed: { color: 'text-orange-700 dark:text-orange-300', bgColor: 'bg-orange-100 dark:bg-orange-900', icon: AlertCircle, iconColor: 'text-orange-500' },
-};
-
-const DATE_RANGES: { id: DateRange; label: string; labelAr: string }[] = [
-  { id: '30', label: 'Last 30 days', labelAr: 'آخر 30 يوم' },
-  { id: '90', label: 'Last 3 months', labelAr: 'آخر 3 أشهر' },
-  { id: '180', label: 'Last 6 months', labelAr: 'آخر 6 أشهر' },
-  { id: 'all', label: 'All time', labelAr: 'كل الأوقات' },
-];
-
-
 
 export function OrdersPage() {
-  const { t, locale } = useI18n();
-  const nav = useAppNavigation();
-  const addItem = useCartStore((s) => s.addItem);
-  const user = useUserStore((s) => s.user);
+  const { locale } = useI18n();
   const isRTL = locale === 'ar';
-
-  const [orders, setOrders] = useState<Order[]>([]);
+  const nav = useAppNavigation();
+  const addItem = useCartStore((state) => state.addItem);
+  const user = useUserStore((state) => state.user);
+  const isHydrated = useUserStore((state) => state.isHydrated);
+  const [orders, setOrders] = useState<LifecycleOrderDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all');
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState<DateRange>('all');
-  const [invoiceOpen, setInvoiceOpen] = useState(false);
-  const [invoiceOrderId, setInvoiceOrderId] = useState<string | undefined>();
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [cancelOrder, setCancelOrder] = useState<LifecycleOrderDto | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
+  const loadOrders = useCallback(async () => {
+    if (!isHydrated) return;
+    setLoading(true);
+    setError('');
+    if (!user) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+    try {
+      const response = await fetch('/api/orders?limit=100', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as {
+        orders?: LifecycleOrderDto[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to load orders.');
+      }
+      setOrders(payload.orders || []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Failed to load orders.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [isHydrated, user]);
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      try {
-        const userId = user?.id;
-        if (!userId) {
-          setOrders([]);
-          setLoading(false);
-          return;
-        }
-        const res = await fetch(`/api/orders?userId=${userId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrders(Array.isArray(data) ? data : data.orders || []);
-        } else {
-          setOrders([]);
-        }
-      } catch {
-        setOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
-  }, [user?.id]);
+    const timer = window.setTimeout(() => {
+      void loadOrders();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadOrders]);
 
-  // Status summary counts
-  const statusSummary = useMemo(() => {
-    const counts: Record<string, number> = { all: orders.length };
-    orders.forEach((o) => {
-      counts[o.status] = (counts[o.status] || 0) + 1;
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return orders.filter((order) => {
+      const matchesStatus =
+        statusFilter === 'all' || order.status === statusFilter;
+      const matchesSearch =
+        !query ||
+        order.orderNumber.toLowerCase().includes(query) ||
+        order.storeName.toLowerCase().includes(query) ||
+        order.items.some(
+          (item) =>
+            item.name.toLowerCase().includes(query) ||
+            item.sku?.toLowerCase().includes(query),
+        );
+      return matchesStatus && matchesSearch;
     });
-    return counts;
-  }, [orders]);
+  }, [orders, search, statusFilter]);
 
-  // Filtered orders
-  const filteredOrders = useMemo(() => {
-    let filtered = orders;
-    // Filter by tab
-    if (activeTab !== 'all') {
-      filtered = filtered.filter((o) => o.status === activeTab);
-    }
-    // Filter by search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter((o) =>
-        o.orderNumber.toLowerCase().includes(q) ||
-        o.storeName.toLowerCase().includes(q)
-      );
-    }
-    // Filter by date range
-    if (dateRange !== 'all') {
-      const days = parseInt(dateRange);
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      filtered = filtered.filter((o) => new Date(o.createdAt) >= cutoff);
-    }
-    return filtered;
-  }, [orders, activeTab, searchQuery, dateRange]);
-
-  const toggleExpand = (orderId: string) => {
-    setExpandedOrder(expandedOrder === orderId ? null : orderId);
-  };
-
-  const handleBuyAgain = (order: Order) => {
-    order.items.forEach((item) => {
+  function buyAgain(order: LifecycleOrderDto) {
+    for (const item of order.items) {
       addItem({
         productId: item.productId,
+        variantId: item.variantId || undefined,
         name: item.name,
         price: item.price,
         image: item.image,
         quantity: 1,
         storeId: order.storeId,
         storeName: order.storeName,
-        variation: item.variation,
+        variation: item.variation || undefined,
       });
-    });
+    }
     nav.setView('cart');
-  };
-
-  const handleViewInvoice = (orderId: string) => {
-    setInvoiceOrderId(orderId);
-    setInvoiceOpen(true);
-  };
-
-  const handleDownloadInvoice = (orderId: string) => {
-    setInvoiceOrderId(orderId);
-    setInvoiceOpen(true);
-  };
-
-  const handleTrackOrder = () => {
-    nav.setView('order-tracking');
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString(getLocale(isRTL), {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const statusCards = [
-    { key: 'all', label: t('allOrders'), icon: Package, color: 'text-foreground', bgColor: 'bg-muted/50' },
-    { key: 'processing', label: t('b_processingStatus'), icon: PackageOpen, color: 'text-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-950/30' },
-    { key: 'shipped', label: t('b_shippedStatus'), icon: Truck, color: 'text-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-950/30' },
-    { key: 'delivered', label: t('b_deliveredStatus'), icon: PackageCheck, color: 'text-emerald-600', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30' },
-    { key: 'cancelled', label: t('b_cancelledStatus'), icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-50 dark:bg-red-950/30' },
-  ];
-
-  const renderTimeline = (timeline: Order['timeline']) => (
-    <div className="relative mt-4">
-      <div className="space-y-3">
-        {timeline.map((step, idx) => {
-          const StepIcon = step.icon || (step.completed ? CheckCircle2 : Clock);
-          return (
-            <div key={idx} className="flex items-start gap-3">
-              {/* Icon + connector */}
-              <div className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  step.completed
-                    ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-muted text-muted-foreground'
-                }`}>
-                  <StepIcon className="size-4" />
-                </div>
-                {idx < timeline.length - 1 && (
-                  <div className={`w-0.5 h-6 ${
-                    step.completed && timeline[idx + 1]?.completed
-                      ? 'bg-emerald-300 dark:bg-emerald-700'
-                      : 'bg-muted'
-                  }`} />
-                )}
-              </div>
-              {/* Content */}
-              <div className="flex-1 pt-1">
-                <p className={`text-sm font-medium ${step.completed ? 'text-foreground' : 'text-muted-foreground'}`}>
-                  {step.status}
-                </p>
-                {step.date && (
-                  <p className="text-xs text-muted-foreground">{formatDate(step.date)}</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const renderOrderCard = (order: Order) => {
-    const config = STATUS_CONFIG[order.status];
-    const StatusIcon = config.icon;
-    const isExpanded = expandedOrder === order.id;
-
-    return (
-      <Card key={order.id} className="overflow-hidden">
-        {/* Order Header */}
-        <div
-          className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-          onClick={() => toggleExpand(order.id)}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                  {order.orderNumber}
-                </span>
-                <Badge className={`${config.bgColor} ${config.color} text-[10px] font-medium border-0`}>
-                  <StatusIcon className="size-3 me-1" />
-                  {t(order.status)}
-                </Badge>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="size-6 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-                  onClick={(e) => { e.stopPropagation(); handleViewInvoice(order.id); }}
-                  title={t('viewInvoice')}
-                >
-                  <InvoiceIcon className="size-3.5" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{formatDate(order.createdAt)}</span>
-                <span>·</span>
-                <span>{order.storeName}</span>
-                <span>·</span>
-                <span>{order.itemCount} {t('b_items')}</span>
-              </div>
-            </div>
-            <div className="text-end flex-shrink-0">
-              <p className="font-bold text-emerald-600 dark:text-emerald-400">
-                {formatPrice(order.total)}
-              </p>
-              <div className="mt-1">
-                {isExpanded ? (
-                  <ChevronUp className="size-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="size-4 text-muted-foreground" />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Expanded Details */}
-        {isExpanded && (
-          <div className="border-t">
-            {/* Items */}
-            <div className="p-4 space-y-3">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('b_itemsUpper')}
-              </h4>
-              {order.items.map((item) => (
-                <div key={item.productId} className="flex items-center gap-3">
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    <Image
-                      src={item.image}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                      sizes="56px"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        if (!img.dataset.retried) {
-                          img.dataset.retried = 'true';
-                          img.src = getPlaceholderImage('electronics', item.name, 56, 56);
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-1">{item.name}</p>
-                    {item.variation && (
-                      <p className="text-xs text-muted-foreground">{item.variation}</p>
-                    )}
-                  </div>
-                  <div className="text-end flex-shrink-0">
-                    <p className="text-sm font-semibold">{formatPrice(item.price * item.quantity)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {t('b_qty')}: {item.quantity}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Separator />
-
-            {/* Timeline with icons */}
-            <div className="p-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                {t('b_orderStatus')}
-              </h4>
-              {renderTimeline(order.timeline)}
-            </div>
-
-            <Separator />
-
-            {/* Shipping & Tracking */}
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  {t('b_shippingAddress')}
-                </h4>
-                <p className="text-sm">{order.shippingAddress.name}</p>
-                <p className="text-xs text-muted-foreground">{order.shippingAddress.address1}</p>
-                <p className="text-xs text-muted-foreground">
-                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
-                </p>
-              </div>
-              {order.trackingNumber && (
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {t('b_trackingInfo')}
-                  </h4>
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">{t('trackingNumber')}: </span>
-                    <span className="font-mono font-medium">{order.trackingNumber}</span>
-                  </p>
-                  {order.carrier && (
-                    <p className="text-xs text-muted-foreground">
-                      {t('b_carrier')}: {order.carrier}
-                    </p>
-                  )}
-                  {order.estimatedDelivery && (
-                    <p className="text-xs text-muted-foreground">
-                      {t('b_estDeliveryShort')}: {formatDate(order.estimatedDelivery)}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Order Summary */}
-            <div className="p-4 space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{t('subtotal')}</span>
-                <span>{formatPrice(order.subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{t('shipping')}</span>
-                <span>{order.shipping === 0 ? t('free') : formatPrice(order.shipping)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{t('b_tax')}</span>
-                <span>{formatPrice(order.tax)}</span>
-              </div>
-              <Separator className="my-1" />
-              <div className="flex justify-between text-sm font-bold">
-                <span>{t('total')}</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{formatPrice(order.total)}</span>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Actions */}
-            <div className="p-4 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs"
-                onClick={() => handleBuyAgain(order)}
-              >
-                <RefreshCcw className="size-3.5 me-1" />
-                {t('reorder')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs border-emerald-300 dark:border-emerald-700 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-                onClick={() => handleViewInvoice(order.id)}
-              >
-                <Eye className="size-3.5 me-1" />
-                {t('viewInvoice')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs"
-                onClick={() => handleDownloadInvoice(order.id)}
-              >
-                <Download className="size-3.5 me-1" />
-                {t('downloadInvoice')}
-              </Button>
-              {order.status === 'shipped' && (
-                <>
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
-                    onClick={() => {}}
-                  >
-                    <CheckCircle2 className="size-3.5 me-1" />
-                    {t('confirmDelivery')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs border-emerald-300 dark:border-emerald-700"
-                    onClick={() => handleTrackOrder()}
-                  >
-                    <Truck className="size-3.5 me-1" />
-                    {t('b_trackOrder')}
-                  </Button>
-                </>
-              )}
-              {(order.status === 'delivered' || order.status === 'shipped') && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs text-orange-600 border-orange-300 dark:border-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
-                >
-                  <MessageSquareWarning className="size-3.5 me-1" />
-                  {t('b_disputeRefund')}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </Card>
-    );
-  };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-6 space-y-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900 animate-pulse" />
-          <div className="h-8 w-40 bg-muted rounded animate-pulse" />
-        </div>
-        {[1, 2, 3].map((i) => (
-          <Card key={i}>
-            <CardContent className="p-4">
-              <div className="flex justify-between items-center">
-                <div className="space-y-2">
-                  <div className="h-4 w-32 bg-muted rounded animate-pulse" />
-                  <div className="h-3 w-48 bg-muted rounded animate-pulse" />
-                </div>
-                <div className="h-6 w-20 bg-muted rounded animate-pulse" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
   }
 
-  // Empty state
-  if (orders.length === 0) {
+  async function submitCancellation() {
+    if (!cancelOrder) return;
+    setCancelling(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `/api/orders/${encodeURIComponent(cancelOrder.id)}/transition`,
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetStatus: 'cancelled',
+            reason: cancelReason.trim() || undefined,
+          }),
+        },
+      );
+      const payload = (await response.json()) as {
+        order?: LifecycleOrderDto;
+        error?: string;
+      };
+      if (!response.ok || !payload.order) {
+        throw new Error(payload.error || 'The order could not be cancelled.');
+      }
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === payload.order!.id ? payload.order! : order,
+        ),
+      );
+      setCancelOrder(null);
+      setCancelReason('');
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : 'The order could not be cancelled.',
+      );
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  if (loading && orders.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-lg mx-auto text-center space-y-6">
-          <div className="w-32 h-32 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center">
-            <Package className="size-16 text-emerald-300 dark:text-emerald-700" />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold">
-            {t('b_noOrdersYet')}
-          </h1>
-          <p className="text-muted-foreground">
-            {isRTL
-              ? 'ابدأ التسوق وستظهر طلباتك هنا!'
-              : 'Start shopping and your orders will appear here!'}
-          </p>
-          <Button
-            size="lg"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => nav.setView('shop')}
-          >
-            <ShoppingBag className="size-4 me-2" />
-            {t('b_startShopping')}
-          </Button>
-        </div>
+      <div className="container mx-auto flex min-h-64 items-center justify-center px-4 py-8">
+        <Loader2 className="size-8 animate-spin text-amber-600" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900">
-          <Package className="size-5 text-emerald-600 dark:text-emerald-400" />
-        </div>
+    <div className="container mx-auto space-y-5 px-4 py-6" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('orders')}</h1>
+          <h1 className="text-2xl font-bold">{isRTL ? 'طلباتي' : 'My orders'}</h1>
           <p className="text-sm text-muted-foreground">
-            {orders.length} {t('b_ordersLower')}
+            {isRTL
+              ? 'تابع تأكيد البائع والتجهيز والشحن والتسليم.'
+              : 'Follow seller confirmation, preparation, shipping, and delivery.'}
           </p>
         </div>
+        <Button variant="outline" onClick={() => void loadOrders()} disabled={loading}>
+          <RefreshCw className={`me-2 size-4 ${loading ? 'animate-spin' : ''}`} />
+          {isRTL ? 'تحديث' : 'Refresh'}
+        </Button>
       </div>
 
-      {/* Status Summary Cards */}
-      <div className="grid grid-cols-5 gap-2 mb-6">
-        {statusCards.map((card) => {
-          const isActive = activeTab === card.key;
-          return (
-            <Card
-              key={card.key}
-              className={`cursor-pointer transition-all ${
-                isActive
-                  ? 'border-emerald-500 shadow-sm shadow-emerald-500/10'
-                  : 'border-border hover:border-emerald-300 dark:hover:border-emerald-700'
-              }`}
-              onClick={() => setActiveTab(card.key)}
-            >
-              <CardContent className={`p-3 text-center ${card.bgColor} rounded-lg`}>
-                <card.icon className={`size-5 mx-auto mb-1 ${card.color}`} />
-                <p className="text-lg font-bold">{statusSummary[card.key] || 0}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{card.label}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        {isRTL
+          ? 'لا توجد دفعة داخل NexaMart. ادفع للبائع عند استلام الطلب.'
+          : 'No payment is taken inside NexaMart. Pay the seller when your order is delivered.'}
       </div>
 
-      {/* Search + Date Filter */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1">
-          <Search className={`absolute top-1/2 -translate-y-1/2 size-4 text-muted-foreground ${isRTL ? 'right-3' : 'left-3'}`} />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('searchByOrder')}
-            className={`h-9 text-sm ${isRTL ? 'pr-9' : 'pl-9'}`}
-          />
-        </div>
-        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-          <SelectTrigger className="w-40 h-9 text-xs">
-            <Calendar className="size-3.5 me-1" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {DATE_RANGES.map((range) => (
-              <SelectItem key={range.id} value={range.id}>
-                {isRTL ? range.labelAr : range.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Orders List */}
-      {filteredOrders.length === 0 ? (
-        <div className="text-center py-12">
-          <Package className="size-12 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-muted-foreground">{t('noResults')}</p>
-          {(searchQuery || dateRange !== 'all') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => { setSearchQuery(''); setDateRange('all'); setActiveTab('all'); }}
-            >
-              {t('clearFilters')}
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3 max-h-[calc(100vh-380px)] overflow-y-auto scrollbar-thin pr-1">
-          {filteredOrders.map((order) => renderOrderCard(order))}
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300" role="alert">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          {error}
         </div>
       )}
 
-      {/* Invoice Viewer Dialog */}
-      <InvoiceViewer
-        open={invoiceOpen}
-        onOpenChange={setInvoiceOpen}
-        orderId={invoiceOrderId}
-      />
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={isRTL ? 'بحث في الطلبات أو SKU' : 'Search orders, products, or SKU'}
+              className="ps-9"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{isRTL ? 'كل الحالات' : 'All statuses'}</SelectItem>
+              {ORDER_STATUS_VALUES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {statusLabel(status, isRTL)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {filtered.length === 0 ? (
+        <Card>
+          <CardContent className="flex min-h-64 flex-col items-center justify-center text-center">
+            <ShoppingBag className="mb-3 size-12 text-muted-foreground/40" />
+            <p className="font-medium">{isRTL ? 'لا توجد طلبات' : 'No orders found'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isRTL ? 'ابدأ التسوق لإنشاء أول طلب.' : 'Start shopping to place your first order.'}
+            </p>
+            <Button asChild className="mt-4 bg-amber-600 text-white hover:bg-amber-700">
+              <Link href="/shop">{isRTL ? 'تصفح المنتجات' : 'Browse products'}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((order) => {
+            const expanded = expandedId === order.id;
+            const StatusIcon = statusIcon(order.status);
+            return (
+              <Card key={order.id} className="overflow-hidden">
+                <button
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 p-4 text-start hover:bg-muted/30"
+                  onClick={() => setExpandedId(expanded ? null : order.id)}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-sm font-bold text-amber-700 dark:text-amber-300">
+                        {order.orderNumber}
+                      </span>
+                      <Badge className={`${statusBadgeClass(order.status)} border-0`}>
+                        <StatusIcon className="me-1 size-3" />
+                        {statusLabel(order.status, isRTL)}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatOrderDate(order.createdAt, isRTL)} · {order.storeName} ·{' '}
+                      {order.itemCount} {isRTL ? 'عنصر' : 'items'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-bold">{formatPrice(order.total)}</span>
+                    {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                  </div>
+                </button>
+
+                {expanded && (
+                  <div className="border-t">
+                    <div className="space-y-3 p-4">
+                      {order.items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3">
+                          <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+                            <Image src={item.image} alt={item.name} fill className="object-cover" sizes="56px" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {isRTL && item.nameAr ? item.nameAr : item.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.sku ? `SKU: ${item.sku}` : ''}
+                            </p>
+                            {formatOrderAttributes(item.attributes, item.variation) && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatOrderAttributes(item.attributes, item.variation)}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-end text-sm">
+                            <p>{item.quantity} × {formatPrice(item.price)}</p>
+                            <p className="font-semibold">{formatPrice(item.total)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid gap-5 p-4 md:grid-cols-2">
+                      <div>
+                        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {isRTL ? 'حالة الطلب' : 'Order history'}
+                        </h3>
+                        <div className="space-y-3">
+                          {order.timeline.map((event) => (
+                            <div key={event.id} className="flex gap-3">
+                              <div className="mt-1 size-2 shrink-0 rounded-full bg-amber-500" />
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {statusLabel(event.toStatus, isRTL)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatOrderDate(event.date, isRTL, true)}
+                                  {event.note ? ` · ${event.note}` : ''}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {isRTL ? 'عنوان التوصيل' : 'Delivery address'}
+                        </h3>
+                        <div className="space-y-1 text-sm">
+                          {addressLines(order.shippingAddress).map((line) => (
+                            <p key={line}>{line}</p>
+                          ))}
+                        </div>
+                        {(order.carrier || order.trackingNumber) && (
+                          <div className="mt-4 rounded-lg bg-muted/50 p-3 text-sm">
+                            <p>{isRTL ? 'الناقل' : 'Carrier'}: {order.carrier || '—'}</p>
+                            <p>{isRTL ? 'التتبع' : 'Tracking'}: {order.trackingNumber || '—'}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex flex-wrap justify-end gap-2 p-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const query = new URLSearchParams({
+                            type: 'order',
+                            lang: isRTL ? 'ar' : 'en',
+                            print: '1',
+                          });
+                          const opened = window.open(
+                            `/api/orders/${encodeURIComponent(order.id)}/document?${query.toString()}`,
+                            '_blank',
+                          );
+                          if (!opened) {
+                            setError(
+                              isRTL
+                                ? 'تعذر فتح مستند الطلب. تحقق من حظر النوافذ المنبثقة.'
+                                : 'The order document could not open. Check the popup blocker.',
+                            );
+                          } else {
+                            opened.opener = null;
+                          }
+                        }}
+                      >
+                        <FileText className="me-2 size-4" />
+                        {isRTL ? 'فتح مستند الطلب' : 'Open order document'}
+                      </Button>
+                      <Button variant="outline" onClick={() => buyAgain(order)}>
+                        <RefreshCw className="me-2 size-4" />
+                        {isRTL ? 'إعادة الطلب' : 'Buy again'}
+                      </Button>
+                      {(order.status === 'shipped' || order.trackingNumber) && (
+                        <Button asChild variant="outline">
+                          <Link href={`/order-tracking?orderId=${encodeURIComponent(order.id)}`}>
+                            <Truck className="me-2 size-4" />
+                            {isRTL ? 'تتبع الطلب' : 'Track order'}
+                          </Link>
+                        </Button>
+                      )}
+                      {order.status === 'delivered' && (
+                        <Button asChild variant="outline">
+                          <Link href="/returns">{isRTL ? 'طلب إرجاع' : 'Request return'}</Link>
+                        </Button>
+                      )}
+                      {order.canCancel && (
+                        <Button
+                          variant="outline"
+                          className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+                          onClick={() => {
+                            setCancelOrder(order);
+                            setCancelReason('');
+                          }}
+                        >
+                          <XCircle className="me-2 size-4" />
+                          {isRTL ? 'إلغاء الطلب' : 'Cancel order'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={Boolean(cancelOrder)} onOpenChange={(open) => !open && setCancelOrder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isRTL ? 'إلغاء الطلب' : 'Cancel order'}</DialogTitle>
+            <DialogDescription>
+              {isRTL
+                ? 'يمكنك الإلغاء قبل تأكيد البائع فقط. سيعاد المخزون تلقائياً.'
+                : 'You can cancel only before seller confirmation. Reserved SKU inventory will be restored automatically.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+            placeholder={isRTL ? 'سبب الإلغاء (اختياري)' : 'Cancellation reason (optional)'}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelOrder(null)}>
+              {isRTL ? 'احتفاظ بالطلب' : 'Keep order'}
+            </Button>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => void submitCancellation()}
+              disabled={cancelling}
+            >
+              {cancelling && <Loader2 className="me-2 size-4 animate-spin" />}
+              {isRTL ? 'تأكيد الإلغاء' : 'Confirm cancellation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

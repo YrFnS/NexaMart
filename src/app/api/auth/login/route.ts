@@ -1,15 +1,23 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
+import { toAuthenticatedUser } from '@/lib/auth';
+import { verifyPassword } from '@/lib/password';
 import {
-  attachSessionCookie,
+  checkApiRateLimit,
+  RATE_LIMITS,
+  validateCsrf,
+} from '@/lib/security';
+import {
   createSessionToken,
-  passwordCredentialKey,
-  toPublicUser,
-  verifyPassword,
-} from '@/lib/auth';
-import { checkApiRateLimit, RATE_LIMITS, validateCsrf } from '@/lib/security';
+  serializeSessionCookie,
+  type SessionRole,
+} from '@/lib/session';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const loginSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(1).max(128),
+});
 
 export async function POST(request: Request) {
   const rateLimit = checkApiRateLimit(request, RATE_LIMITS.auth);
@@ -21,32 +29,49 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
-    const email = String(body.email ?? '').trim().toLowerCase().slice(0, 254);
-    const password = String(body.password ?? '');
-
-    if (!EMAIL_PATTERN.test(email) || !password) {
-      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+    const parsed = loginSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({ where: { email } });
-    if (!user || user.isBanned) {
-      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
-    }
-
-    const credential = await db.platformSettings.findUnique({
-      where: { key: passwordCredentialKey(user.id) },
-      select: { value: true },
+    const user = await db.user.findUnique({
+      where: { email: parsed.data.email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        role: true,
+        loyaltyTier: true,
+        loyaltyPoints: true,
+        walletBalance: true,
+        aiCredits: true,
+        isVerified: true,
+        isBanned: true,
+        passwordHash: true,
+      },
     });
 
-    if (!credential || !verifyPassword(password, credential.value)) {
+    const isValid = Boolean(
+      user?.passwordHash &&
+      !user.isBanned &&
+      (await verifyPassword(parsed.data.password, user.passwordHash)),
+    );
+
+    if (!user || !isValid) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 
-    const publicUser = toPublicUser(user);
+    const publicUser = toAuthenticatedUser(user);
+    const token = createSessionToken({
+      id: user.id,
+      role: user.role as SessionRole,
+    });
+
     const response = NextResponse.json({ user: publicUser });
-    response.headers.set('Cache-Control', 'no-store');
-    return attachSessionCookie(response, createSessionToken(publicUser));
+    response.headers.set('Set-Cookie', serializeSessionCookie(token));
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ error: 'Login failed.' }, { status: 500 });

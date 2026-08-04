@@ -1,10 +1,6 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 
-export default function BuyerLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function BuyerLayout({ children }: { children: ReactNode }) {
   return <AppShell>{children}</AppShell>;
 }

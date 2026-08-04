@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { clearSessionCookie } from '@/lib/auth';
 import { validateCsrf } from '@/lib/security';
+import { serializeExpiredSessionCookie } from '@/lib/session';
 
 export async function POST(request: Request) {
   const csrf = validateCsrf(request);
@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ success: true });
-  response.headers.set('Cache-Control', 'no-store');
-  return clearSessionCookie(response);
+  response.headers.set('Set-Cookie', serializeExpiredSessionCookie());
+  return response;
 }

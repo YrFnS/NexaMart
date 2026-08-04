@@ -1,91 +1,165 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseAiJson, reserveAiCredits } from '@/lib/ai-access';
 import { openrouterChatJSON } from '@/lib/openrouter';
 
+const pricingInputSchema = z
+  .object({
+    productName: z.string().trim().min(2).max(160),
+    category: z.string().trim().max(100).optional(),
+    cost: z.coerce.number().positive().max(1_000_000_000).default(25),
+    competitorPrices: z
+      .array(z.coerce.number().positive().max(1_000_000_000))
+      .max(30)
+      .default([]),
+    targetMargin: z.coerce.number().min(1).max(90).default(30),
+  })
+  .strict();
+
+const recommendationSchema = z.object({
+  recommendation: z.string().trim().min(1).max(1_000),
+  recommendationAr: z.string().trim().min(1).max(1_000),
+  confidence: z.coerce.number().min(0).max(100),
+});
+
+type PricingInput = z.infer<typeof pricingInputSchema>;
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function buildPricingData(input: PricingInput) {
+  const suggestedPrice = roundMoney(
+    input.cost / (1 - input.targetMargin / 100),
+  );
+  const prices = input.competitorPrices;
+  const marketAverage = prices.length
+    ? roundMoney(prices.reduce((sum, price) => sum + price, 0) / prices.length)
+    : null;
+  const competitorRange = prices.length
+    ? { min: Math.min(...prices), max: Math.max(...prices) }
+    : null;
+
+  return {
+    suggestedPrice,
+    marketAverage,
+    competitorRange,
+    breakdown: {
+      baseCost: input.cost,
+      targetMargin: input.targetMargin,
+      categoryMultiplier: 1,
+      priceRange: {
+        conservative: roundMoney(suggestedPrice * 0.95),
+        moderate: suggestedPrice,
+        aggressive: roundMoney(suggestedPrice * 1.1),
+      },
+    },
+    competitors: prices.map((price, index) => ({
+      name: `Provided competitor ${index + 1}`,
+      price,
+      rating: null,
+      supplied: true,
+    })),
+  };
+}
+
+function formulaFallback(input: PricingInput, creditsRemaining: number) {
+  const pricing = buildPricingData(input);
+  const confidence = input.competitorPrices.length >= 5
+    ? 70
+    : input.competitorPrices.length > 0
+      ? 55
+      : 35;
+
+  return NextResponse.json({
+    ...pricing,
+    confidence,
+    recommendation:
+      'Formula-based estimate using the supplied cost and target margin. No live market data was queried.',
+    recommendationAr:
+      'تقدير مبني على معادلة باستخدام التكلفة وهامش الربح المدخلين. لم يتم الاستعلام عن بيانات سوق مباشرة.',
+    estimated: true,
+    source: 'formula_only',
+    marketDataSource: input.competitorPrices.length
+      ? 'caller_supplied_prices'
+      : 'none',
+    disclaimer:
+      'This is a planning estimate, not a verified market price. Confirm taxes, fees, demand, inventory, and competitor data before publishing.',
+    disclaimerAr:
+      'هذا تقدير للتخطيط وليس سعراً سوقياً موثقاً. تحقق من الضرائب والرسوم والطلب والمخزون وبيانات المنافسين قبل النشر.',
+    creditCost: 0,
+    creditsRemaining,
+  });
+}
+
 export async function POST(request: Request) {
+  const parsedInput = pricingInputSchema.safeParse(
+    await request.json().catch(() => null),
+  );
+  if (!parsedInput.success) {
+    return NextResponse.json(
+      { error: 'Please check the smart-pricing inputs.' },
+      { status: 400 },
+    );
+  }
+
+  const access = await reserveAiCredits(request, {
+    feature: 'smartPricing',
+    allowedRoles: ['seller', 'admin'],
+  });
+  if (access.response) return access.response;
+  const { reservation } = access;
+  const pricing = buildPricingData(parsedInput.data);
+
   try {
-    const body = await request.json();
-    const { productName, category, cost, competitorPrices, targetMargin } = body;
-
-    if (!productName) {
-      return Response.json(
-        { error: 'Missing required field: productName' },
-        { status: 400 }
-      );
-    }
-
-    // Use OpenRouter AI for smart pricing
-    const aiResponse = await openrouterChatJSON([
-      {
-        role: 'system',
-        content: `You are an AI pricing strategist for a multi-vendor e-commerce platform. Given product details, provide pricing recommendations in JSON format with these fields:
-- suggestedPrice: number (recommended selling price)
-- marketAverage: number (estimated market average)
-- competitorRange: { min: number, max: number }
-- confidence: number (0-100, confidence level)
-- breakdown: { baseCost: number, targetMargin: number, categoryMultiplier: number, priceRange: { conservative: number, moderate: number, aggressive: number } }
-- competitors: array of { name: string, price: number, rating: number }
-- recommendation: string (English recommendation)
-- recommendationAr: string (Arabic recommendation)
-
-Return ONLY valid JSON, no markdown or explanation.`,
-      },
-      {
-        role: 'user',
-        content: `Product: ${productName}, Category: ${category || 'general'}, Cost: $${cost || 25}, Target Margin: ${targetMargin || 30}%, Competitor Prices: ${JSON.stringify(competitorPrices || [])}`,
-      },
-    ], undefined, { temperature: 0.4 });
-
-    // Try to parse AI response as JSON
-    try {
-      const cleaned = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-      return Response.json(parsed);
-    } catch {
-      // Fallback to calculated pricing if AI response isn't valid JSON
-    }
-
-    // Fallback calculation
-    const baseCost = typeof cost === 'number' ? cost : 25;
-    const targetMarginPercent = typeof targetMargin === 'number' ? targetMargin : 30;
-    const suggestedPrice = Math.round((baseCost / (1 - targetMarginPercent / 100)) * 100) / 100;
-    const marketAverage = Math.round(suggestedPrice * (1 + (Math.random() * 0.2 - 0.1)) * 100) / 100;
-    const minCompetitor = Math.round(marketAverage * 0.75 * 100) / 100;
-    const maxCompetitor = Math.round(marketAverage * 1.25 * 100) / 100;
-
-    const categoryMultiplier: Record<string, number> = {
-      'electronics': 1.2, 'fashion': 1.5, 'home': 1.3, 'beauty': 1.8,
-      'sports': 1.4, 'jewelry': 2.0,
-    };
-
-    const multiplier = categoryMultiplier[category || ''] || 1.4;
-    const adjustedPrice = Math.round(suggestedPrice * multiplier * 100) / 100;
-    const confidence = Math.min(95, Math.max(60, 70 + Math.floor(Math.random() * 25)));
-
-    return Response.json({
-      suggestedPrice: adjustedPrice,
-      marketAverage,
-      competitorRange: { min: minCompetitor, max: maxCompetitor },
-      confidence,
-      breakdown: {
-        baseCost,
-        targetMargin: targetMarginPercent,
-        categoryMultiplier: multiplier,
-        priceRange: {
-          conservative: Math.round(adjustedPrice * 0.85 * 100) / 100,
-          moderate: adjustedPrice,
-          aggressive: Math.round(adjustedPrice * 1.15 * 100) / 100,
+    const aiResponse = await openrouterChatJSON(
+      [
+        {
+          role: 'system',
+          content: `Provide cautious pricing guidance based only on the supplied cost, target margin, category, formula price, and caller-supplied competitor prices. You have no live market access. Do not invent competitor names, prices, ratings, demand, sales, or market averages. Return JSON with recommendation, recommendationAr, and confidence (0-100) only. Explicitly mention missing market evidence when no competitor prices were supplied.`,
         },
-      },
-      competitors: [
-        { name: 'Competitor A', price: Math.round(minCompetitor * 1.05 * 100) / 100, rating: 4.2 },
-        { name: 'Competitor B', price: Math.round(marketAverage * 0.95 * 100) / 100, rating: 4.5 },
-        { name: 'Competitor C', price: Math.round(maxCompetitor * 0.9 * 100) / 100, rating: 3.8 },
-        { name: 'Competitor D', price: Math.round(maxCompetitor * 1.05 * 100) / 100, rating: 4.0 },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            productName: parsedInput.data.productName,
+            category: parsedInput.data.category || null,
+            cost: parsedInput.data.cost,
+            targetMargin: parsedInput.data.targetMargin,
+            formulaPrice: pricing.suggestedPrice,
+            competitorPrices: parsedInput.data.competitorPrices,
+          }),
+        },
       ],
-      recommendation: `Based on market analysis, a price of $${adjustedPrice} is recommended for ${productName}. This positions you competitively within the ${category || 'general'} category.`,
-      recommendationAr: `بناءً على تحليل السوق، يُوصى بسعر ${adjustedPrice}$ لـ ${productName}. يضعك هذا في موقع تنافسي ضمن فئة ${category || 'عامة'}.`,
+      undefined,
+      { temperature: 0.2, max_tokens: 500 },
+    );
+
+    const guidance = parseAiJson(aiResponse, recommendationSchema);
+    if (!guidance) {
+      const creditsRemaining = await reservation.refund();
+      return formulaFallback(parsedInput.data, creditsRemaining);
+    }
+
+    const response = NextResponse.json({
+      ...pricing,
+      ...guidance,
+      estimated: true,
+      source: 'formula_with_ai_guidance',
+      marketDataSource: parsedInput.data.competitorPrices.length
+        ? 'caller_supplied_prices'
+        : 'none',
+      disclaimer:
+        'This is a planning estimate, not a verified market price. Confirm taxes, fees, demand, inventory, and competitor data before publishing.',
+      disclaimerAr:
+        'هذا تقدير للتخطيط وليس سعراً سوقياً موثقاً. تحقق من الضرائب والرسوم والطلب والمخزون وبيانات المنافسين قبل النشر.',
+      creditCost: reservation.cost,
+      creditsRemaining: reservation.complete(),
     });
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   } catch (error) {
-    console.error('Smart Pricing API error:', error);
-    return Response.json({ error: 'Failed to generate pricing suggestion' }, { status: 500 });
+    console.error('Smart pricing API error:', error);
+    const creditsRemaining = await reservation.refund();
+    return formulaFallback(parsedInput.data, creditsRemaining);
   }
 }

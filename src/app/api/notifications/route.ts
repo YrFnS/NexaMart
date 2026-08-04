@@ -1,33 +1,98 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { z } from 'zod';
 import { requireAuthenticatedUser } from '@/lib/auth';
-import { checkApiRateLimit, RATE_LIMITS } from '@/lib/security';
+import { db } from '@/lib/db';
+import {
+  checkApiRateLimit,
+  RATE_LIMITS,
+  validateCsrf,
+  validatePagination,
+} from '@/lib/security';
+
+const patchSchema = z.object({
+  id: z.string().min(1).max(64).optional(),
+  markAllRead: z.boolean().optional(),
+});
 
 export async function GET(request: Request) {
-  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const { page, limit } = validatePagination(
+      searchParams.get('page'),
+      searchParams.get('limit'),
+      100,
+    );
+    const unreadOnly = searchParams.get('unread') === 'true';
+    const where = {
+      userId: auth.user.id,
+      ...(unreadOnly ? { isRead: false } : {}),
+    };
+
+    const [notifications, total, unread] = await db.$transaction([
+      db.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.notification.count({ where }),
+      db.notification.count({ where: { userId: auth.user.id, isRead: false } }),
+    ]);
+
+    return NextResponse.json({ notifications, total, unread, page, limit });
+  } catch (error) {
+    console.error('Notifications GET error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch notifications.' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.write);
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+
+  const csrf = validateCsrf(request);
+  if (!csrf.valid) {
+    return NextResponse.json(
+      { error: csrf.error || 'Invalid request origin.' },
+      { status: 403 },
+    );
+  }
 
   const auth = await requireAuthenticatedUser(request);
   if (auth.response) return auth.response;
-  const currentUser = auth.user;
+
+  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success || (!parsed.data.id && !parsed.data.markAllRead)) {
+    return NextResponse.json(
+      { error: 'A notification id or markAllRead is required.' },
+      { status: 400 },
+    );
+  }
 
   try {
-    const requestedUserId = new URL(request.url).searchParams.get('userId') || currentUser.id;
-    if (requestedUserId !== currentUser.id && currentUser.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const notifications = await db.notification.findMany({
-      where: { userId: requestedUserId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+    const updated = await db.notification.updateMany({
+      where: parsed.data.markAllRead
+        ? { userId: auth.user.id, isRead: false }
+        : { id: parsed.data.id, userId: auth.user.id },
+      data: { isRead: true },
     });
 
-    const response = NextResponse.json(notifications);
-    response.headers.set('Cache-Control', 'private, no-store');
-    return response;
+    if (!parsed.data.markAllRead && updated.count !== 1) {
+      return NextResponse.json({ error: 'Notification not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, updated: updated.count });
   } catch (error) {
-    console.error('Notifications API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
+    console.error('Notifications PATCH error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update notifications.' },
+      { status: 500 },
+    );
   }
 }

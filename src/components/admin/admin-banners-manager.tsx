@@ -76,7 +76,13 @@ export function AdminBannersManager() {
 	}, [t]);
 
 	useEffect(() => {
-		fetchBanners();
+		let cancelled = false;
+		queueMicrotask(() => {
+			if (!cancelled) void fetchBanners();
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, [fetchBanners]);
 
 	const filteredBanners = banners.filter((b) => {

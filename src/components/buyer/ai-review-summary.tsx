@@ -47,8 +47,9 @@ export function AiReviewSummary({ productId, productName, averageRating, totalRe
         return;
       }
 
-      const reviews = await reviewsRes.json();
-      if (!Array.isArray(reviews) || reviews.length === 0) {
+      const payload = await reviewsRes.json();
+      const reviews = Array.isArray(payload) ? payload : payload.reviews || [];
+      if (reviews.length === 0) {
         // No reviews yet, generate a basic fallback summary from the rating
         setSummary({
           summary: `Customers rate this product ${averageRating.toFixed(1)}/5. ${averageRating >= 4 ? 'Most customers are satisfied with their purchase.' : averageRating >= 3 ? 'Customers have mixed feelings about this product.' : 'Some customers have concerns about this product.'}`,
@@ -111,11 +112,16 @@ export function AiReviewSummary({ productId, productName, averageRating, totalRe
   }, [productId, productName, averageRating]);
 
   useEffect(() => {
-    if (totalReviews > 0) {
-      fetchSummary();
-    } else {
-      setLoading(false);
-    }
+    if (totalReviews === 0) return;
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void fetchSummary();
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [totalReviews, fetchSummary]);
 
   // Don't render if no reviews

@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type { CurrencyCode } from '@/lib/currency';
+import { BASE_CURRENCY } from '@/lib/money';
 import { LS_KEYS, STORE_LIMITS } from '@/lib/config';
 
 /**
@@ -23,16 +24,7 @@ interface AppState {
 }
 
 function getInitialCurrency(): CurrencyCode {
-  if (typeof window === 'undefined') return 'USD';
-  try {
-    const saved = localStorage.getItem(LS_KEYS.currency);
-    if (saved && ['USD', 'EUR', 'AED', 'SAR', 'KWD', 'IQD', 'JOD', 'QAR', 'OMR', 'EGP'].includes(saved)) {
-      return saved as CurrencyCode;
-    }
-  } catch {
-    // localStorage not available
-  }
-  return 'USD';
+  return BASE_CURRENCY;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -56,10 +48,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   clearCompare: () => set({ compareIds: [] }),
 
-  setCurrency: (currency: CurrencyCode) => {
-    set({ currency });
+  setCurrency: (_currency: CurrencyCode) => {
+    set({ currency: BASE_CURRENCY });
     try {
-      localStorage.setItem(LS_KEYS.currency, currency);
+      localStorage.setItem(LS_KEYS.currency, BASE_CURRENCY);
     } catch {
       // localStorage not available
     }

@@ -1,56 +1,67 @@
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { requireAuthenticatedUser } from '@/lib/auth';
-import { checkApiRateLimit, RATE_LIMITS, validateEnum } from '@/lib/security';
-
-const VALID_ORDER_STATUSES = [
-  'pending',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'refunded',
-] as const;
+import { db } from '@/lib/db';
+import { normalizeOrderStatus } from '@/lib/order-lifecycle';
+import {
+  lifecycleOrderInclude,
+  serializeLifecycleOrder,
+} from '@/lib/order-lifecycle-server';
+import { validatePagination } from '@/lib/security';
 
 export async function GET(request: Request) {
-  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
-  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
-
   const auth = await requireAuthenticatedUser(request);
   if (auth.response) return auth.response;
-  const currentUser = auth.user;
 
   try {
     const { searchParams } = new URL(request.url);
-    const requestedUserId = searchParams.get('userId') || currentUser.id;
+    const requestedUserId = searchParams.get('userId');
+    const requestedOrderId = searchParams.get('id');
     const statusRaw = searchParams.get('status');
-    const status = statusRaw ? validateEnum(statusRaw, [...VALID_ORDER_STATUSES]) : undefined;
+    const status = statusRaw ? normalizeOrderStatus(statusRaw) : null;
+    const { page, limit } = validatePagination(
+      searchParams.get('page'),
+      searchParams.get('limit'),
+      100,
+    );
 
     if (statusRaw && !status) {
-      return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
-    }
-    if (requestedUserId !== currentUser.id && currentUser.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return Response.json({ error: 'Invalid order status.' }, { status: 400 });
     }
 
-    const where: Record<string, unknown> = { userId: requestedUserId };
-    if (status) where.status = status;
+    const userId =
+      auth.user.role === 'admin' && requestedUserId
+        ? requestedUserId
+        : auth.user.id;
+    const where: Prisma.OrderWhereInput = {
+      userId,
+      ...(requestedOrderId ? { id: requestedOrderId } : {}),
+      ...(status ? { status } : {}),
+    };
 
-    const orders = await db.order.findMany({
-      where,
-      include: {
-        items: { include: { product: true } },
-        store: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+    const [orders, total] = await db.$transaction([
+      db.order.findMany({
+        where,
+        include: lifecycleOrderInclude,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: requestedOrderId ? 1 : limit,
+      }),
+      db.order.count({ where }),
+    ]);
+
+    return Response.json({
+      orders: orders.map((order) =>
+        serializeLifecycleOrder(
+          order,
+          auth.user.role === 'admin' ? 'admin' : 'buyer',
+        ),
+      ),
+      total,
+      page,
+      limit,
     });
-
-    const response = NextResponse.json(orders);
-    response.headers.set('Cache-Control', 'private, no-store');
-    return response;
   } catch (error) {
     console.error('Orders API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
+    return Response.json({ error: 'Failed to fetch orders.' }, { status: 500 });
   }
 }

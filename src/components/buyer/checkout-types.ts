@@ -1,33 +1,18 @@
 import React from 'react';
 
-export type CheckoutStep = 'shipping' | 'payment' | 'review' | 'confirmation';
+export type CheckoutStep = 'shipping' | 'review' | 'confirmation';
 
 export interface AppliedCoupon {
   id: string;
   code: string;
-  discountType: string;
+  discountType: 'percentage' | 'fixed';
   discountValue: number;
   minOrder: number;
   maxDiscount: number | null;
   description: string;
   descriptionAr: string;
-  expiry: string;
-}
-
-export interface AvailableCoupon {
-  id: string;
-  code: string;
-  discountType: string;
-  discountValue: number;
-  minOrder: number;
-  maxDiscount: number | null;
-  expiry: string;
-  description: string;
-  descriptionAr: string;
-  isActive: boolean;
-  usageCount: number;
-  usageLimit: number | null;
-  category: string;
+  expiry: string | null;
+  currency: 'USD';
 }
 
 export interface Address {

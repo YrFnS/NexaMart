@@ -1,11 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, ShoppingBag, Users, ShieldCheck, Package } from 'lucide-react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  CirclePause,
+  CirclePlay,
+  PackageCheck,
+  ShoppingBag,
+  Store,
+  Truck,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
-import { useAppNavigation } from '@/lib/use-app-navigation';
 import { UI_CONFIG } from '@/lib/config';
 
 interface HeroSlide {
@@ -22,245 +33,264 @@ interface HeroSectionProps {
   bestDiscount: number;
 }
 
-const SHOWCASE_IMAGES = [
-  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80',
-  'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&q=80',
-  'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&q=80',
-];
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
-const SHOWCASE_LABELS = ['Edison Smart Watch', 'Studio Headphones', 'Polaroid Camera'];
-const SHOWCASE_PRICES = ['AED 299', 'AED 449', 'AED 189'];
+function subscribeToReducedMotion(callback: () => void) {
+  const media = window.matchMedia(REDUCED_MOTION_QUERY);
+  media.addEventListener('change', callback);
+  return () => media.removeEventListener('change', callback);
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getServerReducedMotionSnapshot() {
+  return false;
+}
 
 export function HeroSection({ heroSlides, bestDiscount }: HeroSectionProps) {
   const { t, locale } = useI18n();
-  const { setView } = useAppNavigation();
   const isRTL = locale === 'ar';
+  const slides = useMemo(
+    () =>
+      heroSlides.length > 0
+        ? heroSlides
+        : [
+            {
+              title: t('heroTitle'),
+              description: t('heroDesc'),
+              gradient: 'from-amber-800 via-amber-700 to-orange-700',
+              cta: t('shopNow'),
+              ctaLink: '/shop',
+              icon: 'ShoppingBag',
+            },
+          ],
+    [heroSlides, t],
+  );
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotionSnapshot,
+    getServerReducedMotionSnapshot,
+  );
 
-  // Auto-advance hero
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+    if (paused || prefersReducedMotion || slides.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setCurrentSlide((current) => (current + 1) % slides.length);
     }, UI_CONFIG.carouselAutoAdvanceMs);
-    return () => clearInterval(timer);
-  }, [heroSlides.length]);
+    return () => window.clearInterval(timer);
+  }, [paused, prefersReducedMotion, slides.length]);
 
-  const goToSlide = (index: number) => setCurrentSlide(index);
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
-
-  const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
+  const safeSlideIndex = currentSlide % slides.length;
+  const slide = slides[safeSlideIndex] || slides[0];
+  const PreviousIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
 
-  const currentIndex = currentSlide % SHOWCASE_IMAGES.length;
+  function previousSlide() {
+    setCurrentSlide((current) =>
+      (current - 1 + slides.length) % slides.length,
+    );
+  }
+
+  function nextSlide() {
+    setCurrentSlide((current) => (current + 1) % slides.length);
+  }
 
   return (
-    <section className="relative overflow-hidden w-full">
-      {/* Full-width editorial background image */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80"
-          alt="Premium MENA marketplace shopping experience"
-          fill
-          priority
-          className="object-cover"
-          sizes="100vw"
-          quality={85}
-        />
-        {/* Overlay gradient: espresso/black at bottom to transparent at top */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
-      </div>
+    <section
+      className="relative isolate min-h-[32rem] overflow-hidden"
+      aria-roledescription={isRTL ? 'عارض شرائح' : 'carousel'}
+      aria-label={isRTL ? 'عروض السوق' : 'Marketplace highlights'}
+      onFocusCapture={() => setPaused(true)}
+    >
+      <Image
+        src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80"
+        alt=""
+        fill
+        preload
+        className="-z-20 object-cover"
+        sizes="100vw"
+        quality={85}
+      />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/90 via-black/70 to-black/35 rtl:bg-gradient-to-l" />
+      <div
+        className={`absolute inset-0 -z-10 bg-gradient-to-br ${slide.gradient} opacity-20 transition-colors duration-500`}
+        aria-hidden="true"
+      />
 
-      {/* Hero content */}
-      <div className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8">
-        <div className="py-16 md:py-24 lg:py-28 min-h-[520px] md:min-h-[580px] lg:min-h-[640px] flex items-center">
-          <div className="w-full grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 items-center">
+      <div className="container mx-auto flex min-h-[32rem] items-center px-5 py-16 md:min-h-[36rem] md:px-8 md:py-20">
+        <div className="max-w-3xl text-white">
+          <div className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-black/30 px-4 text-sm font-semibold backdrop-blur">
+            <ShoppingBag className="size-4 text-amber-300" aria-hidden="true" />
+            <span>{t('appName')}</span>
+            {bestDiscount > 0 && (
+              <span className="text-amber-200">
+                {isRTL
+                  ? `خصومات مسجلة تصل إلى ${bestDiscount}%`
+                  : `Recorded discounts up to ${bestDiscount}%`}
+              </span>
+            )}
+          </div>
 
-            {/* Left side (60%) – Typography + CTA */}
-            <div className="lg:col-span-3 space-y-6 md:space-y-7">
-              {/* Seasonal tag */}
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-medium border border-white/10">
-                <ShoppingBag className="size-4" style={{ color: '#d4a853' }} />
-                <span className="text-white/90">{t('appName')}</span>
-                <span style={{ color: '#d4a853' }}>◆</span>
-                <span className="text-white/70 text-xs">{t('heroTitle')}</span>
-              </div>
+          <div
+            key={safeSlideIndex}
+            role="group"
+            aria-roledescription={isRTL ? 'شريحة' : 'slide'}
+            aria-label={
+              isRTL
+                ? `${safeSlideIndex + 1} من ${slides.length}`
+                : `${safeSlideIndex + 1} of ${slides.length}`
+            }
+          >
+            <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight md:text-5xl lg:text-6xl">
+              {slide.title}
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-white/85 md:text-xl md:leading-8">
+              {slide.description}
+            </p>
 
-              {/* Main heading */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-white">
-                {heroSlides[currentSlide].title}
-              </h1>
-
-              {/* Subheading */}
-              <p className="text-lg md:text-xl text-white/80 max-w-xl leading-relaxed">
-                {heroSlides[currentSlide].description}
-              </p>
-
-              {/* CTA buttons */}
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Button
-                  size="lg"
-                  className="font-bold rounded-xl px-8 h-12 shadow-lg text-black hover:brightness-110 transition-all"
-                  style={{ backgroundColor: '#d4a853' }}
-                  onClick={() => {
-                    const link = heroSlides[currentSlide]?.ctaLink || '/shop';
-                    if (link.startsWith('/')) {
-                      setView(link.slice(1) as 'shop' | 'deals');
-                    } else {
-                      window.open(link, '_blank');
-                    }
-                  }}
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button
+                asChild
+                size="lg"
+                className="min-h-12 rounded-xl bg-amber-500 px-7 font-bold text-black hover:bg-amber-400"
+              >
+                <Link
+                  href={slide.ctaLink || '/shop'}
+                  target={slide.ctaLink.startsWith('/') ? undefined : '_blank'}
+                  rel={
+                    slide.ctaLink.startsWith('/')
+                      ? undefined
+                      : 'noopener noreferrer'
+                  }
                 >
-                  {heroSlides[currentSlide].cta}
+                  {slide.cta}
                   {isRTL ? (
-                    <ArrowLeft className="size-5 ms-2" />
+                    <ArrowLeft className="ms-2 size-5" aria-hidden="true" />
                   ) : (
-                    <ArrowRight className="size-5 ms-2" />
+                    <ArrowRight className="ms-2 size-5" aria-hidden="true" />
                   )}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="font-bold rounded-xl px-8 h-12 border-white/40 text-white bg-transparent hover:bg-white/10 backdrop-blur-sm transition-all"
-                  onClick={() => setView('deals')}
-                >
-                  <ShoppingBag className="size-5 me-2" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="min-h-12 rounded-xl border-white/50 bg-black/20 px-7 font-bold text-white hover:bg-white/15 hover:text-white"
+              >
+                <Link href="/shop?sale=true">
+                  <ShoppingBag className="me-2 size-5" aria-hidden="true" />
                   {t('deals')}
-                </Button>
-              </div>
-
-              {/* Trust badges */}
-              <div className="flex flex-wrap gap-6 pt-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
-                    <Package className="size-4" style={{ color: '#d4a853' }} />
-                  </div>
-                  <span className="text-white/70 text-sm font-medium">10K+ Products</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
-                    <Users className="size-4" style={{ color: '#d4a853' }} />
-                  </div>
-                  <span className="text-white/70 text-sm font-medium">500+ Sellers</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(212, 168, 83, 0.15)' }}>
-                    <ShieldCheck className="size-4" style={{ color: '#d4a853' }} />
-                  </div>
-                  <span className="text-white/70 text-sm font-medium">{t('securePayments')}</span>
-                </div>
-              </div>
+                </Link>
+              </Button>
             </div>
+          </div>
 
-            {/* Right side (40%) – Editorial product showcase card */}
-            <div className="lg:col-span-2 hidden lg:flex justify-center items-center">
-              <div className="relative">
-                {/* Product card */}
-                <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black/40 backdrop-blur-md w-72">
-                  {/* Product image */}
-                  <div className="relative h-64 w-full">
-                    <Image
-                      src={SHOWCASE_IMAGES[currentIndex]}
-                      alt={SHOWCASE_LABELS[currentIndex]}
-                      fill
-                      className="object-cover transition-opacity duration-700"
-                      sizes="(max-width: 768px) 100vw, 288px"
-                      key={currentIndex}
-                    />
-                    {/* Gradient overlay on image */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                    {/* Price badge */}
-                    <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1">
-                      <span className="text-white font-bold text-sm">{SHOWCASE_PRICES[currentIndex]}</span>
-                    </div>
-                    {/* Gold accent tag */}
-                    <div
-                      className="absolute top-3 right-3 rounded-md px-2 py-0.5 text-xs font-bold text-black"
-                      style={{ backgroundColor: '#d4a853' }}
-                    >
-                      {bestDiscount > 0 ? `-${bestDiscount}%` : 'NEW'}
-                    </div>
-                  </div>
-                  {/* Card content */}
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <p className="text-white font-semibold text-sm">{SHOWCASE_LABELS[currentIndex]}</p>
-                      <p className="text-white/50 text-xs mt-0.5">{t('featuredProducts')}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <svg key={star} className="size-3.5" style={{ color: star <= 4 ? '#d4a853' : '#444' }} viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                      <span className="text-white/40 text-xs ms-1">(4.0)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Decorative gold ring */}
-                <div
-                  className="absolute -z-10 rounded-2xl border-2 w-72 h-80"
-                  style={{
-                    borderColor: 'rgba(212, 168, 83, 0.2)',
-                    top: '1rem',
-                    [isRTL ? 'left' : 'right']: '1rem',
-                  }}
-                />
-              </div>
+          <div className="mt-8 grid max-w-2xl gap-3 text-sm text-white/80 sm:grid-cols-3">
+            <div className="flex min-h-11 items-center gap-2">
+              <Store className="size-5 shrink-0 text-amber-300" aria-hidden="true" />
+              <span>{isRTL ? 'متاجر مستقلة' : 'Independent stores'}</span>
+            </div>
+            <div className="flex min-h-11 items-center gap-2">
+              <PackageCheck
+                className="size-5 shrink-0 text-amber-300"
+                aria-hidden="true"
+              />
+              <span>{isRTL ? 'الدفع عند الاستلام' : 'Pay on delivery'}</span>
+            </div>
+            <div className="flex min-h-11 items-center gap-2">
+              <Truck className="size-5 shrink-0 text-amber-300" aria-hidden="true" />
+              <span>{isRTL ? 'تتبع تنفيذ الطلب' : 'Tracked fulfilment'}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Carousel Navigation Dots + Gold progress bar */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20">
-        <div className="flex items-center gap-2.5">
-          {heroSlides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goToSlide(i)}
-              className={`transition-all duration-300 rounded-full ${
-                i === currentSlide
-                  ? 'w-10 h-3 shadow-lg'
-                  : 'w-3 h-3 bg-white/30 hover:bg-white/50 hover:scale-125'
-              }`}
-              style={i === currentSlide ? { backgroundColor: '#d4a853', boxShadow: '0 0 12px rgba(212, 168, 83, 0.5)' } : undefined}
-              aria-label={`Go to slide ${i + 1}`}
-            />
-          ))}
-        </div>
-        {/* Auto-advance progress bar */}
-        <div className="w-32 h-0.5 rounded-full bg-white/20 overflow-hidden">
-          <div
-            key={currentSlide}
-            className="h-full rounded-full hero-progress-bar"
-            style={{
-              '--carousel-duration': `${UI_CONFIG.carouselAutoAdvanceMs}ms`,
-              backgroundColor: '#d4a853',
-            } as React.CSSProperties}
-          />
-        </div>
-      </div>
+      {slides.length > 1 && (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute start-3 top-1/2 z-20 size-11 -translate-y-1/2 rounded-full border border-white/20 bg-black/45 text-white backdrop-blur hover:bg-black/65 hover:text-white md:start-5 md:size-12"
+            onClick={previousSlide}
+            aria-label={isRTL ? 'الشريحة السابقة' : 'Previous slide'}
+          >
+            <PreviousIcon className="size-5 md:size-6" aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute end-3 top-1/2 z-20 size-11 -translate-y-1/2 rounded-full border border-white/20 bg-black/45 text-white backdrop-blur hover:bg-black/65 hover:text-white md:end-5 md:size-12"
+            onClick={nextSlide}
+            aria-label={isRTL ? 'الشريحة التالية' : 'Next slide'}
+          >
+            <NextIcon className="size-5 md:size-6" aria-hidden="true" />
+          </Button>
 
-      {/* Arrow navigation */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-1/2 -translate-y-1/2 left-3 md:left-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110"
-        onClick={prevSlide}
-      >
-        <PrevIcon className="size-5 md:size-6" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-1/2 -translate-y-1/2 right-3 md:right-5 size-10 md:size-12 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm text-white border border-white/10 z-20 transition-all duration-300 hover:scale-110"
-        onClick={nextSlide}
-      >
-        <NextIcon className="size-5 md:size-6" />
-      </Button>
+          <div className="absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-1">
+            <div
+              className="flex items-center rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur"
+              role="group"
+              aria-label={isRTL ? 'شرائح العرض' : 'Hero slides'}
+            >
+              {slides.map((item, index) => (
+                <button
+                  key={`${item.title}-${index}`}
+                  type="button"
+                  className="flex size-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  onClick={() => setCurrentSlide(index)}
+                  aria-label={
+                    isRTL
+                      ? `الانتقال إلى الشريحة ${index + 1}`
+                      : `Go to slide ${index + 1}`
+                  }
+                  aria-current={index === safeSlideIndex ? 'true' : undefined}
+                >
+                  <span
+                    className={`block rounded-full transition-all ${
+                      index === safeSlideIndex
+                        ? 'h-2.5 w-6 bg-amber-400'
+                        : 'size-2.5 bg-white/50'
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              ))}
+              <button
+                type="button"
+                className="flex size-11 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => setPaused((value) => !value)}
+                disabled={prefersReducedMotion}
+                aria-label={
+                  prefersReducedMotion
+                    ? isRTL
+                      ? 'العرض التلقائي متوقف حسب تفضيل تقليل الحركة'
+                      : 'Automatic slides disabled by reduced-motion preference'
+                    : paused
+                      ? isRTL
+                        ? 'تشغيل العرض التلقائي'
+                        : 'Play automatic slides'
+                      : isRTL
+                        ? 'إيقاف العرض التلقائي'
+                        : 'Pause automatic slides'
+                }
+                aria-pressed={paused || prefersReducedMotion}
+              >
+                {paused || prefersReducedMotion ? (
+                  <CirclePlay className="size-5" aria-hidden="true" />
+                ) : (
+                  <CirclePause className="size-5" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }
