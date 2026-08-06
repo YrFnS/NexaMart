@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Cookie, Shield, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -18,21 +18,22 @@ interface CookiePreferences {
 
 type ConsentState = 'undecided' | 'accepted' | 'rejected' | 'customized';
 
-function getStoredConsent(): { state: ConsentState; preferences: CookiePreferences } | null {
+function getStoredConsent(): {
+  state: ConsentState;
+  preferences: CookiePreferences;
+} | null {
   if (typeof window === 'undefined') return null;
   try {
     const stored = localStorage.getItem(CONSENT_KEY);
-    if (stored) return JSON.parse(stored);
+    return stored ? JSON.parse(stored) : null;
   } catch {
-    // ignore
+    return null;
   }
-  return null;
 }
 
 export function CookieConsentBanner() {
   const { t, locale } = useI18n();
   const isRTL = locale === 'ar';
-
   const [visible, setVisible] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
   const [preferences, setPreferences] = useState<CookiePreferences>({
@@ -43,180 +44,158 @@ export function CookieConsentBanner() {
   });
 
   useEffect(() => {
-    const stored = getStoredConsent();
-    if (!stored) {
-      // Show banner after a short delay for better UX
-      const timer = setTimeout(() => setVisible(true), 1000);
-      return () => clearTimeout(timer);
-    }
+    if (getStoredConsent()) return;
+    const timer = window.setTimeout(() => setVisible(true), 800);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  const saveConsent = (state: ConsentState, prefs?: CookiePreferences) => {
-    const data = { state, preferences: prefs || preferences };
-    localStorage.setItem(CONSENT_KEY, JSON.stringify(data));
+  const saveConsent = (state: ConsentState, prefs = preferences) => {
+    try {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({ state, preferences: prefs }));
+    } catch {
+      // Consent remains session-only when storage is unavailable.
+    }
     setVisible(false);
-  };
-
-  const handleAcceptAll = () => {
-    saveConsent('accepted', {
-      essential: true,
-      analytics: true,
-      marketing: true,
-      functional: true,
-    });
-  };
-
-  const handleRejectAll = () => {
-    saveConsent('rejected', {
-      essential: true,
-      analytics: false,
-      marketing: false,
-      functional: false,
-    });
-  };
-
-  const handleCustomize = () => {
-    saveConsent('customized');
   };
 
   if (!visible) return null;
 
+  const preferenceRows = [
+    {
+      key: 'analytics' as const,
+      label: t('analyticsCookies'),
+      description: t('analyticsCookiesDesc'),
+    },
+    {
+      key: 'marketing' as const,
+      label: t('marketingCookies'),
+      description: t('marketingCookiesDesc'),
+    },
+    {
+      key: 'functional' as const,
+      label: t('functionalCookies'),
+      description: t('functionalCookiesDesc'),
+    },
+  ];
+
   return (
-    <div
-      className="fixed bottom-0 inset-x-0 z-50 animate-slide-up"
+    <section
+      className="nexa-cookie-banner fixed inset-x-0 z-[60] animate-slide-up"
       dir={isRTL ? 'rtl' : 'ltr'}
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="cookie-consent-title"
+      aria-describedby="cookie-consent-description"
     >
-      <div className="mx-4 mb-[5.5rem] md:mb-4 max-w-3xl mx-auto">
-        <div className="bg-card border border-border rounded-2xl shadow-2xl p-5 md:p-6">
-          {/* Close button */}
+      <div className="mx-auto max-w-3xl px-4 pb-4 md:pb-4">
+        <div className="relative rounded-2xl border border-amber-200 bg-card p-5 shadow-2xl dark:border-amber-900 md:p-6">
           <button
+            type="button"
             onClick={() => setVisible(false)}
-            className="absolute top-3 end-3 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute end-3 top-3 flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={t('close')}
           >
-            <X className="size-4" />
+            <X className="size-4" aria-hidden="true" />
           </button>
 
-          {/* Icon + Message */}
-          <div className="flex items-start gap-3 mb-4">
-            <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900 shrink-0">
-              <Cookie className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="mb-4 flex items-start gap-3 pe-10">
+            <div className="shrink-0 rounded-xl bg-amber-100 p-2 dark:bg-amber-950">
+              <Cookie className="size-5 text-amber-700 dark:text-amber-300" aria-hidden="true" />
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm mb-1">
+            <div className="min-w-0 flex-1">
+              <h2 id="cookie-consent-title" className="mb-1 text-sm font-semibold">
                 {t('weUseCookies')}
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              </h2>
+              <p id="cookie-consent-description" className="text-xs leading-relaxed text-muted-foreground">
                 {t('cookieDesc')}
               </p>
             </div>
           </div>
 
-          {/* Customize Panel */}
           {showCustomize && (
-            <div className="mb-4 p-4 bg-muted/50 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="mb-4 space-y-3 rounded-xl bg-muted/50 p-4">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium">
-                    {t('essentialCookies')}
-                  </p>
+                  <p className="text-sm font-medium">{t('essentialCookies')}</p>
                   <p className="text-xs text-muted-foreground">
                     {t('essentialCookiesDesc')}
                   </p>
                 </div>
-                <Switch checked disabled />
+                <Switch checked disabled aria-label={t('essentialCookies')} />
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    {t('analyticsCookies')}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('analyticsCookiesDesc')}
-                  </p>
+
+              {preferenceRows.map((row) => (
+                <div key={row.key} className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium">{row.label}</p>
+                    <p className="text-xs text-muted-foreground">{row.description}</p>
+                  </div>
+                  <Switch
+                    checked={preferences[row.key]}
+                    aria-label={row.label}
+                    onCheckedChange={(checked) =>
+                      setPreferences((current) => ({
+                        ...current,
+                        [row.key]: checked,
+                      }))
+                    }
+                  />
                 </div>
-                <Switch
-                  checked={preferences.analytics}
-                  onCheckedChange={(c) => setPreferences((p) => ({ ...p, analytics: c }))}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    {t('marketingCookies')}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('marketingCookiesDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.marketing}
-                  onCheckedChange={(c) => setPreferences((p) => ({ ...p, marketing: c }))}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    {t('functionalCookies')}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('functionalCookiesDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.functional}
-                  onCheckedChange={(c) => setPreferences((p) => ({ ...p, functional: c }))}
-                />
-              </div>
-              <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                <Shield className="size-3" />
-                <span>
-                  {t('privacyProtected')}
-                </span>
+              ))}
+
+              <div className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
+                <Shield className="size-3" aria-hidden="true" />
+                <span>{t('privacyProtected')}</span>
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <button
-              onClick={() => setShowCustomize(!showCustomize)}
-              className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium text-start"
+              type="button"
+              onClick={() => setShowCustomize((current) => !current)}
+              className="min-h-10 text-start text-xs font-medium text-amber-700 hover:underline dark:text-amber-300"
             >
-              {showCustomize
-                ? t('hideOptions')
-                : t('customizePreferences')}
+              {showCustomize ? t('hideOptions') : t('customizePreferences')}
             </button>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
-                className="text-xs h-8"
-                onClick={handleRejectAll}
+                className="min-h-10 text-xs"
+                onClick={() =>
+                  saveConsent('rejected', {
+                    essential: true,
+                    analytics: false,
+                    marketing: false,
+                    functional: false,
+                  })
+                }
               >
                 {t('rejectAll')}
               </Button>
-              {showCustomize ? (
-                <Button
-                  size="sm"
-                  className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={handleCustomize}
-                >
-                  {t('savePreferences')}
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={handleAcceptAll}
-                >
-                  {t('acceptAll')}
-                </Button>
-              )}
+              <Button
+                type="button"
+                size="sm"
+                className="min-h-10 bg-amber-600 text-xs text-white hover:bg-amber-700"
+                onClick={() =>
+                  showCustomize
+                    ? saveConsent('customized')
+                    : saveConsent('accepted', {
+                        essential: true,
+                        analytics: true,
+                        marketing: true,
+                        functional: true,
+                      })
+                }
+              >
+                {showCustomize ? t('savePreferences') : t('acceptAll')}
+              </Button>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

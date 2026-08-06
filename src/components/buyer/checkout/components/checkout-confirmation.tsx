@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Check, PartyPopper, Shield } from 'lucide-react';
+import { Banknote, Check, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -44,11 +44,13 @@ export function CheckoutConfirmation({
         </div>
       </div>
       <div>
-        <h2 className="text-2xl font-bold mb-2">{t('b_orderConfirmed')}</h2>
+        <h2 className="text-2xl font-bold mb-2">
+          {isRTL ? 'تم استلام طلبك' : 'Order received'}
+        </h2>
         <p className="text-muted-foreground">
           {isRTL
-            ? 'شكراً لك! تم استلام طلبك بنجاح.'
-            : 'Thank you! Your order has been placed successfully.'}
+            ? 'الطلب الآن بانتظار تأكيد البائع.'
+            : 'The order is now waiting for seller confirmation.'}
         </p>
       </div>
 
@@ -79,9 +81,11 @@ export function CheckoutConfirmation({
       </Card>
 
       <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg text-start">
-        <Shield className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <Banknote className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-          {t('escrowNote')}
+          {isRTL
+            ? 'لا توجد دفعة داخل التطبيق. ادفع للبائع عند الاستلام بعد التحقق من الطلب.'
+            : 'No payment is taken in the app. Pay the seller on delivery after checking the order.'}
         </p>
       </div>
 

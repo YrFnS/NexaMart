@@ -1,136 +1,165 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { requireAuthenticatedUser } from '@/lib/auth';
+import {
+  CartPricingError,
+  groupPricedCart,
+  priceCartLines,
+} from '@/lib/cart-pricing';
+import {
+  CouponValidationError,
+  quoteCoupon,
+} from '@/lib/coupon-authority';
 import { db } from '@/lib/db';
+import { BASE_CURRENCY, fromCents } from '@/lib/money';
+import {
+  checkApiRateLimit,
+  RATE_LIMITS,
+  validateCsrf,
+} from '@/lib/security';
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
+const requestSchema = z
+  .object({
+    code: z.string().trim().min(2).max(50),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().min(1).max(64),
+          variantId: z.string().min(1).max(64).optional(),
+          quantity: z.number().int().min(1).max(100),
+          variation: z
+            .union([z.string(), z.record(z.string(), z.string())])
+            .optional(),
+        }),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
 
-    const where: Record<string, unknown> = {};
-    if (action === 'available') {
-      where.isActive = true;
-      where.OR = [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } },
-      ];
-    }
+function noStore(response: NextResponse) {
+  response.headers.set('Cache-Control', 'no-store, private');
+  return response;
+}
 
-    const coupons = await db.coupon.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const mapped = coupons.map((c) => ({
-      id: c.id,
-      code: c.code,
-      discountType: c.type === 'percentage' ? 'percentage' : c.type === 'fixed' ? 'fixed' : 'free_shipping',
-      discountValue: c.discount,
-      minOrder: c.minOrder,
-      maxDiscount: c.maxDiscount,
-      expiry: c.expiresAt ? c.expiresAt.toISOString() : null,
-      description: `${c.discount}${c.type === 'percentage' ? '% off' : '$ off'} coupon`,
-      descriptionAr: `كوبون خصم ${c.discount}${c.type === 'percentage' ? '٪' : '$'}`,
-      isActive: c.isActive,
-      usageCount: c.usedCount,
-      usageLimit: c.usageLimit,
-      category: c.storeId ? 'store' : 'platform',
-    }));
-
-    return Response.json({ coupons: mapped, total: mapped.length });
-  } catch (error) {
-    console.error('Coupons API error:', error);
-    return Response.json({ error: 'Failed to fetch coupons' }, { status: 500 });
-  }
+export async function GET() {
+  return noStore(
+    NextResponse.json(
+      {
+        error:
+          'Coupon codes are not published. Submit a code with your authenticated cart to validate it.',
+        code: 'COUPON_CATALOGUE_DISABLED',
+      },
+      { status: 405, headers: { Allow: 'POST' } },
+    ),
+  );
 }
 
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { code, subtotal } = body;
+  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.write);
+  if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
+  const csrf = validateCsrf(request);
+  if (!csrf.valid) {
+    return NextResponse.json(
+      { valid: false, error: csrf.error || 'Invalid request origin.' },
+      { status: 403 },
+    );
+  }
+  const auth = await requireAuthenticatedUser(request);
+  if (auth.response) return auth.response;
 
-    if (!code) {
-      return Response.json(
-        { valid: false, error: 'Coupon code is required', errorAr: 'رمز الكوبون مطلوب' },
-        { status: 400 }
+  const parsed = requestSchema.safeParse(
+    await request.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return noStore(
+      NextResponse.json(
+        {
+          valid: false,
+          error: 'A coupon code and valid cart items are required.',
+          errorAr: 'رمز الكوبون ومنتجات السلة الصحيحة مطلوبة.',
+        },
+        { status: 400 },
+      ),
+    );
+  }
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      const lines = await priceCartLines(tx, parsed.data.items);
+      const groups = groupPricedCart(lines);
+      const quote = await quoteCoupon(
+        tx,
+        parsed.data.code,
+        groups.map((group) => ({
+          storeId: group.storeId,
+          subtotalCents: group.subtotalCents,
+        })),
+      );
+      if (!quote) throw new CouponValidationError('Coupon code is required.');
+      return { quote, groups };
+    });
+
+    const description =
+      result.quote.type === 'percentage'
+        ? `${result.quote.discountValue}% off eligible items`
+        : `${BASE_CURRENCY} ${result.quote.discountValue.toFixed(2)} off eligible items`;
+    const descriptionAr =
+      result.quote.type === 'percentage'
+        ? `خصم ${result.quote.discountValue}٪ على المنتجات المؤهلة`
+        : `خصم ${result.quote.discountValue.toFixed(2)} ${BASE_CURRENCY} على المنتجات المؤهلة`;
+
+    return noStore(
+      NextResponse.json({
+        valid: true,
+        coupon: {
+          id: result.quote.couponId,
+          code: result.quote.code,
+          discountType: result.quote.type,
+          discountValue: result.quote.discountValue,
+          minOrder: result.quote.minOrder,
+          maxDiscount: result.quote.maxDiscount,
+          description,
+          descriptionAr,
+          expiry: result.quote.expiresAt?.toISOString() || null,
+          currency: result.quote.currency,
+        },
+        eligibleSubtotal: fromCents(result.quote.eligibleSubtotalCents),
+        discountAmount: fromCents(result.quote.discountCents),
+        currency: result.quote.currency,
+        storeDiscounts: result.groups.map((group, index) => ({
+          storeId: group.storeId,
+          discountAmount: fromCents(result.quote.allocations[index] || 0),
+        })),
+      }),
+    );
+  } catch (error) {
+    if (
+      error instanceof CartPricingError ||
+      error instanceof CouponValidationError
+    ) {
+      return noStore(
+        NextResponse.json(
+          {
+            valid: false,
+            error: error.message,
+            errorAr: 'تعذر تطبيق الكوبون على السلة الحالية.',
+            code: error.code,
+          },
+          { status: error.status },
+        ),
       );
     }
-
-    const upperCode = code.toUpperCase().trim();
-    const coupon = await db.coupon.findUnique({
-      where: { code: upperCode },
-    });
-
-    if (!coupon) {
-      return Response.json({
-        valid: false,
-        error: 'Invalid coupon code',
-        errorAr: 'رمز الكوبون غير صالح',
-      });
-    }
-
-    if (!coupon.isActive) {
-      return Response.json({
-        valid: false,
-        error: 'This coupon is no longer active',
-        errorAr: 'هذا الكوبون لم يعد فعالاً',
-      });
-    }
-
-    const now = new Date();
-    if (coupon.expiresAt && new Date(coupon.expiresAt) < now) {
-      return Response.json({
-        valid: false,
-        error: 'This coupon has expired',
-        errorAr: 'انتهت صلاحية هذا الكوبون',
-      });
-    }
-
-    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
-      return Response.json({
-        valid: false,
-        error: 'This coupon has reached its usage limit',
-        errorAr: 'لقد وصل هذا الكوبون إلى حد الاستخدام',
-      });
-    }
-
-    const orderSubtotal = subtotal || 0;
-    if (orderSubtotal < coupon.minOrder) {
-      return Response.json({
-        valid: false,
-        error: `Minimum order of $${coupon.minOrder} required`,
-        errorAr: `الحد الأدنى للطلب ${coupon.minOrder}$`,
-      });
-    }
-
-    // Calculate discount
-    let discountAmount = 0;
-    if (coupon.type === 'percentage') {
-      discountAmount = orderSubtotal * (coupon.discount / 100);
-      if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-        discountAmount = coupon.maxDiscount;
-      }
-    } else if (coupon.type === 'fixed') {
-      discountAmount = coupon.discount;
-    } else if (coupon.type === 'free_shipping') {
-      discountAmount = coupon.maxDiscount || 0;
-    }
-
-    return Response.json({
-      valid: true,
-      coupon: {
-        id: coupon.id,
-        code: coupon.code,
-        discountType: coupon.type,
-        discountValue: coupon.discount,
-        minOrder: coupon.minOrder,
-        maxDiscount: coupon.maxDiscount,
-        description: `${coupon.discount}${coupon.type === 'percentage' ? '% off' : '$ off'} coupon`,
-        descriptionAr: `كوبون خصم ${coupon.discount}${coupon.type === 'percentage' ? '٪' : '$'}`,
-        expiry: coupon.expiresAt ? coupon.expiresAt.toISOString() : null,
-      },
-      discountAmount,
-    });
-  } catch (error) {
-    console.error('Validate Coupon API error:', error);
-    return Response.json({ valid: false, error: 'Failed to validate coupon' }, { status: 500 });
+    console.error('Coupon quote error:', error);
+    return noStore(
+      NextResponse.json(
+        {
+          valid: false,
+          error: 'The coupon could not be validated.',
+          errorAr: 'تعذر التحقق من الكوبون.',
+        },
+        { status: 500 },
+      ),
+    );
   }
 }

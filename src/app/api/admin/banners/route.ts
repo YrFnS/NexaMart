@@ -1,224 +1,314 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
-import { validateSearchParam, isValidId, checkApiRateLimit, RATE_LIMITS, requireAdminAuth, sanitizeString } from '@/lib/security';
+import {
+  getAdminActorId,
+  sanitizeString,
+  validateAdminRequest,
+} from '@/lib/security';
+
+const POSITIONS = ['hero', 'sidebar', 'footer', 'popup', 'category'] as const;
+
+const optionalDate = z.preprocess(
+  (value) => (value === '' || value === undefined || value === null ? null : value),
+  z.coerce.date().nullable(),
+);
+
+const optionalLink = z
+  .string()
+  .trim()
+  .max(2_000)
+  .refine(
+    (value) =>
+      value === '' ||
+      value.startsWith('/') ||
+      /^https:\/\//i.test(value),
+    'Links must be relative paths or HTTPS URLs.',
+  )
+  .optional()
+  .nullable();
+
+const bannerFields = z.object({
+  title: z.string().trim().min(1).max(200),
+  titleAr: z.string().trim().max(200).optional().nullable(),
+  description: z.string().trim().max(2_000).optional().nullable(),
+  descriptionAr: z.string().trim().max(2_000).optional().nullable(),
+  image: optionalLink,
+  link: optionalLink,
+  ctaText: z.string().trim().max(100).optional().nullable(),
+  ctaTextAr: z.string().trim().max(100).optional().nullable(),
+  ctaLink: optionalLink,
+  gradient: z.string().trim().max(250).optional().nullable(),
+  icon: z.string().trim().max(80).optional().nullable(),
+  position: z.enum(POSITIONS).default('hero'),
+  sortOrder: z.coerce.number().int().min(-10_000).max(10_000).default(0),
+  isActive: z.boolean().default(true),
+  startDate: optionalDate.optional(),
+  endDate: optionalDate.optional(),
+});
+
+const updateSchema = bannerFields.partial().extend({
+  bannerId: z.string().min(1).max(64),
+});
+
+const idSchema = z.string().min(1).max(64);
+
+function clean(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeString(trimmed) : null;
+}
+
+function requireActor(request: Request): string | NextResponse {
+  const actorId = getAdminActorId(request);
+  if (actorId) return actorId;
+
+  return NextResponse.json(
+    { error: 'An administrator identity is required for audit logging.' },
+    { status: 401 },
+  );
+}
+
+function mapBanner(banner: {
+  id: string;
+  title: string;
+  titleAr: string | null;
+  description: string | null;
+  descriptionAr: string | null;
+  image: string | null;
+  link: string | null;
+  ctaText: string | null;
+  ctaTextAr: string | null;
+  ctaLink: string | null;
+  gradient: string | null;
+  icon: string | null;
+  position: string;
+  sortOrder: number;
+  isActive: boolean;
+  startDate: Date | null;
+  endDate: Date | null;
+  createdAt: Date;
+}) {
+  return {
+    ...banner,
+    startDate: banner.startDate?.toISOString() || null,
+    endDate: banner.endDate?.toISOString() || null,
+    createdAt: banner.createdAt.toISOString(),
+  };
+}
 
 export async function GET(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
-  }
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
   try {
     const banners = await db.banner.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
     });
 
-    const result = banners.map(b => ({
-      id: b.id,
-      title: b.title,
-      titleAr: b.titleAr,
-      description: b.description,
-      descriptionAr: b.descriptionAr,
-      image: b.image,
-      link: b.link,
-      ctaText: b.ctaText,
-      ctaTextAr: b.ctaTextAr,
-      ctaLink: b.ctaLink,
-      gradient: b.gradient,
-      icon: b.icon,
-      position: b.position,
-      sortOrder: b.sortOrder,
-      isActive: b.isActive,
-      startDate: b.startDate ? b.startDate.toISOString() : null,
-      endDate: b.endDate ? b.endDate.toISOString() : null,
-      createdAt: b.createdAt.toISOString(),
-    }));
-
-    return NextResponse.json({ banners: result, total: result.length });
+    return NextResponse.json({
+      banners: banners.map(mapBanner),
+      total: banners.length,
+    });
   } catch (error) {
     console.error('Admin banners GET error:', error);
-    return NextResponse.json({ error: 'Failed to fetch banners' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch banners.' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const actor = requireActor(request);
+  if (actor instanceof NextResponse) return actor;
+
+  const parsed = bannerFields.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid banner details.' }, { status: 400 });
   }
+
   try {
-    const body = await request.json();
-    const { title, titleAr, description, descriptionAr, image, link, ctaText, ctaTextAr, ctaLink, gradient, icon, position, sortOrder, isActive, startDate, endDate, adminId } = body;
-
-    if (!title) {
-      return NextResponse.json({ error: 'Missing title' }, { status: 400 });
-    }
-
-    // Validate title length
-    if (typeof title === 'string' && title.length > 200) {
-      return NextResponse.json({ error: 'Title too long (max 200 chars)' }, { status: 400 });
-    }
-
-    // Validate position
-    const validPositions = ['hero', 'sidebar', 'footer', 'popup', 'category'];
-    if (position && !validPositions.includes(position)) {
-      return NextResponse.json({ error: 'Invalid position value' }, { status: 400 });
-    }
-
-    const banner = await db.banner.create({
-      data: {
-        title: sanitizeString(title),
-        titleAr: titleAr ? sanitizeString(titleAr) : null,
-        description: description ? sanitizeString(description) : null,
-        descriptionAr: descriptionAr ? sanitizeString(descriptionAr) : null,
-        image: image || null,
-        link: link || null,
-        ctaText: ctaText ? sanitizeString(ctaText) : null,
-        ctaTextAr: ctaTextAr ? sanitizeString(ctaTextAr) : null,
-        ctaLink: ctaLink || null,
-        gradient: gradient || null,
-        icon: icon || null,
-        position: position || 'hero',
-        sortOrder: sortOrder ?? 0,
-        isActive: isActive !== false,
-        startDate: startDate ? new Date(startDate) : new Date(),
-        endDate: endDate ? new Date(endDate) : null,
-      },
-    });
-
-    // Create audit log (non-blocking)
-    try {
-      await db.auditLog.create({
+    const banner = await db.$transaction(async (tx) => {
+      const created = await tx.banner.create({
         data: {
-          adminId: adminId || 'system',
-          action: 'banner_created',
-          targetType: 'banner',
-          targetId: banner.id,
-          details: `Banner created: ${title}`,
+          title: sanitizeString(parsed.data.title),
+          titleAr: clean(parsed.data.titleAr),
+          description: clean(parsed.data.description),
+          descriptionAr: clean(parsed.data.descriptionAr),
+          image: parsed.data.image || null,
+          link: parsed.data.link || null,
+          ctaText: clean(parsed.data.ctaText),
+          ctaTextAr: clean(parsed.data.ctaTextAr),
+          ctaLink: parsed.data.ctaLink || null,
+          gradient: parsed.data.gradient || null,
+          icon: parsed.data.icon || null,
+          position: parsed.data.position,
+          sortOrder: parsed.data.sortOrder,
+          isActive: parsed.data.isActive,
+          startDate: parsed.data.startDate ?? new Date(),
+          endDate: parsed.data.endDate ?? null,
         },
       });
-    } catch {
-      // Audit log is optional
-    }
 
-    return NextResponse.json({ success: true, banner }, { status: 201 });
+      await tx.auditLog.create({
+        data: {
+          adminId: actor,
+          action: 'banner_created',
+          targetType: 'banner',
+          targetId: created.id,
+          details: JSON.stringify({
+            title: created.title,
+            position: created.position,
+            isActive: created.isActive,
+          }),
+        },
+      });
+
+      return created;
+    });
+
+    return NextResponse.json(
+      { success: true, banner: mapBanner(banner) },
+      { status: 201 },
+    );
   } catch (error) {
     console.error('Admin banners POST error:', error);
-    return NextResponse.json({ error: 'Failed to create banner' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create banner.' }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const actor = requireActor(request);
+  if (actor instanceof NextResponse) return actor;
+
+  const parsed = updateSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid banner update.' }, { status: 400 });
   }
+
   try {
-    const body = await request.json();
-    const { bannerId, title, titleAr, description, descriptionAr, image, link, ctaText, ctaTextAr, ctaLink, gradient, icon, position, sortOrder, isActive, startDate, endDate, adminId } = body;
+    const { bannerId, ...changes } = parsed.data;
+    const updated = await db.$transaction(async (tx) => {
+      const existing = await tx.banner.findUnique({ where: { id: bannerId } });
+      if (!existing) return null;
 
-    if (!bannerId) {
-      return NextResponse.json({ error: 'Missing bannerId' }, { status: 400 });
-    }
+      const data = {
+        ...(changes.title !== undefined
+          ? { title: sanitizeString(changes.title) }
+          : {}),
+        ...(changes.titleAr !== undefined
+          ? { titleAr: clean(changes.titleAr) }
+          : {}),
+        ...(changes.description !== undefined
+          ? { description: clean(changes.description) }
+          : {}),
+        ...(changes.descriptionAr !== undefined
+          ? { descriptionAr: clean(changes.descriptionAr) }
+          : {}),
+        ...(changes.image !== undefined ? { image: changes.image || null } : {}),
+        ...(changes.link !== undefined ? { link: changes.link || null } : {}),
+        ...(changes.ctaText !== undefined
+          ? { ctaText: clean(changes.ctaText) }
+          : {}),
+        ...(changes.ctaTextAr !== undefined
+          ? { ctaTextAr: clean(changes.ctaTextAr) }
+          : {}),
+        ...(changes.ctaLink !== undefined
+          ? { ctaLink: changes.ctaLink || null }
+          : {}),
+        ...(changes.gradient !== undefined
+          ? { gradient: changes.gradient || null }
+          : {}),
+        ...(changes.icon !== undefined ? { icon: changes.icon || null } : {}),
+        ...(changes.position !== undefined ? { position: changes.position } : {}),
+        ...(changes.sortOrder !== undefined ? { sortOrder: changes.sortOrder } : {}),
+        ...(changes.isActive !== undefined ? { isActive: changes.isActive } : {}),
+        ...(changes.startDate !== undefined
+          ? { startDate: changes.startDate }
+          : {}),
+        ...(changes.endDate !== undefined ? { endDate: changes.endDate } : {}),
+      };
 
-    const banner = await db.banner.findUnique({ where: { id: bannerId } });
-    if (!banner) {
-      return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
-    }
+      const banner = await tx.banner.update({
+        where: { id: bannerId },
+        data,
+      });
 
-    const updateData: Record<string, unknown> = {};
-    if (title !== undefined) updateData.title = title;
-    if (titleAr !== undefined) updateData.titleAr = titleAr;
-    if (description !== undefined) updateData.description = description;
-    if (descriptionAr !== undefined) updateData.descriptionAr = descriptionAr;
-    if (image !== undefined) updateData.image = image;
-    if (link !== undefined) updateData.link = link;
-    if (ctaText !== undefined) updateData.ctaText = ctaText;
-    if (ctaTextAr !== undefined) updateData.ctaTextAr = ctaTextAr;
-    if (ctaLink !== undefined) updateData.ctaLink = ctaLink;
-    if (gradient !== undefined) updateData.gradient = gradient;
-    if (icon !== undefined) updateData.icon = icon;
-    if (position !== undefined) updateData.position = position;
-    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (startDate !== undefined) updateData.startDate = new Date(startDate);
-    if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
-
-    await db.banner.update({ where: { id: bannerId }, data: updateData });
-
-    // Create audit log (non-blocking)
-    try {
-      await db.auditLog.create({
+      await tx.auditLog.create({
         data: {
-          adminId: adminId || 'system',
+          adminId: actor,
           action: 'banner_updated',
           targetType: 'banner',
           targetId: bannerId,
-          details: `Banner updated: ${title || banner.title}`,
+          details: JSON.stringify({
+            title: banner.title,
+            fields: Object.keys(changes),
+            previousPosition: existing.position,
+            nextPosition: banner.position,
+          }),
         },
       });
-    } catch {
-      // Audit log is optional
+
+      return banner;
+    });
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Banner not found.' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, bannerId });
+    return NextResponse.json({
+      success: true,
+      banner: mapBanner(updated),
+    });
   } catch (error) {
     console.error('Admin banners PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update banner' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update banner.' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
-  const authError = requireAdminAuth(request);
-  if (authError) return authError;
-  const rateLimitResult = checkApiRateLimit(request, RATE_LIMITS.admin);
-  if (!rateLimitResult.allowed && rateLimitResult.response) {
-    return rateLimitResult.response;
+  const denied = validateAdminRequest(request);
+  if (denied) return denied;
+
+  const actor = requireActor(request);
+  if (actor instanceof NextResponse) return actor;
+
+  const parsedId = idSchema.safeParse(new URL(request.url).searchParams.get('id'));
+  if (!parsedId.success) {
+    return NextResponse.json({ error: 'A valid banner id is required.' }, { status: 400 });
   }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const bannerId = searchParams.get('id');
-    const adminId = searchParams.get('adminId');
+    const deleted = await db.$transaction(async (tx) => {
+      const banner = await tx.banner.findUnique({ where: { id: parsedId.data } });
+      if (!banner) return null;
 
-    if (!bannerId) {
-      return NextResponse.json({ error: 'Missing banner id' }, { status: 400 });
-    }
-
-    // Validate bannerId format
-    if (!isValidId(bannerId)) {
-      return NextResponse.json({ error: 'Invalid banner ID format' }, { status: 400 });
-    }
-
-    const banner = await db.banner.findUnique({ where: { id: bannerId } });
-    if (!banner) {
-      return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
-    }
-
-    await db.banner.delete({ where: { id: bannerId } });
-
-    // Create audit log (non-blocking)
-    try {
-      await db.auditLog.create({
+      await tx.banner.delete({ where: { id: banner.id } });
+      await tx.auditLog.create({
         data: {
-          adminId: adminId || 'system',
+          adminId: actor,
           action: 'banner_deleted',
           targetType: 'banner',
-          targetId: bannerId,
-          details: `Banner deleted: ${banner.title}`,
+          targetId: banner.id,
+          details: JSON.stringify({
+            title: banner.title,
+            position: banner.position,
+          }),
         },
       });
-    } catch {
-      // Audit log is optional
+      return banner;
+    });
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Banner not found.' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, bannerId });
+    return NextResponse.json({ success: true, bannerId: deleted.id });
   } catch (error) {
     console.error('Admin banners DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete banner' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete banner.' }, { status: 500 });
   }
 }

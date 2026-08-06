@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { io, Socket } from "socket.io-client";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ChatMessage {
 	id: string;
@@ -22,217 +21,147 @@ interface UseChatOptions {
 	avatar?: string;
 }
 
-export function useChat({ userId, username, role, avatar }: UseChatOptions) {
-	const socketRef = useRef<Socket | null>(null);
-	const [isConnected, setIsConnected] = useState(false);
-	const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
-	const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
-	const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
-	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+interface ChatResponse {
+	messages?: ChatMessage[];
+	message?: ChatMessage;
+	error?: string;
+}
 
-	useEffect(() => {
-		const socket = io({
-			path: "/api/socket/io",
-			transports: ["websocket", "polling"],
-			forceNew: true,
-			reconnection: true,
-			reconnectionAttempts: 10,
-			reconnectionDelay: 1000,
-			timeout: 10000,
-		});
+const EMPTY_TYPING_USERS: Record<string, string[]> = {};
+const EMPTY_ONLINE_STATUS: Record<string, boolean> = {};
 
-		socketRef.current = socket;
-
-		socket.on("connect", () => {
-			setIsConnected(true);
-			socket.emit("user:join", { userId, username, role, avatar });
-		});
-
-		socket.on("disconnect", () => {
-			setIsConnected(false);
-		});
-
-		socket.on("message:new", (msg: ChatMessage) => {
-			setMessages((prev) => ({
-				...prev,
-				[msg.conversationId]: [...(prev[msg.conversationId] || []), msg],
-			}));
-		});
-
-		socket.on(
-			"message:sent",
-			(data: { messageId: string; conversationId: string }) => {
-				setMessages((prev) => {
-					const convMsgs = prev[data.conversationId] || [];
-					return {
-						...prev,
-						[data.conversationId]: convMsgs.map((m) =>
-							m.id === data.messageId
-								? { ...m, status: "delivered" as const }
-								: m,
-						),
-					};
-				});
-			},
-		);
-
-		socket.on(
-			"room:history",
-			(data: {
-				conversationId: string;
-				messages: Array<Omit<ChatMessage, "sender"> & { sender: string }>;
-			}) => {
-				setMessages((prev) => ({
-					...prev,
-					[data.conversationId]: data.messages.map((m) => ({
-						...m,
-						sender: (m.sender === userId || m.sender === "buyer"
-							? "buyer"
-							: "seller") as "buyer" | "seller",
-					})),
-				}));
-			},
-		);
-
-		socket.on(
-			"typing:start",
-			(data: { userId: string; username: string; conversationId: string }) => {
-				setTypingUsers((prev) => ({
-					...prev,
-					[data.conversationId]: [
-						...(prev[data.conversationId] || []).filter(
-							(u) => u !== data.username,
-						),
-						data.username,
-					],
-				}));
-			},
-		);
-
-		socket.on(
-			"typing:stop",
-			(data: { userId: string; conversationId: string }) => {
-				setTypingUsers((prev) => {
-					const users = prev[data.conversationId] || [];
-					return {
-						...prev,
-						[data.conversationId]: users.slice(0, -1),
-					};
-				});
-			},
-		);
-
-		socket.on("user:online", (data: { userId: string; username: string }) => {
-			setOnlineStatus((prev) => ({ ...prev, [data.userId]: true }));
-		});
-
-		socket.on("user:offline", (data: { userId: string; username: string }) => {
-			setOnlineStatus((prev) => ({ ...prev, [data.userId]: false }));
-		});
-
-		socket.on(
-			"messages:read",
-			(data: { conversationId: string; readBy: string }) => {
-				setMessages((prev) => {
-					const convMsgs = prev[data.conversationId] || [];
-					return {
-						...prev,
-						[data.conversationId]: convMsgs.map((m) =>
-							m.sender === "buyer"
-								? { ...m, read: true, status: "read" as const }
-								: m,
-						),
-					};
-				});
-			},
-		);
-
-		return () => {
-			socket.disconnect();
-		};
-	}, [userId, username, role, avatar]);
-
-	const joinRoom = useCallback((conversationId: string) => {
-		socketRef.current?.emit("room:join", { conversationId });
-	}, []);
-
-	const leaveRoom = useCallback((conversationId: string) => {
-		socketRef.current?.emit("room:leave", { conversationId });
-	}, []);
-
-	const sendMessage = useCallback(
-		(conversationId: string, text: string) => {
-			const socket = socketRef.current;
-			if (!socket || !text.trim()) return;
-
-			const newMsg: ChatMessage = {
-				id: `msg-${Date.now()}`,
-				conversationId,
-				sender: "buyer",
-				senderName: username,
-				text,
-				time: new Date().toLocaleTimeString([], {
+function normalizeMessage(message: ChatMessage): ChatMessage {
+	const date = new Date(message.time);
+	return {
+		...message,
+		time: Number.isNaN(date.getTime())
+			? message.time
+			: date.toLocaleTimeString([], {
 					hour: "2-digit",
 					minute: "2-digit",
 				}),
-				read: false,
-				status: "sent",
-			};
+	};
+}
 
-			setMessages((prev) => ({
-				...prev,
-				[conversationId]: [...(prev[conversationId] || []), newMsg],
-			}));
+export function useChat({ userId }: UseChatOptions) {
+	const activeRoomsRef = useRef(new Set<string>());
+	const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
+	const isConnected = userId !== "guest";
 
-			socket.emit("message:send", {
-				conversationId,
-				text,
-				sender: userId,
-				senderName: username,
-			});
-		},
-		[userId, username],
-	);
+	const refreshRoom = useCallback(
+		async (conversationId: string) => {
+			if (!isConnected) return;
 
-	const startTyping = useCallback(
-		(conversationId: string) => {
-			socketRef.current?.emit("typing:start", {
-				conversationId,
-				userId,
-				username,
-			});
-		},
-		[userId, username],
-	);
+			try {
+				const response = await fetch(
+					`/api/chat?conversationId=${encodeURIComponent(conversationId)}`,
+					{
+						credentials: "same-origin",
+						cache: "no-store",
+					},
+				);
+				if (!response.ok) return;
 
-	const stopTyping = useCallback(
-		(conversationId: string) => {
-			if (typingTimeoutRef.current) {
-				clearTimeout(typingTimeoutRef.current);
+				const data = (await response.json()) as ChatResponse;
+				setMessages((current) => ({
+					...current,
+					[conversationId]: (data.messages || []).map(normalizeMessage),
+				}));
+			} catch {
+				// Keep the most recent successfully loaded messages.
 			}
-			socketRef.current?.emit("typing:stop", {
-				conversationId,
-				userId,
-			});
 		},
-		[userId],
+		[isConnected],
 	);
 
 	const markAsRead = useCallback(
 		(conversationId: string) => {
-			socketRef.current?.emit("messages:read", {
-				conversationId,
-				userId,
-			});
+			if (!isConnected) return;
+			void fetch("/api/chat", {
+				method: "PATCH",
+				credentials: "same-origin",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ conversationId }),
+			}).then(() => refreshRoom(conversationId));
 		},
-		[userId],
+		[isConnected, refreshRoom],
 	);
+
+	const refreshActiveRooms = useCallback(async () => {
+		await Promise.all(
+			[...activeRoomsRef.current].map((conversationId) =>
+				refreshRoom(conversationId),
+			),
+		);
+	}, [refreshRoom]);
+
+	useEffect(() => {
+		if (!isConnected) return;
+
+		const interval = window.setInterval(() => {
+			void refreshActiveRooms();
+		}, 4_000);
+		return () => window.clearInterval(interval);
+	}, [isConnected, refreshActiveRooms]);
+
+	const joinRoom = useCallback(
+		(conversationId: string) => {
+			activeRoomsRef.current.add(conversationId);
+			void refreshRoom(conversationId);
+			markAsRead(conversationId);
+		},
+		[markAsRead, refreshRoom],
+	);
+
+	const leaveRoom = useCallback((conversationId: string) => {
+		activeRoomsRef.current.delete(conversationId);
+	}, []);
+
+	const sendMessage = useCallback(
+		(conversationId: string, text: string) => {
+			const trimmed = text.trim();
+			if (!isConnected || !trimmed) return;
+
+			void fetch("/api/chat", {
+				method: "POST",
+				credentials: "same-origin",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ conversationId, text: trimmed }),
+			})
+				.then(async (response) => {
+					if (!response.ok) return null;
+					return (await response.json()) as ChatResponse;
+				})
+				.then((data) => {
+					if (!data?.message) return;
+					const message = normalizeMessage(data.message);
+					setMessages((current) => {
+						const room = current[conversationId] || [];
+						if (room.some((item) => item.id === message.id)) return current;
+						return {
+							...current,
+							[conversationId]: [...room, message],
+						};
+					});
+				});
+		},
+		[isConnected],
+	);
+
+	const startTyping = useCallback((_conversationId: string) => {
+		// Typing indicators require a dedicated real-time service and are disabled
+		// in the authenticated polling transport.
+	}, []);
+
+	const stopTyping = useCallback((_conversationId: string) => {
+		// No-op for the polling transport.
+	}, []);
 
 	return {
 		isConnected,
 		messages,
-		typingUsers,
-		onlineStatus,
+		typingUsers: EMPTY_TYPING_USERS,
+		onlineStatus: EMPTY_ONLINE_STATUS,
 		joinRoom,
 		leaveRoom,
 		sendMessage,

@@ -1,21 +1,20 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+  prisma?: PrismaClient;
+};
+
+function createPrismaClient() {
+  return new PrismaClient({
+    log:
+      process.env.NODE_ENV === 'development'
+        ? ['warn', 'error']
+        : ['error'],
+  });
 }
 
-// Always create a fresh client to avoid stale SQLite connections after DB reset
-if (globalForPrisma.prisma) {
-  try {
-    globalForPrisma.prisma.$disconnect();
-  } catch {
-    // ignore disconnect errors
-  }
-  globalForPrisma.prisma = undefined;
+export const db = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = db;
 }
-
-export const db = new PrismaClient({
-  log: ['query'],
-})
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

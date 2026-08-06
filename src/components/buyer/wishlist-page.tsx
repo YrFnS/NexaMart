@@ -1,41 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
+  AlertCircle,
+  ArrowDownAZ,
   Heart,
+  Loader2,
+  RefreshCw,
+  Share2,
+  ShoppingBag,
   ShoppingCart,
   Trash2,
-  Plus,
-  FolderOpen,
-  ShoppingBag,
-  ArrowRight,
-  ArrowLeft,
-  MoreVertical,
-  FolderPlus,
-  Check,
-  X,
-  Loader2,
-  Share2,
-  ArrowUpDown,
-  GripVertical,
-  Bell,
-  BellRing,
-  TrendingDown,
-  Package,
-  AlertCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,13 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -60,682 +35,553 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useI18n } from '@/lib/i18n';
+import { parseVariationOptions } from '@/lib/checkout-authority';
 import { formatPrice } from '@/lib/currency';
-import { useAppStore } from '@/stores/app-store';
+import { useI18n } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/use-app-navigation';
+import { useAppStore } from '@/stores/app-store';
 import { useCartStore } from '@/stores/cart-store';
 import { useUserStore } from '@/stores/user-store';
-import { toast } from 'sonner';
-import { getPlaceholderImage } from '@/lib/placeholder-image';
+import {
+  useWishlistStore,
+  type WishlistEntry,
+} from '@/stores/wishlist-store';
 
-interface WishlistItem {
-  id: string;
-  productId: string;
-  name: string;
-  nameAr?: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  storeName: string;
-  storeId: string;
-  rating: number;
-  reviewCount: number;
-  stock: number;
-  collection?: string;
-  addedAt: string;
+type SortOption = 'newest' | 'price-low' | 'price-high' | 'name';
+
+function parseImages(images: string): string[] {
+  try {
+    const parsed = JSON.parse(images) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (value): value is string =>
+        typeof value === 'string' &&
+        (value.startsWith('/') ||
+          value.startsWith('https://') ||
+          value.startsWith('http://')),
+    );
+  } catch {
+    return [];
+  }
 }
-
-interface Collection {
-  id: string;
-  name: string;
-  nameAr?: string;
-  count: number;
-}
-
-type SortOption = 'date' | 'price-low' | 'price-high' | 'name';
-
-const DEFAULT_COLLECTIONS: Collection[] = [
-  { id: 'all', name: 'All Items', nameAr: 'جميع المنتجات', count: 0 },
-  { id: 'favorites', name: 'Favorites', nameAr: 'المفضلة', count: 0 },
-  { id: 'gift-ideas', name: 'Gift Ideas', nameAr: 'أفكار هدايا', count: 0 },
-  { id: 'watch-later', name: 'Watch Later', nameAr: 'شاهد لاحقاً', count: 0 },
-];
-
-const SORT_OPTIONS: { id: SortOption; label: string; labelAr: string }[] = [
-  { id: 'date', label: 'Date Added', labelAr: 'تاريخ الإضافة' },
-  { id: 'price-low', label: 'Price: Low-High', labelAr: 'السعر: الأقل أولاً' },
-  { id: 'price-high', label: 'Price: High-Low', labelAr: 'السعر: الأعلى أولاً' },
-  { id: 'name', label: 'Name A-Z', labelAr: 'الاسم أ-ي' },
-];
 
 export function WishlistPage() {
-  const { t, locale } = useI18n();
-  const nav = useAppNavigation();
-  const addItem = useCartStore((s) => s.addItem);
-  const { user } = useUserStore();
+  const { locale } = useI18n();
   const isRTL = locale === 'ar';
-
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeCollection, setActiveCollection] = useState('all');
-  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
-  const [removeAllTarget, setRemoveAllTarget] = useState(false);
-  const [collections, setCollections] = useState<Collection[]>(DEFAULT_COLLECTIONS);
-  const [showNewCollection, setShowNewCollection] = useState(false);
-  const [showNewCollectionDialog, setShowNewCollectionDialog] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState('');
-  const [newCollectionNameAr, setNewCollectionNameAr] = useState('');
-  const [addingToCart, setAddingToCart] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>('date');
-  const [priceDropAlerts, setPriceDropAlerts] = useState<Set<string>>(new Set());
-  const [showShareDialog, setShowShareDialog] = useState(false);
+  const nav = useAppNavigation();
+  const currency = useAppStore((state) => state.currency);
+  const addItem = useCartStore((state) => state.addItem);
+  const user = useUserStore((state) => state.user);
+  const isHydrated = useUserStore((state) => state.isHydrated);
+  const items = useWishlistStore((state) => state.items);
+  const loading = useWishlistStore((state) => state.loading);
+  const loaded = useWishlistStore((state) => state.loaded);
+  const error = useWishlistStore((state) => state.error);
+  const pendingProductIds = useWishlistStore(
+    (state) => state.pendingProductIds,
+  );
+  const hydrate = useWishlistStore((state) => state.hydrate);
+  const remove = useWishlistStore((state) => state.remove);
+  const removeAll = useWishlistStore((state) => state.removeAll);
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
-    const fetchWishlist = async () => {
-      const userId = user?.id;
-      if (!userId) {
-        setWishlistItems([]);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/wishlist?userId=${userId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setWishlistItems(Array.isArray(data) ? data : data.items || []);
-        } else {
-          setWishlistItems([]);
-        }
-      } catch {
-        setWishlistItems([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchWishlist();
-  }, [user?.id]);
+    if (!isHydrated) return;
+    void hydrate(user?.id || null);
+  }, [hydrate, isHydrated, user?.id]);
 
-  // Update collection counts when items change
-  useEffect(() => {
-    setCollections((prev) =>
-      prev.map((c) => ({
-        ...c,
-        count: c.id === 'all'
-          ? wishlistItems.length
-          : wishlistItems.filter((i) => i.collection === c.id).length,
-      }))
+  const sortedItems = useMemo(() => {
+    const next = [...items];
+    if (sortBy === 'price-low') {
+      return next.sort((a, b) => a.product.price - b.product.price);
+    }
+    if (sortBy === 'price-high') {
+      return next.sort((a, b) => b.product.price - a.product.price);
+    }
+    if (sortBy === 'name') {
+      return next.sort((a, b) => a.product.name.localeCompare(b.product.name));
+    }
+    return next.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-  }, [wishlistItems]);
+  }, [items, sortBy]);
 
-  const filteredItems = useMemo(() => {
-    let items = activeCollection === 'all' ? wishlistItems : wishlistItems.filter((item) => item.collection === activeCollection);
-    switch (sortBy) {
-      case 'price-low':
-        return [...items].sort((a, b) => a.price - b.price);
-      case 'price-high':
-        return [...items].sort((a, b) => b.price - a.price);
-      case 'name':
-        return [...items].sort((a, b) => a.name.localeCompare(b.name));
-      case 'date':
-      default:
-        return [...items].sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+  function productName(item: WishlistEntry) {
+    return isRTL && item.product.nameAr
+      ? item.product.nameAr
+      : item.product.name;
+  }
+
+  function storeName(item: WishlistEntry) {
+    return isRTL && item.product.store?.nameAr
+      ? item.product.store.nameAr
+      : item.product.store?.name || '';
+  }
+
+  function imageFor(item: WishlistEntry) {
+    return parseImages(item.product.images)[0] || '/placeholder-product.svg';
+  }
+
+  function requiresOptions(item: WishlistEntry) {
+    return (
+      Object.keys(parseVariationOptions(item.product.variations || '{}'))
+        .length > 0
+    );
+  }
+
+  function addToCart(item: WishlistEntry) {
+    if (requiresOptions(item)) {
+      toast.info(
+        isRTL
+          ? 'اختر خيارات المنتج قبل إضافته إلى السلة.'
+          : 'Choose product options before adding it to your cart.',
+      );
+      nav.selectProduct(item.productId);
+      return;
     }
-  }, [wishlistItems, activeCollection, sortBy]);
+    if (item.product.stock <= 0) return;
 
-  const handleRemoveItem = async (itemId: string) => {
-    const userId = user?.id;
-    if (!userId) return;
-    try {
-      await fetch('/api/wishlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remove', itemId, userId }),
-      });
-    } catch {
-      // Continue with local state update
-    }
-    setWishlistItems((prev) => prev.filter((i) => i.id !== itemId));
-    setRemoveTarget(null);
-  };
-
-  const handleRemoveAll = () => {
-    const itemsToRemove = activeCollection === 'all' ? wishlistItems : wishlistItems.filter((i) => i.collection === activeCollection);
-    const removeIds = new Set(itemsToRemove.map((i) => i.id));
-    setWishlistItems((prev) => prev.filter((i) => !removeIds.has(i.id)));
-    setRemoveAllTarget(false);
-  };
-
-  const handleAddToCart = async (item: WishlistItem) => {
-    setAddingToCart(item.id);
     addItem({
       productId: item.productId,
-      name: item.name,
-      price: item.price,
-      originalPrice: item.originalPrice,
-      image: item.image,
+      name: item.product.name,
+      price: item.product.price,
+      originalPrice: item.product.originalPrice ?? undefined,
+      image: imageFor(item),
       quantity: 1,
-      storeId: item.storeId,
-      storeName: item.storeName,
+      storeId: item.product.storeId,
+      storeName: item.product.store?.name || '',
+      hasFreeShipping: item.product.hasFreeShipping,
     });
-    setTimeout(() => setAddingToCart(null), 600);
-  };
+    toast.success(isRTL ? 'تمت الإضافة إلى السلة.' : 'Added to cart.');
+  }
 
-  const handleAddAllToCart = () => {
-    filteredItems.forEach((item) => {
-      if (item.stock > 0) {
-        addItem({
-          productId: item.productId,
-          name: item.name,
-          price: item.price,
-          originalPrice: item.originalPrice,
-          image: item.image,
-          quantity: 1,
-          storeId: item.storeId,
-          storeName: item.storeName,
-        });
+  function addAvailableToCart() {
+    let added = 0;
+    let requiresSelection = 0;
+    for (const item of sortedItems) {
+      if (item.product.stock <= 0) continue;
+      if (requiresOptions(item)) {
+        requiresSelection += 1;
+        continue;
       }
-    });
-    nav.setView('cart');
-  };
-
-  const handleCreateCollection = () => {
-    const name = newCollectionName.trim();
-    if (!name) return;
-    const newCol: Collection = {
-      id: name.toLowerCase().replace(/\s+/g, '-'),
-      name,
-      nameAr: newCollectionNameAr.trim() || name,
-      count: 0,
-    };
-    setCollections((prev) => [...prev, newCol]);
-    setNewCollectionName('');
-    setNewCollectionNameAr('');
-    setShowNewCollectionDialog(false);
-  };
-
-  const handleMoveToCollection = (itemId: string, collectionId: string) => {
-    setWishlistItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, collection: collectionId === 'all' ? undefined : collectionId } : item
-      )
-    );
-    toast.success(t('itemMoved'));
-  };
-
-  const handleShareWishlist = () => {
-    const shareText = isRTL
-      ? `قائمة أمنياتي على NexaMart - ${wishlistItems.length} منتجات`
-      : `My NexaMart Wishlist - ${wishlistItems.length} items`;
-    if (navigator.share) {
-      navigator.share({
-        title: isRTL ? 'قائمة أمنياتي' : 'My Wishlist',
-        text: shareText,
-        url: window.location.href,
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success(t('linkCopied'));
+      addItem({
+        productId: item.productId,
+        name: item.product.name,
+        price: item.product.price,
+        originalPrice: item.product.originalPrice ?? undefined,
+        image: imageFor(item),
+        quantity: 1,
+        storeId: item.product.storeId,
+        storeName: item.product.store?.name || '',
+        hasFreeShipping: item.product.hasFreeShipping,
+      });
+      added += 1;
     }
-  };
 
-  const togglePriceDropAlert = (itemId: string) => {
-    setPriceDropAlerts((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
+    if (added > 0) {
+      toast.success(
+        isRTL
+          ? `تمت إضافة ${added} منتج إلى السلة.`
+          : `${added} item${added === 1 ? '' : 's'} added to cart.`,
+      );
+      nav.setView('cart');
+    }
+    if (requiresSelection > 0) {
+      toast.info(
+        isRTL
+          ? `${requiresSelection} منتج يحتاج إلى اختيار الخيارات أولاً.`
+          : `${requiresSelection} item${
+              requiresSelection === 1 ? '' : 's'
+            } require option selection first.`,
+      );
+    }
+  }
+
+  async function removeItem(item: WishlistEntry) {
+    if (!user) return;
+    const success = await remove(user.id, item.id, item.productId);
+    if (success) {
+      toast.success(
+        isRTL ? 'تمت الإزالة من المفضلة.' : 'Removed from your wishlist.',
+      );
+    } else {
+      toast.error(
+        useWishlistStore.getState().error ||
+          (isRTL ? 'تعذر تحديث المفضلة.' : 'Could not update wishlist.'),
+      );
+    }
+  }
+
+  async function clearWishlist() {
+    if (!user) return;
+    setClearing(true);
+    const success = await removeAll(user.id);
+    setClearing(false);
+    if (success) {
+      setClearOpen(false);
+      toast.success(isRTL ? 'تم مسح المفضلة.' : 'Wishlist cleared.');
+    } else {
+      toast.error(
+        useWishlistStore.getState().error ||
+          (isRTL ? 'تعذر مسح المفضلة.' : 'Could not clear wishlist.'),
+      );
+    }
+  }
+
+  async function shareWishlist() {
+    const text = isRTL
+      ? `قائمة مفضلتي على NexaMart (${items.length} منتجات)`
+      : `My NexaMart wishlist (${items.length} items)`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: isRTL ? 'قائمة مفضلتي' : 'My wishlist',
+          text,
+          url: window.location.href,
+        });
       } else {
-        next.add(itemId);
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success(isRTL ? 'تم نسخ الرابط.' : 'Link copied.');
       }
-      return next;
-    });
-  };
+    } catch {
+      // The native share dialog may be dismissed without an error to display.
+    }
+  }
 
-  // Loading state
-  if (loading) {
+  if (!isHydrated || (loading && !loaded)) {
     return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900 animate-pulse" />
-          <div className="h-8 w-32 bg-muted rounded animate-pulse" />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-3">
-                <div className="aspect-square bg-muted rounded-lg animate-pulse mb-3" />
-                <div className="h-4 w-3/4 bg-muted rounded animate-pulse mb-2" />
-                <div className="h-3 w-1/2 bg-muted rounded animate-pulse" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="container mx-auto flex min-h-72 items-center justify-center px-4 py-10">
+        <Loader2 className="size-8 animate-spin text-amber-600" />
+        <span className="sr-only">
+          {isRTL ? 'جاري تحميل المفضلة' : 'Loading wishlist'}
+        </span>
       </div>
     );
   }
 
-  // Empty state
-  if (wishlistItems.length === 0) {
+  if (!user) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-lg mx-auto text-center space-y-6">
-          <div className="w-32 h-32 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center">
-            <Heart className="size-16 text-emerald-300 dark:text-emerald-700" />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold">{t('emptyWishlist')}</h1>
-          <p className="text-muted-foreground">
-            {isRTL
-              ? 'احفظ المنتجات التي تعجبك لتجدها لاحقاً!'
-              : 'Save products you love to find them later!'}
-          </p>
-          <Button
-            size="lg"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => nav.setView('shop')}
-          >
-            <ShoppingBag className="size-4 me-2" />
-            {t('continueShopping')}
-          </Button>
-        </div>
+      <div className="container mx-auto px-4 py-14">
+        <Card className="mx-auto max-w-lg border-amber-200 dark:border-amber-900">
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+            <div className="flex size-20 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950">
+              <Heart className="size-10 text-amber-700 dark:text-amber-300" />
+            </div>
+            <h1 className="text-2xl font-bold">
+              {isRTL ? 'احفظ منتجاتك المفضلة' : 'Save your favorite products'}
+            </h1>
+            <p className="text-muted-foreground">
+              {isRTL
+                ? 'سجّل الدخول لمزامنة المفضلة بين الصفحات والأجهزة.'
+                : 'Sign in to keep your wishlist synchronized across pages and devices.'}
+            </p>
+            <Button
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={() => nav.setView('auth')}
+            >
+              {isRTL ? 'تسجيل الدخول' : 'Sign in'}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div
+      className="container mx-auto space-y-5 px-4 py-6"
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900">
-            <Heart className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="flex size-11 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950">
+            <Heart className="size-5 fill-amber-600 text-amber-700 dark:text-amber-300" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{t('wishlist')}</h1>
-            <p className="text-sm text-muted-foreground">
-              {wishlistItems.length} {t('b_items')}
+            <h1 className="text-2xl font-bold">
+              {isRTL ? 'المفضلة' : 'Wishlist'}
+            </h1>
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {isRTL
+                ? `${items.length} منتج محفوظ`
+                : `${items.length} saved item${items.length === 1 ? '' : 's'}`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 gap-1.5"
-            onClick={handleShareWishlist}
-          >
-            <Share2 className="size-3.5" />
-            {t('shareWishlist')}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 gap-1.5"
-            onClick={handleAddAllToCart}
-          >
-            <ShoppingCart className="size-3.5" />
-            {isRTL ? 'أضف الكل للسلة' : 'Add All to Cart'}
-          </Button>
-        </div>
-      </div>
+        {items.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={() => void shareWishlist()}
+            >
+              <Share2 className="me-2 size-4" aria-hidden="true" />
+              {isRTL ? 'مشاركة' : 'Share'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={addAvailableToCart}
+            >
+              <ShoppingCart className="me-2 size-4" aria-hidden="true" />
+              {isRTL ? 'أضف المتاح للسلة' : 'Add available'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+              onClick={() => setClearOpen(true)}
+            >
+              <Trash2 className="me-2 size-4" aria-hidden="true" />
+              {isRTL ? 'مسح الكل' : 'Clear all'}
+            </Button>
+          </div>
+        )}
+      </header>
 
-      {/* Collection Tabs */}
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin">
-        {collections.map((col) => (
-          <Button
-            key={col.id}
-            variant={activeCollection === col.id ? 'default' : 'outline'}
-            size="sm"
-            className={`shrink-0 text-xs rounded-full ${
-              activeCollection === col.id
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'border-border hover:border-emerald-300 dark:hover:border-emerald-700'
-            }`}
-            onClick={() => setActiveCollection(col.id)}
-          >
-            {col.id !== 'all' && <FolderOpen className="size-3 me-1" />}
-            {isRTL && col.nameAr ? col.nameAr : col.name}
-            <Badge variant="secondary" className="ms-1.5 text-[10px] px-1 py-0">
-              {col.count}
-            </Badge>
-          </Button>
-        ))}
-
-        {/* New Collection Button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0 text-xs rounded-full border-dashed"
-          onClick={() => setShowNewCollectionDialog(true)}
+      {error && (
+        <div
+          className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+          role="alert"
         >
-          <FolderPlus className="size-3 me-1" />
-          {t('b_newCollection')}
-        </Button>
-      </div>
-
-      {/* Sort + Actions Bar */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-            <SelectTrigger className="w-40 h-8 text-xs">
-              <ArrowUpDown className="size-3 me-1" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id}>
-                  {isRTL ? opt.labelAr : opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
+          <span className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            {error}
+          </span>
           <Button
+            type="button"
             variant="ghost"
             size="sm"
-            className="text-xs text-red-500 hover:text-red-600"
-            onClick={() => setRemoveAllTarget(true)}
+            onClick={() => void hydrate(user.id, true)}
           >
-            <Trash2 className="size-3 me-1" />
-            {t('removeAll')}
+            <RefreshCw className="me-1.5 size-4" />
+            {isRTL ? 'إعادة المحاولة' : 'Retry'}
           </Button>
-        </div>
-      </div>
-
-      {/* Wishlist Grid */}
-      {filteredItems.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderOpen className="size-12 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-muted-foreground">
-            {t('b_noItemsInCollection')}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-          {filteredItems.map((item) => {
-            const displayName = isRTL && item.nameAr ? item.nameAr : item.name;
-            const discount = item.originalPrice
-              ? Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100)
-              : 0;
-
-            return (
-              <Card
-                key={item.id}
-                className="group relative overflow-hidden hover:shadow-lg hover:shadow-emerald-500/5 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all duration-300"
-              >
-                <CardContent className="p-0">
-                  {/* Image */}
-                  <div
-                    className="relative aspect-square overflow-hidden bg-muted cursor-pointer"
-                    onClick={() => nav.selectProduct(item.productId)}
-                  >
-                    <Image
-                      src={item.image}
-                      alt={displayName}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-110"
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        if (!img.dataset.retried) {
-                          img.dataset.retried = 'true';
-                          img.src = getPlaceholderImage('electronics', displayName, 400, 400);
-                        }
-                      }}
-                    />
-
-                    {/* Discount Badge */}
-                    {discount > 0 && (
-                      <Badge className="absolute top-2 start-2 bg-red-500 text-white text-[10px] px-1.5 py-0">
-                        -{discount}%
-                      </Badge>
-                    )}
-
-                    {/* Stock Status Badge */}
-                    {item.stock === 0 && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <Badge className="bg-red-600 text-white">{t('outOfStock')}</Badge>
-                      </div>
-                    )}
-                    {item.stock > 0 && item.stock <= 5 && (
-                      <Badge className="absolute top-2 end-2 bg-amber-500 text-white text-[10px] px-1.5 py-0 z-10">
-                        {isRTL ? 'مخزون قليل' : 'Low Stock'}
-                      </Badge>
-                    )}
-                    {item.stock > 5 && item.stock <= 20 && (
-                      <Badge className="absolute top-2 end-2 bg-emerald-500 text-white text-[10px] px-1.5 py-0 z-10">
-                        <Package className="size-2 me-0.5" />{isRTL ? 'متوفر' : 'In Stock'}
-                      </Badge>
-                    )}
-
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-
-                    {/* Action buttons on hover */}
-                    <div className="absolute bottom-2 start-2 end-2 flex gap-1.5 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-                      <Button
-                        size="sm"
-                        className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCart(item);
-                        }}
-                        disabled={item.stock === 0}
-                      >
-                        {addingToCart === item.id ? (
-                          <Check className="size-3.5 me-1" />
-                        ) : (
-                          <ShoppingCart className="size-3.5 me-1" />
-                        )}
-                        {addingToCart === item.id
-                          ? t('b_added')
-                          : t('addToCart')}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Details */}
-                  <div className="p-3 space-y-1.5">
-                    <p className="text-[10px] text-muted-foreground truncate">{item.storeName}</p>
-                    <h3
-                      className="text-sm font-medium line-clamp-2 min-h-[2.5rem] cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                      onClick={() => nav.selectProduct(item.productId)}
-                    >
-                      {displayName}
-                    </h3>
-
-                    {/* Price */}
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatPrice(item.price)}
-                      </span>
-                      {item.originalPrice && item.originalPrice > item.price && (
-                        <span className="text-xs text-muted-foreground line-through">
-                          {formatPrice(item.originalPrice)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Price Drop Alert Toggle */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); togglePriceDropAlert(item.id); }}
-                      className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${
-                        priceDropAlerts.has(item.id)
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400'
-                      }`
-                    }
-                    >
-                      {priceDropAlerts.has(item.id) ? (
-                        <BellRing className="size-3" />
-                      ) : (
-                        <Bell className="size-3" />
-                      )}
-                      {priceDropAlerts.has(item.id)
-                        ? (isRTL ? 'تنبيه السعر مفعّل' : 'Price alert on')
-                        : (isRTL ? 'تنبيه انخفاض السعر' : 'Price drop alert')
-                      }
-                    </button>
-
-                    {/* Actions Row */}
-                    <div className="flex items-center justify-between pt-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
-                            <MoreVertical className="size-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align={isRTL ? 'start' : 'end'}>
-                          {collections
-                            .filter((c) => c.id !== 'all' && c.id !== item.collection)
-                            .map((col) => (
-                              <DropdownMenuItem
-                                key={col.id}
-                                onClick={() => handleMoveToCollection(item.id, col.id)}
-                              >
-                                <FolderOpen className="size-3.5 me-2" />
-                                {isRTL && col.nameAr ? col.nameAr : col.name}
-                              </DropdownMenuItem>
-                            ))}
-                          <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600"
-                            onClick={() => setRemoveTarget(item.id)}
-                          >
-                            <Trash2 className="size-3.5 me-2" />
-                            {t('b_removeFromWishlist')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-red-500 hover:text-red-600"
-                        onClick={() => setRemoveTarget(item.id)}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
         </div>
       )}
 
-      {/* Continue Shopping */}
-      <div className="text-center mt-8">
-        <Button
-          variant="ghost"
-          className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
-          onClick={() => nav.setView('shop')}
-        >
-          {isRTL ? <ArrowRight className="size-4 me-1" /> : <ArrowLeft className="size-4 me-1" />}
-          {t('continueShopping')}
-        </Button>
-      </div>
+      {items.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
+            <div className="flex size-24 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/50">
+              <Heart className="size-12 text-amber-300 dark:text-amber-800" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">
+                {isRTL ? 'لا توجد منتجات محفوظة' : 'Your wishlist is empty'}
+              </h2>
+              <p className="mt-1 text-muted-foreground">
+                {isRTL
+                  ? 'استخدم زر القلب في بطاقات المنتجات لحفظها هنا.'
+                  : 'Use the heart button on any product card to save it here.'}
+              </p>
+            </div>
+            <Button
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={() => nav.setView('shop')}
+            >
+              <ShoppingBag className="me-2 size-4" aria-hidden="true" />
+              {isRTL ? 'تصفح المنتجات' : 'Browse products'}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                {isRTL
+                  ? 'المفضلة متزامنة مع حسابك وتُحدّث من جميع صفحات المنتجات.'
+                  : 'This list is synchronized with your account and updates from every product page.'}
+              </p>
+              <Select
+                value={sortBy}
+                onValueChange={(value) => setSortBy(value as SortOption)}
+              >
+                <SelectTrigger className="w-full sm:w-52" aria-label={isRTL ? 'ترتيب المنتجات' : 'Sort products'}>
+                  <ArrowDownAZ className="me-2 size-4" aria-hidden="true" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">
+                    {isRTL ? 'الأحدث إضافة' : 'Recently added'}
+                  </SelectItem>
+                  <SelectItem value="price-low">
+                    {isRTL ? 'السعر: الأقل أولاً' : 'Price: low to high'}
+                  </SelectItem>
+                  <SelectItem value="price-high">
+                    {isRTL ? 'السعر: الأعلى أولاً' : 'Price: high to low'}
+                  </SelectItem>
+                  <SelectItem value="name">
+                    {isRTL ? 'الاسم' : 'Name'}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
 
-      {/* Remove Single Item Confirmation */}
-      <AlertDialog open={!!removeTarget} onOpenChange={(open) => !open && setRemoveTarget(null)}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {sortedItems.map((item) => {
+              const name = productName(item);
+              const image = imageFor(item);
+              const optionsRequired = requiresOptions(item);
+              const pending = Boolean(pendingProductIds[item.productId]);
+              return (
+                <article
+                  key={item.id}
+                  className="overflow-hidden rounded-xl border border-border bg-card"
+                >
+                  <Link
+                    href={`/product/${item.productId}`}
+                    className="relative block aspect-square overflow-hidden bg-muted"
+                    aria-label={
+                      isRTL ? `عرض تفاصيل ${name}` : `View ${name} details`
+                    }
+                  >
+                    <Image
+                      src={image}
+                      alt={name}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      loading="lazy"
+                      className="object-cover transition-transform duration-200 hover:scale-[1.03]"
+                    />
+                  </Link>
+
+                  <div className="space-y-3 p-4">
+                    <div className="min-w-0">
+                      {storeName(item) && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {storeName(item)}
+                        </p>
+                      )}
+                      <h2 className="mt-1 min-h-10 font-semibold leading-5">
+                        <Link
+                          href={`/product/${item.productId}`}
+                          className="line-clamp-2 hover:text-amber-700 dark:hover:text-amber-300"
+                        >
+                          {name}
+                        </Link>
+                      </h2>
+                    </div>
+
+                    <div className="flex items-end justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-amber-700 dark:text-amber-300">
+                          {formatPrice(item.product.price, currency)}
+                        </p>
+                        {item.product.originalPrice &&
+                          item.product.originalPrice > item.product.price && (
+                            <p className="text-xs text-muted-foreground line-through">
+                              {formatPrice(
+                                item.product.originalPrice,
+                                currency,
+                              )}
+                            </p>
+                          )}
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          item.product.stock <= 0
+                            ? 'border-red-200 text-red-700 dark:border-red-900 dark:text-red-300'
+                            : 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
+                        }
+                      >
+                        {item.product.stock <= 0
+                          ? isRTL
+                            ? 'غير متوفر'
+                            : 'Out of stock'
+                          : optionsRequired
+                            ? isRTL
+                              ? 'خيارات مطلوبة'
+                              : 'Options required'
+                            : isRTL
+                              ? 'متوفر'
+                              : 'In stock'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <Button
+                        type="button"
+                        className="h-10 bg-amber-600 text-white hover:bg-amber-700"
+                        onClick={() => addToCart(item)}
+                        disabled={item.product.stock <= 0}
+                      >
+                        <ShoppingCart className="me-2 size-4" aria-hidden="true" />
+                        {optionsRequired
+                          ? isRTL
+                            ? 'اختر الخيارات'
+                            : 'Choose options'
+                          : isRTL
+                            ? 'أضف للسلة'
+                            : 'Add to cart'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="size-10 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+                        onClick={() => void removeItem(item)}
+                        disabled={pending}
+                        aria-label={
+                          isRTL
+                            ? `إزالة ${name} من المفضلة`
+                            : `Remove ${name} from wishlist`
+                        }
+                      >
+                        {pending ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t('b_removeFromWishlistQ')}
+              {isRTL ? 'مسح قائمة المفضلة؟' : 'Clear your wishlist?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {isRTL
-                ? 'هل أنت متأكد من إزالة هذا المنتج من قائمة المفضلة؟'
-                : 'Are you sure you want to remove this item from your wishlist?'}
+                ? 'سيتم حذف جميع المنتجات المحفوظة من حسابك. لا يمكن التراجع عن هذا الإجراء.'
+                : 'All saved products will be removed from your account. This action cannot be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogCancel disabled={clearing}>
+              {isRTL ? 'إلغاء' : 'Cancel'}
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => removeTarget && handleRemoveItem(removeTarget)}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={(event) => {
+                event.preventDefault();
+                void clearWishlist();
+              }}
+              disabled={clearing}
+              className="bg-red-600 text-white hover:bg-red-700"
             >
-              {t('b_remove')}
+              {clearing && <Loader2 className="me-2 size-4 animate-spin" />}
+              {isRTL ? 'مسح الكل' : 'Clear all'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Remove All Confirmation */}
-      <AlertDialog open={removeAllTarget} onOpenChange={setRemoveAllTarget}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('removeAllItems')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {activeCollection === 'all'
-                ? isRTL
-                  ? 'هل أنت متأكد من إزالة جميع المنتجات من قائمة المفضلة؟ لا يمكن التراجع عن هذا الإجراء.'
-                  : 'Are you sure you want to remove all items from your wishlist? This action cannot be undone.'
-                : isRTL
-                  ? 'هل أنت متأكد من إزالة جميع المنتجات من هذه المجموعة؟'
-                  : 'Are you sure you want to remove all items from this collection?'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRemoveAll}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {t('removeAll')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Create Collection Dialog */}
-      <Dialog open={showNewCollectionDialog} onOpenChange={setShowNewCollectionDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FolderPlus className="size-5 text-emerald-600" />
-              {t('createCollection')}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium">{t('b_collectionNameEn')}</label>
-              <Input
-                value={newCollectionName}
-                onChange={(e) => setNewCollectionName(e.target.value)}
-                placeholder={t('b_egBirthdayGifts')}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium">{t('collectionNameAr')}</label>
-              <Input
-                value={newCollectionNameAr}
-                onChange={(e) => setNewCollectionNameAr(e.target.value)}
-                placeholder="مثال: هدايا عيد الميلاد"
-                dir="rtl"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewCollectionDialog(false)}>
-              {t('cancel')}
-            </Button>
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={handleCreateCollection}
-              disabled={!newCollectionName.trim()}
-            >
-              {t('b_create')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

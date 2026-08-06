@@ -113,7 +113,13 @@ export function PriceAlertsPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void fetchData();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [fetchData]);
 
   const handleDeleteAlert = async (alertId: string) => {

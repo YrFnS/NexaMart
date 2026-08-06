@@ -1,32 +1,27 @@
 'use client';
+
 import Link from 'next/link';
 import {
-  Star,
-  Truck,
-  Shield,
-  Clock,
-  Minus,
-  Plus,
-  Share2,
   BadgeCheck,
-  MessageCircle,
-  Sparkles,
-  Store,
-  Check,
+  Clock3,
   MapPin,
+  Minus,
   Package,
+  Plus,
+  ShoppingBag,
+  Sparkles,
+  Star,
+  Store,
+  Truck,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { COLOR_MAP } from '@/lib/theme';
-import { formatPrice } from '@/lib/currency';
-import { APP_NAME, DEFAULT_SELLER_PHONE } from '@/lib/config';
-
+import { Button } from '@/components/ui/button';
 import { type Product } from '@/components/buyer/product-card';
-import { VariationSelector } from '@/components/buyer/variation-selector';
 import { TieredPricing } from '@/components/buyer/tiered-pricing';
-import { ContactSellerButtons } from '@/components/common/contact-seller-buttons';
+import { VariationSelector } from '@/components/buyer/variation-selector';
 import { ListingExpirationBadge } from '@/components/common/listing-expiration-badge';
+import { formatPrice } from '@/lib/currency';
+import { COLOR_MAP } from '@/lib/theme';
 
 interface TierPrice {
   minQty: number;
@@ -36,17 +31,19 @@ interface TierPrice {
 interface ProductInfoSectionProps {
   product: Product;
   quantity: number;
-  setQuantity: (q: number) => void;
+  setQuantity: (quantity: number) => void;
   selectedVariations: Record<string, string>;
-  setSelectedVariations: (v: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
+  setSelectedVariations: (
+    value:
+      | Record<string, string>
+      | ((current: Record<string, string>) => Record<string, string>),
+  ) => void;
   variations: Record<string, string[]>;
   tieredPricing: TierPrice[];
   discount: number;
   displayName: string;
   effectivePrice: number;
   stockStatus: 'outOfStock' | 'lowStock' | 'inStock';
-  copied: boolean;
-  setCopied: (v: boolean) => void;
   isRTL: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
 }
@@ -55,130 +52,162 @@ function getColorHex(colorName: string): string | undefined {
   return COLOR_MAP[colorName.toLowerCase()] || undefined;
 }
 
-export function ProductInfoSection(props: ProductInfoSectionProps) {
-  const {
-    product, quantity, setQuantity, selectedVariations, setSelectedVariations,
-    variations, tieredPricing, discount, displayName,
-    effectivePrice, stockStatus,
-    copied, setCopied,
-    isRTL, t,
-  } = props;
+function parseAttributes(value: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, option]) => [key, String(option)]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function optionIsAvailable(
+  product: Product,
+  type: string,
+  value: string,
+  selected: Record<string, string>,
+): boolean {
+  const activeVariants =
+    product.variantSkus?.filter(
+      (variant) => variant.isActive && variant.stock > 0,
+    ) || [];
+  if (activeVariants.length === 0) return product.stock > 0;
+
+  return activeVariants.some((variant) => {
+    const attributes = parseAttributes(variant.attributes);
+    if (attributes[type] !== value) return false;
+    return Object.entries(selected).every(
+      ([selectedType, selectedValue]) =>
+        selectedType === type ||
+        !selectedValue ||
+        attributes[selectedType] === selectedValue,
+    );
+  });
+}
+
+export function ProductInfoSection({
+  product,
+  quantity,
+  setQuantity,
+  selectedVariations,
+  setSelectedVariations,
+  variations,
+  tieredPricing,
+  discount,
+  displayName,
+  effectivePrice,
+  stockStatus,
+  isRTL,
+  t,
+}: ProductInfoSectionProps) {
+  const hasVariants = Boolean(
+    product.variantSkus?.some((variant) => variant.isActive),
+  );
+  const storeName =
+    isRTL && product.store?.nameAr
+      ? product.store.nameAr
+      : product.store?.name;
+  const hasOriginalPrice = Boolean(
+    product.originalPrice && product.originalPrice > effectivePrice,
+  );
+  const saveAmount = hasOriginalPrice
+    ? Number(product.originalPrice) - effectivePrice
+    : 0;
 
   return (
     <div className="space-y-5">
-      {/* Title & Badges */}
       <div>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           {product.isNew && (
-            <Badge className="bg-amber-500 text-white text-xs">{t('new')}</Badge>
+            <Badge className="bg-amber-600 text-white">{t('new')}</Badge>
           )}
           {product.isSale && (
-            <Badge className="bg-red-500 text-white text-xs sale-badge-shimmer relative overflow-hidden">
-              <Sparkles className="size-3 me-0.5" />
+            <Badge className="bg-red-600 text-white">
+              <Sparkles className="me-1 size-3" aria-hidden="true" />
               {t('sale')}
             </Badge>
           )}
           {product.isFeatured && (
-            <Badge className="bg-amber-500 text-white text-xs">{t('featured')}</Badge>
+            <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+              {t('featured')}
+            </Badge>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight">{displayName}</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9 shrink-0 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-full"
-            onClick={async () => {
-              if (navigator.share) {
-                try {
-                  await navigator.share({
-                    title: displayName,
-                    text: `${product.name} - ${APP_NAME}`,
-                    url: window.location.href,
-                  });
-                } catch {
-                  await navigator.clipboard.writeText(window.location.href);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }
-              } else {
-                await navigator.clipboard.writeText(window.location.href);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }
-            }}
-          >
-            {copied ? <Check className="size-4 text-amber-500" /> : <Share2 className="size-4" />}
-          </Button>
-          {copied && (
-            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium animate-in fade-in">
-              {t('productLinkCopied')}
-            </span>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold leading-tight md:text-3xl">
+          {displayName}
+        </h1>
       </div>
 
-      {/* Rating */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1">
-          {Array.from({ length: 5 }, (_, i) => (
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          className="flex items-center gap-1"
+          aria-label={`${product.rating.toFixed(1)} / 5`}
+        >
+          {Array.from({ length: 5 }, (_, index) => (
             <Star
-              key={i}
+              key={index}
+              aria-hidden="true"
               className={`size-4 ${
-                i < Math.floor(product.rating)
+                index < Math.floor(product.rating)
                   ? 'fill-amber-400 text-amber-400'
-                  : i < product.rating
-                  ? 'fill-amber-400/50 text-amber-400'
                   : 'text-muted-foreground/30'
               }`}
             />
           ))}
-          <span className="text-sm font-medium ms-1">{(product.rating ?? 0).toFixed(1)}</span>
+          <span className="ms-1 text-sm font-medium">
+            {product.rating.toFixed(1)}
+          </span>
         </div>
         <span className="text-sm text-muted-foreground">
-          ({product.reviewCount} {t('reviews')})
+          {product.reviewCount} {t('reviews')}
         </span>
         <span className="text-sm text-muted-foreground">
           {product.soldCount.toLocaleString()} {t('sold')}
         </span>
-        <ListingExpirationBadge createdAt={product.createdAt || new Date().toISOString()} expiresAt={(product as unknown as Record<string, unknown>).expiresAt as string | undefined} />
+        <ListingExpirationBadge
+          createdAt={product.createdAt}
+          expiresAt={product.expiresAt}
+        />
       </div>
 
-      {/* Price */}
-      <div className="space-y-2 py-2">
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="text-4xl md:text-5xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
+      <div className="space-y-2 py-1">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <span className="text-4xl font-extrabold tracking-tight text-amber-700 dark:text-amber-300 md:text-5xl">
             {formatPrice(effectivePrice)}
           </span>
-          {product.originalPrice && product.originalPrice > product.price && (
+          {hasOriginalPrice && product.originalPrice && (
             <>
               <span className="text-xl text-muted-foreground line-through decoration-red-400/60">
                 {formatPrice(product.originalPrice)}
               </span>
-              <Badge className="bg-red-500 text-white text-sm font-bold animate-discount-soft-pulse">
+              <Badge className="bg-red-600 text-white">
                 -{discount}% {t('off')}
               </Badge>
             </>
           )}
         </div>
-        {product.originalPrice && product.originalPrice > product.price && (
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg w-fit">
-            <Sparkles className="size-3.5" />
-            {t('youSaveAmount', { amount: formatPrice(product.originalPrice - product.price) })}
+        {saveAmount > 0 && (
+          <div className="flex w-fit items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            {t('youSaveAmount', { amount: formatPrice(saveAmount) })}
           </div>
         )}
-        {effectivePrice < product.price && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
+        {!hasVariants && effectivePrice < product.price && (
+          <p className="text-xs text-amber-700 dark:text-amber-300">
             {t('bulkPriceApplied', { quantity })}
           </p>
         )}
       </div>
 
-      {/* Tiered Pricing */}
-      {tieredPricing.length > 0 && (
+      {!hasVariants && tieredPricing.length > 0 && (
         <TieredPricing
           tiers={tieredPricing.map((tier) => {
-            const tierDiscount = Math.round(((product.price - tier.price) / product.price) * 100);
+            const tierDiscount = Math.round(
+              ((product.price - tier.price) / product.price) * 100,
+            );
             return {
               minQty: tier.minQty,
               price: tier.price,
@@ -190,213 +219,175 @@ export function ProductInfoSection(props: ProductInfoSectionProps) {
         />
       )}
 
-      {/* Variations */}
-      {Object.entries(variations).filter(([, values]) => values.length > 0).length > 0 && (
+      {Object.entries(variations).some(([, values]) => values.length > 0) && (
         <VariationSelector
           variations={Object.entries(variations)
             .filter(([, values]) => values.length > 0)
             .map(([key, values]) => ({
               type: key,
-              typeAr: t(key + 'Variation') || key,
-              options: values.map((val) => ({
-                label: val,
-                value: val,
-                colorHex: key.toLowerCase().includes('color') ? getColorHex(val) : undefined,
-                inStock: true,
+              typeAr: t(`${key}Variation`) || key,
+              options: values.map((value) => ({
+                label: value,
+                value,
+                colorHex: key.toLowerCase().includes('color')
+                  ? getColorHex(value)
+                  : undefined,
+                inStock: optionIsAvailable(
+                  product,
+                  key,
+                  value,
+                  selectedVariations,
+                ),
               })),
               selected: selectedVariations[key],
-            }))
-          }
+            }))}
           onVariationChange={(type, value) =>
-            setSelectedVariations((prev) => ({ ...prev, [type]: value }))
+            setSelectedVariations((current) => ({
+              ...current,
+              [type]: value,
+            }))
           }
           basePrice={product.price}
         />
       )}
 
-      {/* Quantity */}
       <div>
-        <h4 className="text-sm font-semibold mb-2">{t('quantity')}</h4>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center border border-border rounded-lg">
+        <h2 className="mb-2 text-sm font-semibold">{t('quantity')}</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center rounded-lg border">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-none"
+              className="size-10 rounded-none"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               disabled={quantity <= 1}
+              aria-label={isRTL ? 'تقليل الكمية' : 'Decrease quantity'}
             >
-              <Minus className="size-3" />
+              <Minus className="size-4" aria-hidden="true" />
             </Button>
-            <span className="w-12 text-center font-medium text-sm">{quantity}</span>
+            <span
+              className="w-12 text-center text-sm font-semibold"
+              aria-live="polite"
+            >
+              {quantity}
+            </span>
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="size-9 rounded-none"
-              onClick={() => setQuantity(Math.min(product.stock || 99, quantity + 1))}
-              disabled={quantity >= (product.stock || 99)}
+              className="size-10 rounded-none"
+              onClick={() =>
+                setQuantity(Math.min(product.stock, quantity + 1))
+              }
+              disabled={product.stock <= 0 || quantity >= product.stock}
+              aria-label={isRTL ? 'زيادة الكمية' : 'Increase quantity'}
             >
-              <Plus className="size-3" />
+              <Plus className="size-4" aria-hidden="true" />
             </Button>
           </div>
-          <span className="text-sm text-muted-foreground">
-            {product.stock > 0 ? `${product.stock} ${t('available')}` : t('outOfStock')}
+          <span className="text-sm text-muted-foreground" aria-live="polite">
+            {product.stock > 0
+              ? `${product.stock} ${t('available')}`
+              : t('outOfStock')}
           </span>
         </div>
       </div>
 
-      {/* Stock Status */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          {stockStatus === 'inStock' && (
-            <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 gap-1">
-              <BadgeCheck className="size-3" />
-              {t('inStock')}
-            </Badge>
-          )}
-          {stockStatus === 'lowStock' && (
-            <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 gap-1">
-              <Clock className="size-3" />
-              {t('lowStockOnlyLeft', { count: product.stock })}
-            </Badge>
-          )}
-          {stockStatus === 'outOfStock' && (
-            <Badge variant="secondary" className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 gap-1">
-              {t('outOfStock')}
-            </Badge>
-          )}
-        </div>
-        {product.stock > 0 && product.stock <= 50 && (
-          <div className="space-y-1">
-            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full animate-stock-fill ${
-                  product.stock <= 5 ? 'bg-red-500' : product.stock <= 15 ? 'bg-amber-500' : 'stock-bar-gradient'
-                }`}
-                style={{ width: `${Math.min(100, (product.stock / 50) * 100)}%` }}
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              {product.stock <= 5
-                ? t('sellingFast')
-                : product.stock <= 15
-                ? t('limitedStock')
-                : t('currentlyInStock')}
-            </p>
-          </div>
+        {stockStatus === 'inStock' && (
+          <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <BadgeCheck className="me-1 size-3" aria-hidden="true" />
+            {t('inStock')}
+          </Badge>
+        )}
+        {stockStatus === 'lowStock' && (
+          <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <Clock3 className="me-1 size-3" aria-hidden="true" />
+            {t('lowStockOnlyLeft', { count: product.stock })}
+          </Badge>
+        )}
+        {stockStatus === 'outOfStock' && (
+          <Badge className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300">
+            {t('outOfStock')}
+          </Badge>
         )}
       </div>
 
-
-
-      {/* Estimated Delivery Date */}
-      {product.stock > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <Truck className="size-5 text-yellow-600 dark:text-yellow-400" />
-          <div>
-            <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
-              {(() => {
-                const now = new Date();
-                const hoursLeft = 23 - now.getHours();
-                const deliveryDate = new Date(now);
-                deliveryDate.setDate(deliveryDate.getDate() + (product.hasFreeShipping ? 3 : 5));
-                const dateStr = deliveryDate.toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                });
-                return t('orderWithinHours', { hours: hoursLeft, date: dateStr });
-              })()}
-            </span>
-            {product.hasFreeShipping && (
-              <p className="text-xs text-yellow-600/70 dark:text-yellow-400/70">{t('freeShipping')}</p>
-            )}
-          </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          <ShoppingBag className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <p>
+            {isRTL
+              ? 'يسجل NexaMart الطلب فقط. يتم الدفع مباشرةً للبائع عند الاستلام.'
+              : 'NexaMart records the order only. Payment is made directly to the seller on delivery.'}
+          </p>
         </div>
-      )}
-
-      {/* Shipping Info */}
-      {product.hasFreeShipping && (
-        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/50 rounded-lg border border-amber-200 dark:border-amber-800">
-          <Truck className="size-5 text-amber-600" />
-          <div>
-            <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-              {t('freeShipping')}
-            </span>
-            <p className="text-xs text-muted-foreground">{t('fastDeliveryDesc')}</p>
-          </div>
+        <div className="flex items-start gap-2 rounded-xl border p-3 text-sm">
+          <Truck className="mt-0.5 size-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <p>
+            {product.hasFreeShipping
+              ? isRTL
+                ? 'هذا المنتج مميز بشحن مجاني ضمن شحنة البائع. يؤكد الإجمالي النهائي عند مراجعة الطلب.'
+                : 'This item is marked for free shipping within the seller shipment. The final total is confirmed at order review.'
+              : isRTL
+                ? 'يُحسب الشحن لكل بائع عند مراجعة الطلب، ويضيف البائع بيانات الناقل والتتبع بعد الشحن.'
+                : 'Shipping is calculated per seller at order review. The seller records carrier and tracking details after dispatch.'}
+          </p>
         </div>
-      )}
-
-      {/* Escrow Note */}
-      <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/50 rounded-lg border border-amber-200 dark:border-amber-800">
-        <Shield className="size-5 text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-700 dark:text-amber-300">{t('escrowNote')}</p>
       </div>
 
-      {/* Seller Info Card */}
       {product.store && (
         <Link
           href={`/store/${product.storeId}`}
-          className="block p-4 rounded-xl border border-border hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300 cursor-pointer card-hover-glow seller-card-gradient relative overflow-hidden"
+          className="group block rounded-xl border p-4 transition-colors hover:border-amber-400 hover:bg-amber-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:hover:border-amber-700 dark:hover:bg-amber-950/20"
+          aria-label={
+            isRTL
+              ? `فتح متجر ${storeName || product.store.name}`
+              : `Open ${storeName || product.store.name} store`
+          }
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-50/80 via-transparent to-yellow-50/50 dark:from-amber-950/30 dark:via-transparent dark:to-yellow-950/20 pointer-events-none" />
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-white font-bold text-lg shadow-md ring-2 ring-white dark:ring-gray-800">
-                {product.store.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold truncate">{product.store.name}</span>
-                  {product.store.isVerified && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-full verified-check-anim">
-                      <BadgeCheck className="size-3" />
-                      {t('verified')}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <div className="flex items-center">
-                    <Star className="size-3 fill-amber-400 text-amber-400" />
-                    <span className="text-xs text-muted-foreground ms-0.5">
-                      {(product.store?.rating ?? 0).toFixed(1)}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5 font-medium">
-                    <Clock className="size-2.5" />
-                    {t('responseTime')}
-                  </span>
-                </div>
-              </div>
+          <div className="flex items-start gap-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-lg font-bold text-white">
+              {product.store.name.charAt(0).toUpperCase()}
             </div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm">
-                <Store className="size-3.5" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="truncate font-semibold">{storeName}</span>
+                {product.store.isVerified && (
+                  <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                    <BadgeCheck className="me-1 size-3" aria-hidden="true" />
+                    {t('verified')}
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Star className="size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                  {product.store.rating.toFixed(1)}
+                </span>
+                {typeof product.store.productCount === 'number' && (
+                  <span className="flex items-center gap-1">
+                    <Package className="size-3" aria-hidden="true" />
+                    {product.store.productCount}{' '}
+                    {isRTL ? 'منتج' : 'products'}
+                  </span>
+                )}
+                {product.store.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="size-3" aria-hidden="true" />
+                    {product.store.location}
+                  </span>
+                )}
+              </div>
+              <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700 group-hover:text-amber-800 dark:text-amber-300">
+                <Store className="size-4" aria-hidden="true" />
                 {t('visitStore')}
               </span>
-              <Button variant="ghost" size="sm" className="text-amber-600 gap-1 shrink-0 h-8" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                <MessageCircle className="size-3.5" />
-                {t('chatWithSeller')}
-              </Button>
-            </div>
-            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><MapPin className="size-2.5" />{product.store?.location || t('defaultLocation')}</span>
-              <span className="flex items-center gap-1"><Package className="size-2.5" />{t('onTimeDelivery')}</span>
-              <span className="flex items-center gap-1"><Shield className="size-2.5" />{t('protected')}</span>
             </div>
           </div>
         </Link>
       )}
-
-      {/* Contact Seller Buttons */}
-      <ContactSellerButtons
-        phone={DEFAULT_SELLER_PHONE}
-        storeName={product.store?.name}
-        productId={product.id}
-      />
     </div>
   );
 }
-
-

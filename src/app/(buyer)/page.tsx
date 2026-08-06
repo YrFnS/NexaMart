@@ -1,65 +1,38 @@
-'use client';
+import type { Metadata } from 'next';
+import { HomeOnboarding } from '@/components/buyer/home-onboarding';
+import { HomePage } from '@/components/buyer/home-page';
+import { APP_DESCRIPTION, APP_NAME, APP_URL } from '@/lib/config';
+import { getHomePageData, jsonLd } from '@/lib/storefront-data';
 
-import { useState, useEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
+export const metadata: Metadata = {
+  title: 'Marketplace home',
+  description: APP_DESCRIPTION,
+  alternates: { canonical: '/' },
+};
 
-const HomePage = dynamic(
-  () => import('@/components/buyer/home-page').then(mod => ({ default: mod.HomePage })),
-  {
-    loading: () => (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-muted-foreground text-sm">Loading...</p>
-        </div>
-      </div>
-    ),
-  }
-);
-
-const OnboardingFlow = dynamic(
-  () => import('@/components/common/onboarding-flow').then(mod => ({ default: mod.OnboardingFlow })),
-  { ssr: false }
-);
-
-const ONBOARDING_KEY = 'nexamart_onboarding_dismissed';
-
-export default function Home() {
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const onboardingChecked = useRef(false);
-
-  useEffect(() => {
-    if (onboardingChecked.current) return;
-    onboardingChecked.current = true;
-
-    try {
-      const dismissed = localStorage.getItem(ONBOARDING_KEY);
-      if (!dismissed) {
-        const timer = setTimeout(() => {
-          setShowOnboarding(true);
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
-    } catch {
-      // localStorage not available (SSR) - default to not showing
-    }
-  }, []);
-
-  const handleOnboardingComplete = () => {
-    try {
-      localStorage.setItem(ONBOARDING_KEY, 'true');
-    } catch {
-      // localStorage not available
-    }
-    setShowOnboarding(false);
+export default async function Home() {
+  const initialData = await getHomePageData();
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: APP_NAME,
+    url: APP_URL,
+    description: APP_DESCRIPTION,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${APP_URL}/shop?search={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
   };
 
   return (
     <>
-      <HomePage />
-      {showOnboarding && (
-        <OnboardingFlow onComplete={handleOnboardingComplete} />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd(websiteSchema) }}
+      />
+      <HomePage initialData={initialData} />
+      <HomeOnboarding />
     </>
   );
 }

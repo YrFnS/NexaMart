@@ -1,6 +1,36 @@
+import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { checkApiRateLimit, RATE_LIMITS, requireAdminAuth } from '@/lib/security';
+import {
+  checkApiRateLimit,
+  RATE_LIMITS,
+  requireAdminAuth,
+} from '@/lib/security';
+
+const reportableOrderWhere: Prisma.OrderWhereInput = {
+  status: { notIn: ['cancelled', 'rejected'] },
+};
+
+function emptyDashboard() {
+  return {
+    kpi: {
+      recordedOrderValue: 0,
+      totalUsers: 0,
+      activeSellers: 0,
+      totalOrders: 0,
+      totalProducts: 0,
+      totalStores: 0,
+      avgOrderValue: 0,
+      deliveredOrders: 0,
+    },
+    orderValueChart: [],
+    ordersByStatus: [],
+    categoryDist: [],
+    topStores: [],
+    recentSignups: [],
+    recentDisputes: [],
+  };
+}
 
 export async function GET(request: Request) {
   const authError = requireAdminAuth(request);
@@ -9,179 +39,172 @@ export async function GET(request: Request) {
   if (!rateLimitResult.allowed && rateLimitResult.response) {
     return rateLimitResult.response;
   }
+
   try {
-    // Run all aggregation queries in parallel
     const [
       totalUsers,
       totalOrders,
       totalProducts,
       totalStores,
-      orderAgg,
+      activeSellers,
+      deliveredOrders,
+      orderAggregate,
+      ordersByStatusRaw,
+      categoryDistRaw,
+      categories,
+      topStoresRaw,
+      recentUsers,
+      recentDisputesRaw,
     ] = await Promise.all([
       db.user.count(),
       db.order.count(),
-      db.product.count(),
+      db.product.count({ where: { status: 'active' } }),
       db.store.count(),
+      db.store.count({ where: { productCount: { gt: 0 } } }),
+      db.order.count({ where: { status: 'delivered' } }),
       db.order.aggregate({
+        where: reportableOrderWhere,
         _sum: { total: true },
         _avg: { total: true },
       }),
+      db.order.groupBy({
+        by: ['status'],
+        orderBy: { status: 'asc' },
+        _count: { status: true },
+      }),
+      db.product.groupBy({
+        by: ['categoryId'],
+        where: { status: 'active' },
+        orderBy: { categoryId: 'asc' },
+        _count: { categoryId: true },
+      }),
+      db.category.findMany({ select: { id: true, name: true } }),
+      db.store.findMany({
+        take: 5,
+        orderBy: [{ rating: 'desc' }, { createdAt: 'desc' }],
+        select: {
+          id: true,
+          name: true,
+          rating: true,
+          orders: {
+            where: reportableOrderWhere,
+            select: { total: true },
+          },
+        },
+      }),
+      db.user.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { name: true, email: true, role: true, createdAt: true },
+      }),
+      db.dispute.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          order: { select: { orderNumber: true } },
+          buyer: { select: { name: true } },
+          seller: {
+            select: { name: true, store: { select: { name: true } } },
+          },
+        },
+      }),
     ]);
 
-    const platformRevenue = (orderAgg._sum.total || 0) * 0.1; // 10% commission estimate
-    const avgOrderValue = orderAgg._avg.total || 0;
-
-    // Get orders by status
-    const ordersByStatusRaw = await db.order.groupBy({
-      by: ['status'],
-      _count: { status: true },
-    });
-
-    const ordersByStatus = ordersByStatusRaw.map((item) => ({
-      status: item.status.charAt(0).toUpperCase() + item.status.slice(1),
-      count: item._count.status,
+    const categoryById = new Map(
+      categories.map((category) => [category.id, category.name]),
+    );
+    const categoryDist = categoryDistRaw.map((entry) => ({
+      category: categoryById.get(entry.categoryId) || 'Other',
+      value: entry._count.categoryId,
     }));
 
-    // Get category distribution
-    const categoryDistRaw = await db.product.groupBy({
-      by: ['categoryId'],
-      _count: { categoryId: true },
-      where: { status: 'active' },
-    });
-
-    // Get category names
-    const categories = await db.category.findMany({
-      select: { id: true, name: true },
-    });
-
-    const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
-
-    const categoryDist = categoryDistRaw.map((item) => ({
-      category: categoryMap.get(item.categoryId) || 'Other',
-      value: item._count.categoryId,
+    const ordersByStatus = ordersByStatusRaw.map((entry) => ({
+      status: entry.status,
+      count: entry._count.status,
     }));
 
-    // Get top sellers by revenue
-    const topStores = await db.store.findMany({
-      take: 5,
-      orderBy: { rating: 'desc' },
-      select: {
-        name: true,
-        rating: true,
-        productCount: true,
-        orders: {
-          select: { total: true },
-        },
-      },
-    });
-
-    const topSellers = topStores.map((store) => ({
+    const topStores = topStoresRaw.map((store) => ({
+      id: store.id,
       name: store.name,
-      revenue: store.orders.reduce((sum, o) => sum + o.total, 0),
+      orderValue: store.orders.reduce(
+        (sum, order) => sum + Number(order.total),
+        0,
+      ),
       orders: store.orders.length,
       rating: store.rating,
     }));
 
-    // Get recent signups
-    const recentUsers = await db.user.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: { name: true, email: true, role: true, createdAt: true },
-    });
-
-    const recentSignups = recentUsers.map((u) => ({
-      name: u.name || 'Unknown',
-      email: u.email,
-      role: u.role,
-      date: u.createdAt.toISOString().split('T')[0],
+    const recentSignups = recentUsers.map((user) => ({
+      name: user.name || 'Unknown',
+      email: user.email,
+      role: user.role,
+      date: user.createdAt.toISOString(),
     }));
 
-    // Get recent disputes
-    const recentDisputesRaw = await db.dispute.findMany({
-      take: 3,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        order: { select: { orderNumber: true } },
-        buyer: { select: { name: true } },
-        seller: { select: { name: true, store: { select: { name: true } } } },
-      },
-    });
-
-    const recentDisputes = recentDisputesRaw.map((d) => ({
-      orderNum: d.order.orderNumber,
-      buyer: d.buyer.name || 'Unknown',
-      seller: d.seller.store?.[0]?.name || d.seller.name || 'Unknown',
-      reason: d.reason,
-      status: d.status,
+    const recentDisputes = recentDisputesRaw.map((dispute) => ({
+      orderNum: dispute.order.orderNumber,
+      buyer: dispute.buyer.name || 'Unknown',
+      seller:
+        dispute.seller.store?.name || dispute.seller.name || 'Unknown',
+      reason: dispute.reason,
+      status: dispute.status,
     }));
 
-    // Revenue chart - aggregate by month (last 12 months)
     const now = new Date();
-    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const twelveMonthsAgo = new Date(
+      now.getFullYear(),
+      now.getMonth() - 11,
+      1,
+    );
     const ordersForChart = await db.order.findMany({
-      where: { createdAt: { gte: twelveMonthsAgo }, status: { not: 'cancelled' } },
-      select: { createdAt: true, total: true },
-    });
-
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const revenueByMonth: Record<string, number> = {};
-
-    for (const order of ordersForChart) {
-      const monthKey = `${monthNames[order.createdAt.getMonth()]} ${order.createdAt.getFullYear()}`;
-      revenueByMonth[monthKey] = (revenueByMonth[monthKey] || 0) + order.total;
-    }
-
-    const revenueChart = Object.entries(revenueByMonth).map(([month, revenue]) => ({
-      month: month.split(' ')[0],
-      revenue: Math.round(revenue),
-    }));
-
-    const activeSellers = await db.store.count({
-      where: { productCount: { gt: 0 } },
-    });
-
-    const dashboardData = {
-      kpi: {
-        gmv: orderAgg._sum.total || 0,
-        gmvChange: 0,
-        totalUsers,
-        totalUsersChange: 0,
-        activeSellers,
-        activeSellersChange: 0,
-        totalOrders,
-        totalOrdersChange: 0,
-        platformRevenue: Math.round(platformRevenue),
-        platformRevenueChange: 0,
-        avgOrderValue: Math.round(avgOrderValue * 100) / 100,
-        avgOrderValueChange: 0,
+      where: {
+        ...reportableOrderWhere,
+        createdAt: { gte: twelveMonthsAgo },
       },
-      revenueChart,
-      ordersByStatus,
-      categoryDist,
-      topSellers,
-      recentSignups,
-      recentDisputes,
-    };
+      select: { createdAt: true, total: true },
+      orderBy: { createdAt: 'asc' },
+    });
 
-    return NextResponse.json(dashboardData);
-  } catch (error) {
-    console.error('Admin Dashboard API error:', error);
-    // Return zeros if DB query fails
+    const orderValueByMonth = new Map<string, number>();
+    for (let offset = 11; offset >= 0; offset -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      orderValueByMonth.set(key, 0);
+    }
+    for (const order of ordersForChart) {
+      const key = `${order.createdAt.getFullYear()}-${String(
+        order.createdAt.getMonth() + 1,
+      ).padStart(2, '0')}`;
+      orderValueByMonth.set(
+        key,
+        (orderValueByMonth.get(key) || 0) + Number(order.total),
+      );
+    }
+    const orderValueChart = [...orderValueByMonth.entries()].map(
+      ([month, value]) => ({ month, value: Math.round(value * 100) / 100 }),
+    );
+
     return NextResponse.json({
       kpi: {
-        gmv: 0, gmvChange: 0,
-        totalUsers: 0, totalUsersChange: 0,
-        activeSellers: 0, activeSellersChange: 0,
-        totalOrders: 0, totalOrdersChange: 0,
-        platformRevenue: 0, platformRevenueChange: 0,
-        avgOrderValue: 0, avgOrderValueChange: 0,
+        recordedOrderValue: Number(orderAggregate._sum.total || 0),
+        totalUsers,
+        activeSellers,
+        totalOrders,
+        totalProducts,
+        totalStores,
+        avgOrderValue:
+          Math.round(Number(orderAggregate._avg.total || 0) * 100) / 100,
+        deliveredOrders,
       },
-      revenueChart: [],
-      ordersByStatus: [],
-      categoryDist: [],
-      topSellers: [],
-      recentSignups: [],
-      recentDisputes: [],
+      orderValueChart,
+      ordersByStatus,
+      categoryDist,
+      topStores,
+      recentSignups,
+      recentDisputes,
     });
+  } catch (error) {
+    console.error('Admin dashboard API error:', error);
+    return NextResponse.json(emptyDashboard(), { status: 500 });
   }
 }
