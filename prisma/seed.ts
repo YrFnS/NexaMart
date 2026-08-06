@@ -70,6 +70,8 @@ async function main() {
 	await db.auditLog.deleteMany({});
 	await db.storeReview.deleteMany({});
 	await db.helpTicket.deleteMany({});
+	await db.replacementShipment.deleteMany({});
+	await db.orderStatusEvent.deleteMany({});
 	await db.banner.deleteMany({});
 	await db.staff.deleteMany({});
 	await db.dispute.deleteMany({});
@@ -206,6 +208,7 @@ async function main() {
 				phone: "+962799887766",
 				role: "buyer",
 				isVerified: false,
+				isBanned: true,
 				loyaltyPoints: 50,
 				walletBalance: 0,
 				aiCredits: 0,
@@ -1603,6 +1606,169 @@ async function main() {
 		],
 	});
 
+	// ─── COMPLETE DEMO COVERAGE ───────────────────────────────────────────────────
+	await db.product.update({ where: { id: "RSP-007" }, data: { status: "draft" } });
+	await db.product.update({ where: { id: "SHH-008" }, data: { status: "archived" } });
+
+	await db.wishlist.createMany({
+		data: [
+			{ userId: user.id, productId: allProducts[1].id },
+			{ userId: buyer2.id, productId: allProducts[4].id },
+		],
+	});
+
+	await db.storeReview.createMany({
+		data: [
+			{ storeId: stores[0].id, userId: user.id, rating: 5, comment: "Fast delivery and helpful support." },
+			{ storeId: stores[4].id, userId: buyer2.id, rating: 3, comment: "Good products; delivery updates could improve." },
+		],
+	});
+
+	await db.auction.createMany({
+		data: [
+			{ productId: allProducts[0].id, startPrice: 40, currentPrice: 40, reservePrice: 70, startTime: new Date(now.getTime() + 24 * 60 * 60 * 1000), endTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), status: "upcoming" },
+			{ productId: allProducts[1].id, startPrice: 120, currentPrice: 180, reservePrice: 200, startTime: new Date(now.getTime() - 24 * 60 * 60 * 1000), endTime: new Date(now.getTime() + 24 * 60 * 60 * 1000), status: "active", bidCount: 7 },
+			{ productId: allProducts[2].id, startPrice: 100, currentPrice: 225, reservePrice: 180, startTime: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000), endTime: new Date(now.getTime() - 24 * 60 * 60 * 1000), status: "ended", bidCount: 12, winnerId: buyer3.id },
+		],
+	});
+
+	await db.app.createMany({
+		data: [
+			{ name: "Inventory Sync", nameAr: "مزامنة المخزون", description: "Synchronize seller inventory.", category: "operations", developer: "NexaMart Labs", rating: 4.8, installs: 2400, isFree: true },
+			{ name: "Advanced Analytics", nameAr: "تحليلات متقدمة", description: "Detailed store performance reports.", category: "analytics", developer: "NexaMart Labs", rating: 4.6, installs: 780, price: 19.99, isFree: false },
+		],
+	});
+
+	await db.priceAlert.createMany({
+		data: [
+			{ userId: user.id, productId: allProducts[1].id, targetPrice: 199.99, currentPrice: 249.99, isActive: true },
+			{ userId: buyer2.id, productId: allProducts[4].id, targetPrice: 89.99, currentPrice: 79.99, isActive: false, isNotified: true },
+			{ userId: buyer3.id, productId: allProducts[5].id, targetPrice: 99.99, currentPrice: 149.99, isActive: false, expiresAt: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+		],
+	});
+
+	const orderItems = await db.orderItem.findMany();
+	const itemForOrder = (orderId: string) => {
+		const item = orderItems.find((candidate) => candidate.orderId === orderId);
+		if (!item) throw new Error(`Missing seeded order item for ${orderId}`);
+		return item;
+	};
+	const variants = await db.productVariant.findMany();
+	const variantForProduct = (productId: string) =>
+		variants.find((variant) => variant.productId === productId);
+
+	const returnInputs = [
+		{ order: orders[0], buyerId: user.id, sellerId: seller.id, status: "pending", reason: "not_as_described", resolution: "return_only", details: "Packaging was intact but the color differed from the listing." },
+		{ order: orders[4], buyerId: buyer2.id, sellerId: seller.id, status: "processing", reason: "defective", resolution: "exchange", details: "One key intermittently fails.", sellerNote: "Replacement approved after inspection." },
+		{ order: orders[6], buyerId: buyer3.id, sellerId: seller4.id, status: "completed", reason: "damaged_shipping", resolution: "offline_refund", details: "Bottle arrived damaged.", offlineRefundStatus: "confirmed", offlineRefundConfirmedAt: now, offlineRefundConfirmedBy: seller4.id, inventoryDisposition: "discard", inventoryDispositionAt: now, inventoryDispositionBy: seller4.id },
+	];
+	for (const input of returnInputs) {
+		const item = itemForOrder(input.order.id);
+		const variant = variantForProduct(item.productId);
+		await db.return.create({
+			data: {
+				orderId: input.order.id,
+				orderItemId: item.id,
+				productId: item.productId,
+				variantId: variant?.id,
+				sku: variant?.sku,
+				buyerId: input.buyerId,
+				sellerId: input.sellerId,
+				quantity: 1,
+				unitPrice: item.price,
+				refundAmount: item.total,
+				reason: input.reason,
+				details: input.details,
+				resolution: input.resolution,
+				status: input.status,
+				offlineRefundStatus: input.offlineRefundStatus || "not_required",
+				offlineRefundConfirmedAt: input.offlineRefundConfirmedAt,
+				offlineRefundConfirmedBy: input.offlineRefundConfirmedBy,
+				inventoryDisposition: input.inventoryDisposition,
+				inventoryDispositionAt: input.inventoryDispositionAt,
+				inventoryDispositionBy: input.inventoryDispositionBy,
+				sellerNote: input.sellerNote,
+				timeline: JSON.stringify([{ status: input.status, date: now.toISOString(), note: "Seeded lifecycle state" }]),
+			},
+		});
+	}
+
+	const seededReturns = await db.return.findMany({ orderBy: { createdAt: "asc" } });
+	const exchangeReturn = seededReturns.find((entry) => entry.resolution === "exchange");
+	if (!exchangeReturn) throw new Error("Missing seeded exchange return");
+	const exchangeOrder = orders.find((entry) => entry.id === exchangeReturn.orderId);
+	if (!exchangeOrder?.storeId) throw new Error("Missing store for seeded exchange return");
+	await db.replacementShipment.create({
+		data: {
+			returnId: exchangeReturn.id,
+			orderId: exchangeReturn.orderId,
+			orderItemId: exchangeReturn.orderItemId,
+			productId: exchangeReturn.productId,
+			variantId: exchangeReturn.variantId,
+			buyerId: exchangeReturn.buyerId,
+			sellerId: exchangeReturn.sellerId,
+			storeId: exchangeOrder.storeId,
+			sku: exchangeReturn.sku,
+			quantity: exchangeReturn.quantity,
+			carrier: "Aramex",
+			trackingNumber: "REPL-2026-001",
+			status: "shipped",
+			shippedAt: now,
+			notes: "Replacement shipped after quality review.",
+		},
+	});
+
+	await db.invoice.createMany({
+		data: [
+			{ orderId: orders[0].id, invoiceNumber: "INV-001", sellerId: seller.id, buyerId: user.id, subtotal: 89.99, discount: 10, tax: 6.3, total: 86.29, paymentMethod: "cash_on_delivery", status: "paid" },
+			{ orderId: orders[1].id, invoiceNumber: "INV-002", sellerId: seller2.id, buyerId: user.id, subtotal: 199.99, tax: 14, total: 213.99, paymentMethod: "cash_on_delivery", status: "unpaid", dueDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
+			{ orderId: orders[4].id, invoiceNumber: "INV-003", sellerId: seller.id, buyerId: buyer2.id, subtotal: 149.99, discount: 15, tax: 9.45, total: 144.44, paymentMethod: "cash_on_delivery", status: "overdue", dueDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+		],
+	});
+
+	await db.payout.createMany({
+		data: [
+			{ sellerId: seller.id, storeId: stores[0].id, amount: 1200, status: "pending" },
+			{ sellerId: seller2.id, storeId: stores[1].id, amount: 850, method: "wallet", status: "processing" },
+			{ sellerId: seller3.id, storeId: stores[2].id, amount: 640, status: "completed", processedAt: now },
+			{ sellerId: seller4.id, storeId: stores[3].id, amount: 175, status: "rejected", processedAt: now, notes: "Bank account verification required." },
+		],
+	});
+
+	await db.dispute.createMany({
+		data: [
+			{ orderId: orders[0].id, buyerId: user.id, sellerId: seller.id, reason: "Item condition", description: "Buyer requested a review of the listed condition.", status: "open" },
+			{ orderId: orders[1].id, buyerId: user.id, sellerId: seller2.id, reason: "Delivery delay", status: "under_review", aiSummary: "Shipment is in transit and carrier evidence is pending." },
+			{ orderId: orders[4].id, buyerId: buyer2.id, sellerId: seller.id, reason: "Replacement", status: "resolved", resolution: "Seller shipped a replacement." },
+			{ orderId: orders[6].id, buyerId: buyer3.id, sellerId: seller4.id, reason: "Damaged parcel", status: "closed", resolution: "Offline refund confirmed." },
+		],
+	});
+
+	await db.staff.createMany({
+		data: [
+			{ storeId: stores[0].id, userId: buyer2.id, role: "manager", status: "active" },
+			{ storeId: stores[0].id, userId: buyer3.id, role: "editor", inviteEmail: buyer3.email, status: "pending" },
+			{ storeId: stores[1].id, userId: buyer4.id, role: "viewer", inviteEmail: buyer4.email, status: "revoked" },
+		],
+	});
+
+	await db.helpTicket.createMany({
+		data: [
+			{ userId: user.id, subject: "How do I update an address?", category: "account", status: "open", priority: "low" },
+			{ userId: buyer2.id, subject: "Shipment tracking has not updated", category: "orders", status: "in_progress", priority: "high" },
+			{ userId: seller.id, subject: "CSV import completed", category: "seller", status: "resolved", priority: "medium" },
+			{ userId: buyer3.id, subject: "Refund confirmation received", category: "returns", status: "closed", priority: "medium" },
+		],
+	});
+
+	await db.auditLog.createMany({
+		data: [
+			{ adminId: admin.id, action: "approve", targetType: "store", targetId: stores[0].id, details: JSON.stringify({ verified: true }) },
+			{ adminId: admin.id, action: "archive", targetType: "product", targetId: "SHH-008", details: JSON.stringify({ reason: "catalog cleanup" }) },
+			{ adminId: admin.id, action: "resolve", targetType: "dispute", targetId: orders[4].id, details: JSON.stringify({ outcome: "replacement" }) },
+		],
+	});
+
 	// ─── COUNTS ───────────────────────────────────────────────────────────────────
 	const counts = {
 		users: await db.user.count(),
@@ -1611,16 +1777,34 @@ async function main() {
 		products: await db.product.count(),
 		productVariants: await db.productVariant.count(),
 		orders: await db.order.count(),
+		orderItems: await db.orderItem.count(),
+		orderStatusEvents: await db.orderStatusEvent.count(),
 		reviews: await db.review.count(),
+		storeReviews: await db.storeReview.count(),
+		wishlists: await db.wishlist.count(),
+		addresses: await db.address.count(),
+		notifications: await db.notification.count(),
+		flashSales: await db.flashSale.count(),
+		coupons: await db.coupon.count(),
+		auctions: await db.auction.count(),
+		apps: await db.app.count(),
+		chatMessages: await db.chatMessage.count(),
+		platformSettings: await db.platformSettings.count(),
 		cars: await db.car.count(),
 		properties: await db.property.count(),
 		classifieds: await db.classified.count(),
 		jobs: await db.job.count(),
 		services: await db.service.count(),
-		coupons: await db.coupon.count(),
-		flashSales: await db.flashSale.count(),
+		returns: await db.return.count(),
+		replacementShipments: await db.replacementShipment.count(),
+		priceAlerts: await db.priceAlert.count(),
+		invoices: await db.invoice.count(),
+		payouts: await db.payout.count(),
+		disputes: await db.dispute.count(),
+		staff: await db.staff.count(),
 		banners: await db.banner.count(),
-		chatMessages: await db.chatMessage.count(),
+		helpTickets: await db.helpTicket.count(),
+		auditLogs: await db.auditLog.count(),
 	};
 
 	console.log("✅ Database seeded successfully!");
