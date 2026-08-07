@@ -51,6 +51,18 @@ test.describe('P3 critical authenticated flows', () => {
     expect(sessionResult.payload.user?.role).toBe('buyer');
   });
 
+  test('buyer cannot render the seller workspace', async ({ page }) => {
+    await loginWithApi(page);
+    await gotoAndExpectOk(page, '/seller/dashboard');
+
+    await expect(
+      page.getByRole('heading', { name: 'Seller access required' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'NexaMart Seller' }),
+    ).not.toBeVisible();
+  });
+
   test('buyer places one pay-on-delivery order per seller', async ({ page }) => {
     await loginWithApi(page);
 

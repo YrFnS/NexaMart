@@ -167,9 +167,36 @@ export default function SellerDashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t, dir } = useI18n();
   const router = useRouter();
-  const { user } = useUserStore();
+  const { user, isHydrated } = useUserStore();
   const pathname = usePathname();
   const isRTL = dir() === 'rtl';
+
+  if (!isHydrated) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="h-10 w-10 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (user?.role !== 'seller' && user?.role !== 'admin') {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <section className="w-full max-w-md rounded-2xl border border-emerald-200 bg-card p-6 text-center shadow-xl dark:border-emerald-800">
+          <h1 className="text-xl font-bold">Seller access required</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Sign in with an authorized seller account to continue.
+          </p>
+          <Button
+            className="mt-5 bg-emerald-600 text-white hover:bg-emerald-700"
+            onClick={() => router.push('/auth')}
+          >
+            Sign in
+          </Button>
+        </section>
+      </main>
+    );
+  }
 
   // Determine active nav label for the page title
   const activeNavItem = navItems.find(item => {
