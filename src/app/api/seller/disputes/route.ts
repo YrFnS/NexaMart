@@ -1,6 +1,10 @@
+import { requireUserRole } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 export async function GET(request: Request) {
+  const auth = await requireUserRole(request, ['seller', 'admin']);
+  if (auth.response) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const sellerId = searchParams.get('sellerId');
@@ -9,8 +13,38 @@ export async function GET(request: Request) {
       return Response.json([]);
     }
 
+    const accessibleStores =
+      auth.user.role === 'admin'
+        ? []
+        : await db.store.findMany({
+            where: {
+              ownerId: sellerId,
+              OR: [
+                { ownerId: auth.user.id },
+                {
+                  staff: {
+                    some: {
+                      userId: auth.user.id,
+                      status: 'active',
+                      role: { in: ['owner', 'manager', 'editor'] },
+                    },
+                  },
+                },
+              ],
+            },
+            select: { id: true },
+          });
+    if (auth.user.role !== 'admin' && accessibleStores.length === 0) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const disputes = await db.dispute.findMany({
-      where: { sellerId },
+      where: {
+        sellerId,
+        ...(auth.user.role === 'admin'
+          ? {}
+          : { order: { storeId: { in: accessibleStores.map((store) => store.id) } } }),
+      },
       include: {
         order: true,
         buyer: { select: { id: true, name: true, email: true } },
