@@ -101,12 +101,22 @@ export async function requireUserRole(
   const auth = await requireAuthenticatedUser(request);
   if (auth.response) return auth;
 
-  if (!allowedRoles.includes(auth.user.role)) {
-    return {
-      user: null,
-      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
-    };
-  }
+  if (allowedRoles.includes(auth.user.role)) return auth;
 
-  return auth;
+  const activeSellerStaff = allowedRoles.includes('seller')
+    ? await db.staff.findFirst({
+        where: {
+          userId: auth.user.id,
+          status: 'active',
+          role: { in: ['owner', 'manager', 'editor'] },
+        },
+        select: { id: true },
+      })
+    : null;
+  if (activeSellerStaff) return auth;
+
+  return {
+    user: null,
+    response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+  };
 }

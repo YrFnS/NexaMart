@@ -27,7 +27,7 @@ interface AuthResponse {
   error?: string;
 }
 
-export function AuthPage() {
+export function AuthPage({ demoLoginEnabled }: { demoLoginEnabled: boolean }) {
   const { t, locale } = useI18n();
   const nav = useAppNavigation();
   const setUser = useUserStore((state) => state.setUser);
@@ -101,11 +101,15 @@ export function AuthPage() {
 
   useEffect(() => {
     const role = new URLSearchParams(window.location.search).get('demo');
-    if ((role === 'buyer' || role === 'seller') && !demoLoginStarted.current) {
+    if (
+      demoLoginEnabled &&
+      (role === 'buyer' || role === 'seller') &&
+      !demoLoginStarted.current
+    ) {
       demoLoginStarted.current = true;
       void handleDemoLogin(role);
     }
-  }, [handleDemoLogin]);
+  }, [demoLoginEnabled, handleDemoLogin]);
 
   async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
@@ -277,26 +281,28 @@ export function AuthPage() {
                     <AuthError message={error} />
                     <SubmitButton loading={isLoading} label={t('login')} />
 
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 rounded-xl border-emerald-300 text-emerald-700"
-                        onClick={() => void handleDemoLogin('buyer')}
-                        disabled={isLoading}
-                      >
-                        {isRTL ? 'تجربة حساب المشتري' : 'Buyer Demo'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 rounded-xl border-teal-300 text-teal-700"
-                        onClick={() => void handleDemoLogin('seller')}
-                        disabled={isLoading}
-                      >
-                        {isRTL ? 'تجربة حساب البائع' : 'Seller Demo'}
-                      </Button>
-                    </div>
+                    {demoLoginEnabled && (
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl border-emerald-300 text-emerald-700"
+                          onClick={() => void handleDemoLogin('buyer')}
+                          disabled={isLoading}
+                        >
+                          {isRTL ? 'تجربة حساب المشتري' : 'Buyer Demo'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 rounded-xl border-teal-300 text-teal-700"
+                          onClick={() => void handleDemoLogin('seller')}
+                          disabled={isLoading}
+                        >
+                          {isRTL ? 'تجربة حساب البائع' : 'Seller Demo'}
+                        </Button>
+                      </div>
+                    )}
 
                     <p className="text-xs text-center text-muted-foreground">
                       {t('dontHaveAccount')}{' '}
