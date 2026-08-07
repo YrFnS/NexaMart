@@ -216,7 +216,6 @@ async function main() {
 		],
 	});
 
-	const allUsers = await db.user.findMany({ orderBy: { createdAt: "asc" } });
 	const [
 		user,
 		seller,
@@ -228,7 +227,20 @@ async function main() {
 		buyer2,
 		buyer3,
 		buyer4,
-	] = allUsers;
+	] = await Promise.all(
+		[
+			"demo@nexamart.com",
+			"seller@nexamart.com",
+			"admin@nexamart.com",
+			"fashion@nexamart.com",
+			"home@nexamart.com",
+			"beauty@nexamart.com",
+			"sports@nexamart.com",
+			"ahmed@nexamart.com",
+			"fatima@nexamart.com",
+			"omar@nexamart.com",
+		].map((email) => db.user.findUniqueOrThrow({ where: { email } })),
+	);
 
 	// ─── CATEGORIES ───────────────────────────────────────────────────────────────
 	await db.category.createMany({
