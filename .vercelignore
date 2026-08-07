@@ -1,0 +1,9 @@
+.git
+.gitnexus
+node_modules
+.next
+test-results
+playwright-report
+staging-test-results
+*.db
+.env*
