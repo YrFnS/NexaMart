@@ -240,14 +240,9 @@ export const LS_KEYS = {
 export const DEFAULT_TIMEZONE =
   process.env.NEXT_PUBLIC_DEFAULT_TIMEZONE || 'Asia/Baghdad';
 
-// ─── External Image Service ──────────────────────────────────────────────────
-
-export const IMAGE_SERVICES = {
-  /** Placeholder image service for demo/mock data */
-  picsum: (seed: string, width = 400, height = 400) =>
-    `https://picsum.photos/seed/${seed}/${width}/${height}`,
-};
-
+// User-visible images come from explicit, curated URLs in storefront data.
+// Keep missing-image fallbacks local so a broken network asset never removes
+// the product content or its accessible label.
 export const PAYMENT_METHODS = [
   { name: 'Visa', color: 'bg-[#1A1F71] text-white' },
   { name: 'Mastercard', color: 'bg-[#EB001B] text-white' },

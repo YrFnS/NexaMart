@@ -103,7 +103,7 @@ async function main() {
 	await db.user.deleteMany({});
 
 	// ─── USERS ────────────────────────────────────────────────────────────────────
-	const users = await db.user.createMany({
+	await db.user.createMany({
 		data: [
 			{
 				email: "demo@nexamart.com",
@@ -250,6 +250,7 @@ async function main() {
 				nameAr: "إلكترونيات",
 				slug: "electronics",
 				icon: "smartphone",
+				image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=600&q=80",
 				productCount: 156,
 			},
 			{
@@ -257,6 +258,7 @@ async function main() {
 				nameAr: "أزياء",
 				slug: "fashion",
 				icon: "shirt",
+				image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80",
 				productCount: 243,
 			},
 			{
@@ -264,6 +266,7 @@ async function main() {
 				nameAr: "المنزل والحديقة",
 				slug: "home-garden",
 				icon: "home",
+				image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80",
 				productCount: 89,
 			},
 			{
@@ -271,6 +274,7 @@ async function main() {
 				nameAr: "الجمال والصحة",
 				slug: "beauty",
 				icon: "sparkles",
+				image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
 				productCount: 167,
 			},
 			{
@@ -278,6 +282,7 @@ async function main() {
 				nameAr: "رياضة",
 				slug: "sports",
 				icon: "dumbbell",
+				image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600&q=80",
 				productCount: 78,
 			},
 			{
@@ -285,6 +290,7 @@ async function main() {
 				nameAr: "ألعاب",
 				slug: "toys",
 				icon: "gamepad-2",
+				image: "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=1200&q=80",
 				productCount: 56,
 			},
 			{
@@ -292,6 +298,7 @@ async function main() {
 				nameAr: "سيارات",
 				slug: "automotive",
 				icon: "car",
+				image: "https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?auto=compress&cs=tinysrgb&w=1200",
 				productCount: 34,
 			},
 			{
@@ -299,6 +306,7 @@ async function main() {
 				nameAr: "كتب ووسائط",
 				slug: "books",
 				icon: "book-open",
+				image: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=1200&q=80",
 				productCount: 112,
 			},
 			{
@@ -306,6 +314,7 @@ async function main() {
 				nameAr: "طعام وبقالة",
 				slug: "food",
 				icon: "shopping-basket",
+				image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
 				productCount: 95,
 			},
 			{
@@ -313,6 +322,7 @@ async function main() {
 				nameAr: "مجوهرات وساعات",
 				slug: "jewelry",
 				icon: "watch",
+				image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80",
 				productCount: 67,
 			},
 		],
@@ -454,7 +464,7 @@ async function main() {
 				price: 249.99,
 				originalPrice: 349.99,
 				images:
-					'["https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.pexels.com/photos/277390/pexels-photo-277390.jpeg?auto=compress&cs=tinysrgb&w=1200"]',
 				categoryId: categories[0].id,
 				storeId: stores[0].id,
 				stock: 75,
@@ -504,7 +514,7 @@ async function main() {
 				descriptionAr: "كاميرا احترافية بدقة 4K مع تقريب بصري 30x وWiFi",
 				price: 599.99,
 				originalPrice: 799.99,
-				images: '["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+				images: '["https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80"]',
 				categoryId: categories[0].id,
 				storeId: stores[0].id,
 				stock: 30,
@@ -550,7 +560,7 @@ async function main() {
 				descriptionAr: "لوحة مفاتيح ميكانيكية RGB بمفاتيح Cherry MX",
 				price: 149.99,
 				originalPrice: 189.99,
-				images: '["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+				images: '["https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1200&q=80"]',
 				categoryId: categories[0].id,
 				storeId: stores[0].id,
 				stock: 120,
@@ -596,7 +606,7 @@ async function main() {
 				descriptionAr: "جهاز تحكم مركزي للمنزل الذكي متوافق مع جميع المنصات",
 				price: 179.99,
 				originalPrice: 229.99,
-				images: '["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+				images: '["https://images.pexels.com/photos/157811/pexels-photo-157811.jpeg?auto=compress&cs=tinysrgb&w=1200"]',
 				categoryId: categories[2].id,
 				storeId: stores[2].id,
 				stock: 55,
@@ -642,7 +652,7 @@ async function main() {
 				price: 129.99,
 				originalPrice: 179.99,
 				images:
-					'["https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=1200&q=80"]',
 				categoryId: categories[3].id,
 				storeId: stores[3].id,
 				stock: 90,
@@ -1027,7 +1037,7 @@ async function main() {
 				condition: "used",
 				color: "Pearl White",
 				images:
-					'["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?auto=compress&cs=tinysrgb&w=1200"]',
 				city: "Dubai",
 				country: "UAE",
 				sellerId: seller.id,
@@ -1052,7 +1062,7 @@ async function main() {
 				bodyType: "suv",
 				condition: "used",
 				color: "Carbon Black",
-				images: '["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+				images: '["https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1200&q=80"]',
 				city: "Riyadh",
 				country: "Saudi Arabia",
 				sellerId: seller.id,
@@ -1078,7 +1088,7 @@ async function main() {
 				condition: "used",
 				color: "Midnight Silver",
 				images:
-					'["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=1200&q=80"]',
 				city: "Dubai",
 				country: "UAE",
 				sellerId: seller2.id,
@@ -1104,7 +1114,7 @@ async function main() {
 				condition: "used",
 				color: "Sand Beige",
 				images:
-					'["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1200&q=80"]',
 				city: "Kuwait City",
 				country: "Kuwait",
 				sellerId: seller3.id,
@@ -1135,7 +1145,7 @@ async function main() {
 				country: "UAE",
 				address: "Dubai Marina Walk, Tower A",
 				images:
-					'["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.pexels.com/photos/1642125/pexels-photo-1642125.jpeg?auto=compress&cs=tinysrgb&w=1200"]',
 				agentName: "Mohammed Al-Fahim",
 				agentPhone: "+971501234567",
 				isVerifiedAgent: true,
@@ -1187,7 +1197,7 @@ async function main() {
 				country: "Jordan",
 				address: "Abdoun, Building 23",
 				images:
-					'["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80"]',
 				agentName: "Lina Haddad",
 				agentPhone: "+962795551234",
 				isVerifiedAgent: false,
@@ -1213,7 +1223,7 @@ async function main() {
 				condition: "used",
 				city: "Amman",
 				country: "Jordan",
-				images: '["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+				images: '["https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?auto=compress&cs=tinysrgb&w=1200"]',
 				contactPhone: "+962795551234",
 				sellerId: user.id,
 				status: "active",
@@ -1232,7 +1242,7 @@ async function main() {
 				city: "Riyadh",
 				country: "Saudi Arabia",
 				images:
-					'["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"]',
+					'["https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=1200&q=80"]',
 				contactPhone: "+966509876543",
 				sellerId: buyer2.id,
 				status: "active",
@@ -1252,7 +1262,7 @@ async function main() {
 					"Building scalable microservices with Node.js and TypeScript.",
 				descriptionAr: "نبحث عن مهندس برمجيات أول للانضمام لفريقنا.",
 				company: "NexaTech Solutions",
-				companyLogo: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+				companyLogo: "https://api.iconify.design/mdi:office-building.svg?color=%23059669",
 				location: "Dubai Internet City",
 				city: "Dubai",
 				country: "UAE",
@@ -1275,8 +1285,7 @@ async function main() {
 				description: "Lead digital marketing efforts across the MENA region.",
 				descriptionAr: "نبحث عن مدير تسويق ذو خبرة.",
 				company: "Gulf Brands Group",
-				companyLogo:
-					"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+				companyLogo: "https://api.iconify.design/mdi:storefront-outline.svg?color=%23b45309",
 				location: "King Fahd Road",
 				city: "Riyadh",
 				country: "Saudi Arabia",
@@ -1299,8 +1308,7 @@ async function main() {
 				description: "Create beautiful and intuitive interfaces.",
 				descriptionAr: "نبحث عن مصمم UX/UI موهوب.",
 				company: "CreativePixel Agency",
-				companyLogo:
-					"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+				companyLogo: "https://api.iconify.design/mdi:palette-outline.svg?color=%237c3aed",
 				location: "Remote",
 				city: "Amman",
 				country: "Jordan",
@@ -1356,7 +1364,7 @@ async function main() {
 				category: "Maintenance",
 				providerName: "CoolAir Services",
 				providerAvatar:
-					"https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80",
+					"https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=600",
 				rating: 4.5,
 				reviewCount: 156,
 				location: "All Riyadh districts",
@@ -1379,7 +1387,7 @@ async function main() {
 				category: "Photography",
 				providerName: "LensArt Studios",
 				providerAvatar:
-					"https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80",
+					"https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=600&q=80",
 				rating: 4.9,
 				reviewCount: 45,
 				location: "All Qatar",
@@ -1473,7 +1481,7 @@ async function main() {
 				title: "Mega Electronics Sale",
 				titleAr: "تخفيضات الإلكترونيات الكبرى",
 				image:
-					"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+					"https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80",
 				link: "/deals?category=electronics",
 				position: "hero",
 				sortOrder: 1,

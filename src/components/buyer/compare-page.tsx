@@ -15,7 +15,6 @@ import { useI18n } from '@/lib/i18n';
 import { useAppStore } from '@/stores/app-store';
 import { useCartStore } from '@/stores/cart-store';
 import { formatPrice } from '@/lib/currency';
-import { IMAGE_SERVICES } from '@/lib/config';
 import { getPlaceholderImage } from '@/lib/placeholder-image';
 
 interface CompareProduct {
