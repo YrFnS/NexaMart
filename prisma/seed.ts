@@ -800,7 +800,7 @@ async function main() {
 				orderNumber: "ORD-005",
 				userId: buyer2.id,
 				storeId: stores[0].id,
-				status: "delivered",
+				status: "processing",
 				subtotal: 149.99,
 				shippingCost: 0,
 				discount: 15,
@@ -819,7 +819,10 @@ async function main() {
 				orderNumber: "ORD-006",
 				userId: buyer2.id,
 				storeId: stores[2].id,
-				status: "shipped",
+				status: "cancelled",
+				cancelledAt: now,
+				cancelledBy: buyer2.id,
+				cancellationReason: "Buyer cancelled before seller fulfillment.",
 				subtotal: 179.99,
 				shippingCost: 0,
 				discount: 0,
@@ -840,7 +843,7 @@ async function main() {
 				orderNumber: "ORD-007",
 				userId: buyer3.id,
 				storeId: stores[3].id,
-				status: "delivered",
+				status: "disputed",
 				subtotal: 129.99,
 				shippingCost: 0,
 				discount: 0,
@@ -1671,6 +1674,8 @@ async function main() {
 
 	const returnInputs = [
 		{ order: orders[0], buyerId: user.id, sellerId: seller.id, status: "pending", reason: "not_as_described", resolution: "return_only", details: "Packaging was intact but the color differed from the listing." },
+		{ order: orders[1], buyerId: user.id, sellerId: seller2.id, status: "approved", reason: "wrong_item", resolution: "return_only", details: "The received color did not match the selected option." },
+		{ order: orders[2], buyerId: user.id, sellerId: seller.id, status: "rejected", reason: "changed_mind", resolution: "return_only", details: "The return window did not cover this request." },
 		{ order: orders[4], buyerId: buyer2.id, sellerId: seller.id, status: "processing", reason: "defective", resolution: "exchange", details: "One key intermittently fails.", sellerNote: "Replacement approved after inspection." },
 		{ order: orders[6], buyerId: buyer3.id, sellerId: seller4.id, status: "completed", reason: "damaged_shipping", resolution: "offline_refund", details: "Bottle arrived damaged.", offlineRefundStatus: "confirmed", offlineRefundConfirmedAt: now, offlineRefundConfirmedBy: seller4.id, inventoryDisposition: "discard", inventoryDispositionAt: now, inventoryDispositionBy: seller4.id },
 	];
