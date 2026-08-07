@@ -115,7 +115,7 @@ model Product {
   images          String   @default("[]") // JSON array
   categoryId      String
   storeId         String
-  sku             String?
+  sku             String?  @unique
   stock           Int      @default(0)
   rating          Float    @default(0)
   reviewCount     Int      @default(0)
