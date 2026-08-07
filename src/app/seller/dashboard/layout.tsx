@@ -188,7 +188,7 @@ export default function SellerDashboardLayout({
             Sign in with an authorized seller account to continue.
           </p>
           <Button
-            className="mt-5 bg-emerald-600 text-white hover:bg-emerald-700"
+            className="mt-5 bg-emerald-700 text-white hover:bg-emerald-800"
             onClick={() => router.push('/auth')}
           >
             Sign in
