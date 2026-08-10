@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { toAuthenticatedUser } from '@/lib/auth';
+import {
+  hasSellerWorkspaceAccess,
+  toAuthenticatedUser,
+} from '@/lib/auth';
 import { verifyPassword } from '@/lib/password';
 import {
   checkApiRateLimit,
@@ -63,10 +66,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 
-    const publicUser = toAuthenticatedUser(user);
+    const role = user.role as SessionRole;
+    const publicUser = toAuthenticatedUser(
+      user,
+      await hasSellerWorkspaceAccess(user.id, role),
+    );
     const token = createSessionToken({
       id: user.id,
-      role: user.role as SessionRole,
+      role,
     });
 
     const response = NextResponse.json({ user: publicUser });
