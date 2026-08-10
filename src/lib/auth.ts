@@ -19,6 +19,10 @@ export interface AuthenticatedUser {
   canAccessSellerWorkspace: boolean;
 }
 
+interface GetAuthenticatedUserOptions {
+  includeSellerWorkspaceAccess?: boolean;
+}
+
 const publicUserSelect = {
   id: true,
   email: true,
@@ -89,7 +93,10 @@ export async function hasSellerWorkspaceAccess(
   return Boolean(activeSellerStaff);
 }
 
-export async function getAuthenticatedUser(request: Request): Promise<AuthenticatedUser | null> {
+export async function getAuthenticatedUser(
+  request: Request,
+  options: GetAuthenticatedUserOptions = {},
+): Promise<AuthenticatedUser | null> {
   const claims = getSessionClaims(request);
   if (!claims) return null;
 
@@ -103,7 +110,12 @@ export async function getAuthenticatedUser(request: Request): Promise<Authentica
   }
 
   const authenticatedUser = toAuthenticatedUser(user);
-  if (authenticatedUser.canAccessSellerWorkspace) return authenticatedUser;
+  if (
+    authenticatedUser.canAccessSellerWorkspace ||
+    !options.includeSellerWorkspaceAccess
+  ) {
+    return authenticatedUser;
+  }
 
   return toAuthenticatedUser(
     user,
@@ -138,9 +150,12 @@ export async function requireUserRole(
   if (
     allowedRoles.includes('seller') &&
     auth.user.role === 'buyer' &&
-    auth.user.canAccessSellerWorkspace
+    (await hasSellerWorkspaceAccess(auth.user.id, auth.user.role))
   ) {
-    return auth;
+    return {
+      user: { ...auth.user, canAccessSellerWorkspace: true },
+      response: null,
+    };
   }
 
   return {
