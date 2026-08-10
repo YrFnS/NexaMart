@@ -186,7 +186,10 @@ test.describe('seeded role and access matrix', () => {
     expect(sellerApi.ok, JSON.stringify(sellerApi.payload)).toBe(true);
   });
 
-  test('banned user with revoked staff membership cannot authenticate', async ({ page }) => {
+  test('banned user with revoked staff membership cannot authenticate', async ({
+    context,
+    page,
+  }) => {
     await gotoAndExpectOk(page, '/auth');
     await page.locator('#login-email').fill('omar@nexamart.com');
     await page.locator('#login-password').fill(SEEDED_PASSWORD);
@@ -200,7 +203,11 @@ test.describe('seeded role and access matrix', () => {
 
     expect((await loginResponse).status()).toBe(401);
     await expect(page.getByText('Invalid email or password.')).toBeVisible();
-    expect(await getSessionUser(page)).toBeNull();
+
+    const authenticatedSessionCookie = (await context.cookies()).find(
+      (cookie) => cookie.name === 'nexamart_session' && Boolean(cookie.value),
+    );
+    expect(authenticatedSessionCookie).toBeUndefined();
 
     const sellerApi = await browserGet(page, '/api/seller/dashboard');
     expect(sellerApi.status).toBe(401);
