@@ -4,6 +4,7 @@ import {
   getDeploymentEnvironment,
   getRateLimitMode,
   getReleaseSha,
+  isDeploymentReady,
   isSearchIndexingAllowed,
 } from './deployment.ts';
 
@@ -58,12 +59,44 @@ test('production rate limiting requires both Redis REST credentials', () => {
   );
 });
 
-test('release identity prefers an explicit deployment SHA', () => {
+test('production readiness requires distributed rate limiting', () => {
+  assert.equal(
+    isDeploymentReady({
+      DEPLOYMENT_ENV: 'production',
+      NODE_ENV: 'production',
+      RATE_LIMIT_ALLOW_MEMORY_FALLBACK: 'true',
+    }),
+    false,
+  );
+  assert.equal(
+    isDeploymentReady({
+      DEPLOYMENT_ENV: 'production',
+      NODE_ENV: 'production',
+      UPSTASH_REDIS_REST_URL: 'https://redis.example',
+      UPSTASH_REDIS_REST_TOKEN: 'token',
+    }),
+    true,
+  );
+  assert.equal(
+    isDeploymentReady({
+      DEPLOYMENT_ENV: 'staging',
+      NODE_ENV: 'production',
+      RATE_LIMIT_ALLOW_MEMORY_FALLBACK: 'true',
+    }),
+    true,
+  );
+});
+
+test('release identity prefers the provider commit over stale manual metadata', () => {
   assert.equal(
     getReleaseSha({
-      RELEASE_SHA: 'explicit-release',
+      RELEASE_SHA: 'stale-explicit-release',
       VERCEL_GIT_COMMIT_SHA: 'vercel-release',
     }),
+    'vercel-release',
+  );
+  assert.equal(
+    getReleaseSha({ RELEASE_SHA: 'explicit-release' }),
     'explicit-release',
   );
   assert.equal(getReleaseSha({}), null);
