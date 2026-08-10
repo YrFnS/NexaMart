@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuthenticatedUser } from '@/lib/auth';
+import { requireUserRole } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { checkApiRateLimit, RATE_LIMITS } from '@/lib/security';
 
@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const rateLimit = checkApiRateLimit(request, RATE_LIMITS.general);
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
 
-  const auth = await requireAuthenticatedUser(request);
+  const auth = await requireUserRole(request, ['seller', 'admin']);
   if (auth.response) return auth.response;
 
   try {
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
                     some: {
                       userId: auth.user.id,
                       status: 'active',
+                      role: { in: ['owner', 'manager', 'editor'] },
                     },
                   },
                 },
