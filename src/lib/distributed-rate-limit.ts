@@ -1,4 +1,4 @@
-import { getDeploymentEnvironment } from './deployment';
+import { getDeploymentEnvironment } from './deployment.ts';
 
 export interface DistributedRateLimitInput {
   namespace: string;
