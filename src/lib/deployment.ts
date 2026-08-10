@@ -24,13 +24,16 @@ export function getDeploymentEnvironment(
 export function getReleaseSha(
   environment: Environment = process.env,
 ): string | null {
+  // Provider-owned values describe the code that is actually executing. Keep a
+  // manually configured RELEASE_SHA only as a fallback so stale project
+  // settings cannot make health checks report an older commit.
   const release =
-    value(environment.RELEASE_SHA) ||
     value(environment.VERCEL_GIT_COMMIT_SHA) ||
     value(environment.RENDER_GIT_COMMIT) ||
     value(environment.RAILWAY_GIT_COMMIT_SHA) ||
     value(environment.SOURCE_VERSION) ||
-    value(environment.GITHUB_SHA);
+    value(environment.GITHUB_SHA) ||
+    value(environment.RELEASE_SHA);
 
   return release ? release.slice(0, 128) : null;
 }
@@ -53,6 +56,20 @@ export function getRateLimitMode(
     environment.RATE_LIMIT_ALLOW_MEMORY_FALLBACK === 'true';
 
   return memoryFallbackAllowed ? 'memory-fallback' : 'unavailable';
+}
+
+export function isDeploymentReady(
+  environment: Environment = process.env,
+): boolean {
+  const rateLimit = getRateLimitMode(environment);
+  if (rateLimit === 'unavailable') return false;
+
+  // A single-instance in-memory limiter is useful for local development and
+  // the explicit browser harness, but it is not production-grade protection.
+  return (
+    getDeploymentEnvironment(environment) !== 'production' ||
+    rateLimit === 'redis'
+  );
 }
 
 export function isSearchIndexingAllowed(
