@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSessionClaims, type SessionRole } from '@/lib/session';
 
+const sellerWorkspaceStaffRoles = ['owner', 'manager', 'editor'] as const;
+
 export interface AuthenticatedUser {
   id: string;
   email: string;
@@ -14,6 +16,7 @@ export interface AuthenticatedUser {
   walletBalance: number;
   aiCredits: number;
   isVerified: boolean;
+  canAccessSellerWorkspace: boolean;
 }
 
 const publicUserSelect = {
@@ -31,19 +34,22 @@ const publicUserSelect = {
   isBanned: true,
 } as const;
 
-export function toAuthenticatedUser(user: {
-  id: string;
-  email: string;
-  name: string | null;
-  phone: string | null;
-  avatar: string | null;
-  role: string;
-  loyaltyTier: string;
-  loyaltyPoints: number;
-  walletBalance: number;
-  aiCredits: number;
-  isVerified: boolean;
-}): AuthenticatedUser {
+export function toAuthenticatedUser(
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    phone: string | null;
+    avatar: string | null;
+    role: string;
+    loyaltyTier: string;
+    loyaltyPoints: number;
+    walletBalance: number;
+    aiCredits: number;
+    isVerified: boolean;
+  },
+  canAccessSellerWorkspace?: boolean,
+): AuthenticatedUser {
   const role: SessionRole = ['buyer', 'seller', 'admin'].includes(user.role)
     ? (user.role as SessionRole)
     : 'buyer';
@@ -60,7 +66,27 @@ export function toAuthenticatedUser(user: {
     walletBalance: user.walletBalance,
     aiCredits: user.aiCredits,
     isVerified: user.isVerified,
+    canAccessSellerWorkspace:
+      canAccessSellerWorkspace ?? role === 'seller' || role === 'admin',
   };
+}
+
+export async function hasSellerWorkspaceAccess(
+  userId: string,
+  role: SessionRole,
+): Promise<boolean> {
+  if (role === 'seller' || role === 'admin') return true;
+
+  const activeSellerStaff = await db.staff.findFirst({
+    where: {
+      userId,
+      status: 'active',
+      role: { in: [...sellerWorkspaceStaffRoles] },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(activeSellerStaff);
 }
 
 export async function getAuthenticatedUser(request: Request): Promise<AuthenticatedUser | null> {
@@ -76,7 +102,13 @@ export async function getAuthenticatedUser(request: Request): Promise<Authentica
     return null;
   }
 
-  return toAuthenticatedUser(user);
+  const authenticatedUser = toAuthenticatedUser(user);
+  if (authenticatedUser.canAccessSellerWorkspace) return authenticatedUser;
+
+  return toAuthenticatedUser(
+    user,
+    await hasSellerWorkspaceAccess(user.id, authenticatedUser.role),
+  );
 }
 
 export async function requireAuthenticatedUser(
@@ -103,17 +135,13 @@ export async function requireUserRole(
 
   if (allowedRoles.includes(auth.user.role)) return auth;
 
-  const activeSellerStaff = allowedRoles.includes('seller')
-    ? await db.staff.findFirst({
-        where: {
-          userId: auth.user.id,
-          status: 'active',
-          role: { in: ['owner', 'manager', 'editor'] },
-        },
-        select: { id: true },
-      })
-    : null;
-  if (activeSellerStaff) return auth;
+  if (
+    allowedRoles.includes('seller') &&
+    auth.user.role === 'buyer' &&
+    auth.user.canAccessSellerWorkspace
+  ) {
+    return auth;
+  }
 
   return {
     user: null,
