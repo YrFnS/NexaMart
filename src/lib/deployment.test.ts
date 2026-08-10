@@ -40,7 +40,14 @@ test('production rate limiting requires both Redis REST credentials', () => {
       DEPLOYMENT_ENV: 'staging',
       NODE_ENV: 'production',
     }),
-    'unavailable',
+    'memory-fallback',
+  );
+  assert.equal(
+    getRateLimitMode({
+      VERCEL_ENV: 'preview',
+      NODE_ENV: 'production',
+    }),
+    'memory-fallback',
   );
   assert.equal(
     getRateLimitMode({
@@ -81,7 +88,13 @@ test('production readiness requires distributed rate limiting', () => {
     isDeploymentReady({
       DEPLOYMENT_ENV: 'staging',
       NODE_ENV: 'production',
-      RATE_LIMIT_ALLOW_MEMORY_FALLBACK: 'true',
+    }),
+    true,
+  );
+  assert.equal(
+    isDeploymentReady({
+      VERCEL_ENV: 'preview',
+      NODE_ENV: 'production',
     }),
     true,
   );
