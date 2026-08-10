@@ -47,12 +47,11 @@ export function getRateLimitMode(
   );
   if (redisConfigured) return 'redis';
 
-  // Keep readiness reporting aligned with the actual limiter implementation:
-  // any Node production process fails closed unless fallback is explicitly
-  // enabled, including a production-built staging deployment.
-  const nodeEnvironment = value(environment.NODE_ENV)?.toLowerCase();
+  // Preview and staging deployments may use a process-local limiter so they
+  // remain testable. Only the actual production environment fails closed
+  // unless an operator explicitly enables the degraded fallback.
   const memoryFallbackAllowed =
-    nodeEnvironment !== 'production' ||
+    getDeploymentEnvironment(environment) !== 'production' ||
     environment.RATE_LIMIT_ALLOW_MEMORY_FALLBACK === 'true';
 
   return memoryFallbackAllowed ? 'memory-fallback' : 'unavailable';
@@ -64,7 +63,7 @@ export function isDeploymentReady(
   const rateLimit = getRateLimitMode(environment);
   if (rateLimit === 'unavailable') return false;
 
-  // A single-instance in-memory limiter is useful for local development and
+  // A single-instance in-memory limiter is useful for previews, staging, and
   // the explicit browser harness, but it is not production-grade protection.
   return (
     getDeploymentEnvironment(environment) !== 'production' ||
