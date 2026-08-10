@@ -67,7 +67,7 @@ export function toAuthenticatedUser(
     aiCredits: user.aiCredits,
     isVerified: user.isVerified,
     canAccessSellerWorkspace:
-      canAccessSellerWorkspace ?? role === 'seller' || role === 'admin',
+      canAccessSellerWorkspace ?? (role === 'seller' || role === 'admin'),
   };
 }
 
