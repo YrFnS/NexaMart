@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildDistributedRateLimitKey,
+  isMemoryRateLimitFallbackAllowed,
   normalizeRateLimitNamespace,
   parseRedisRateLimitResult,
 } from './distributed-rate-limit.ts';
@@ -54,4 +55,32 @@ test('Redis counter responses produce bounded remaining and reset values', () =>
     unavailable: false,
   });
   assert.equal(parseRedisRateLimitResult({ result: 1 }, 5, now), null);
+});
+
+test('memory fallback is automatic outside production but explicit in production', () => {
+  assert.equal(
+    isMemoryRateLimitFallbackAllowed({
+      VERCEL_ENV: 'preview',
+      NODE_ENV: 'production',
+    }),
+    true,
+  );
+  assert.equal(
+    isMemoryRateLimitFallbackAllowed({
+      DEPLOYMENT_ENV: 'staging',
+      NODE_ENV: 'production',
+    }),
+    true,
+  );
+  assert.equal(
+    isMemoryRateLimitFallbackAllowed({ NODE_ENV: 'production' }),
+    false,
+  );
+  assert.equal(
+    isMemoryRateLimitFallbackAllowed({
+      NODE_ENV: 'production',
+      RATE_LIMIT_ALLOW_MEMORY_FALLBACK: 'true',
+    }),
+    true,
+  );
 });
