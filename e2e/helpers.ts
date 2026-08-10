@@ -96,18 +96,19 @@ export async function expectNoSeriousAccessibilityViolations(page: Page) {
 export async function loginWithApi(
   page: Page,
   email = 'demo@nexamart.com',
+  password = SEEDED_PASSWORD,
 ) {
   if (page.url() === 'about:blank') {
     await gotoAndExpectOk(page, '/');
   }
 
   const result = await page.evaluate(
-    async ({ loginEmail, password }) => {
+    async ({ loginEmail, loginPassword }) => {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         user?: { email?: string; role?: string };
@@ -120,7 +121,7 @@ export async function loginWithApi(
         payload,
       };
     },
-    { loginEmail: email, password: SEEDED_PASSWORD },
+    { loginEmail: email, loginPassword: password },
   );
 
   expect(
