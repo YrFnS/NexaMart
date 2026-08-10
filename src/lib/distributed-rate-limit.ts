@@ -1,3 +1,5 @@
+import { getDeploymentEnvironment } from './deployment';
+
 export interface DistributedRateLimitInput {
   namespace: string;
   identifier: string;
@@ -22,6 +24,8 @@ interface UpstashResponse {
   result?: unknown;
   error?: string;
 }
+
+type Environment = Readonly<Record<string, string | undefined>>;
 
 const localStore = new Map<string, LocalEntry>();
 
@@ -89,10 +93,12 @@ export function parseRedisRateLimitResult(
   };
 }
 
-function allowMemoryFallback(): boolean {
+export function isMemoryRateLimitFallbackAllowed(
+  environment: Environment = process.env,
+): boolean {
   return (
-    process.env.NODE_ENV !== 'production' ||
-    process.env.RATE_LIMIT_ALLOW_MEMORY_FALLBACK === 'true'
+    getDeploymentEnvironment(environment) !== 'production' ||
+    environment.RATE_LIMIT_ALLOW_MEMORY_FALLBACK === 'true'
   );
 }
 
@@ -157,7 +163,7 @@ export async function checkDistributedRateLimit(
   const configuration = upstashConfiguration();
 
   if (!configuration) {
-    return allowMemoryFallback()
+    return isMemoryRateLimitFallbackAllowed()
       ? checkLocalRateLimit(key, maxRequests, windowMs, now)
       : unavailableResult(now, windowMs);
   }
@@ -205,7 +211,7 @@ export async function checkDistributedRateLimit(
     return parsed;
   } catch (error) {
     console.error('Distributed rate limiter unavailable:', error);
-    return allowMemoryFallback()
+    return isMemoryRateLimitFallbackAllowed()
       ? checkLocalRateLimit(key, maxRequests, windowMs, now)
       : unavailableResult(now, windowMs);
   } finally {
