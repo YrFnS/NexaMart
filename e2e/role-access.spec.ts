@@ -53,7 +53,7 @@ async function browserGet(
   }, path);
 }
 
-async function expectSellerGate(page: Page) {
+async function expectSellerGate(page: Page): Promise<void> {
   await gotoAndExpectOk(page, '/seller/dashboard');
   await expect(
     page.getByRole('heading', { name: 'Seller access required' }),
@@ -61,7 +61,7 @@ async function expectSellerGate(page: Page) {
   await expect(page.getByText('NexaMart Seller', { exact: true })).not.toBeVisible();
 }
 
-async function expectSellerWorkspace(page: Page) {
+async function expectSellerWorkspace(page: Page): Promise<void> {
   await gotoAndExpectOk(page, '/seller/dashboard');
   await expect(page.getByText('NexaMart Seller', { exact: true })).toBeVisible();
   await expect(
@@ -69,7 +69,10 @@ async function expectSellerWorkspace(page: Page) {
   ).not.toBeVisible();
 }
 
-async function expectAdminGate(page: Page, unauthorizedAccount = false) {
+async function expectAdminGate(
+  page: Page,
+  unauthorizedAccount = false,
+): Promise<void> {
   await gotoAndExpectOk(page, '/admin');
   await expect(
     page.getByText('Sign in with an administrator account to continue.'),
@@ -198,5 +201,10 @@ test.describe('seeded role and access matrix', () => {
     expect((await loginResponse).status()).toBe(401);
     await expect(page.getByText('Invalid email or password.')).toBeVisible();
     expect(await getSessionUser(page)).toBeNull();
+
+    const sellerApi = await browserGet(page, '/api/seller/dashboard');
+    expect(sellerApi.status).toBe(401);
+    const adminApi = await browserGet(page, '/api/admin/users');
+    expect(adminApi.status).toBe(401);
   });
 });
