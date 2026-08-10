@@ -3,6 +3,7 @@ import {
   getDeploymentEnvironment,
   getRateLimitMode,
   getReleaseSha,
+  isDeploymentReady,
   isSearchIndexingAllowed,
 } from '@/lib/deployment';
 
@@ -24,7 +25,7 @@ export async function GET() {
   try {
     await db.$queryRaw`SELECT 1`;
 
-    const ready = rateLimit !== 'unavailable';
+    const ready = isDeploymentReady();
     return Response.json(
       {
         service: 'nexamart',
