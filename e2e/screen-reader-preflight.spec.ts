@@ -103,12 +103,20 @@ test.describe('P3 keyboard and screen-reader preflight', () => {
     await expect(
       loginForm.getByRole('button', { name: 'إخفاء كلمة المرور' }),
     ).toBeVisible();
-    await expect(
-      loginForm.getByRole('button', { name: 'تجربة حساب المشتري' }),
-    ).toBeVisible();
-    await expect(
-      loginForm.getByRole('button', { name: 'تجربة حساب البائع' }),
-    ).toBeVisible();
+
+    const demoBuyer = loginForm.getByRole('button', {
+      name: 'تجربة حساب المشتري',
+    });
+    const demoSeller = loginForm.getByRole('button', {
+      name: 'تجربة حساب البائع',
+    });
+    if (process.env.ENABLE_DEMO_LOGIN === 'true') {
+      await expect(demoBuyer).toBeVisible();
+      await expect(demoSeller).toBeVisible();
+    } else {
+      await expect(demoBuyer).toHaveCount(0);
+      await expect(demoSeller).toHaveCount(0);
+    }
 
     await expectNoHorizontalOverflow(page);
     await expectNoSeriousAccessibilityViolations(page);
