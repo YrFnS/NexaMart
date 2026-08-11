@@ -182,12 +182,12 @@ export function ProductActions({
     <>
       <div
         data-product-primary-actions
-        className="relative rounded-xl p-[2px] action-buttons-gradient-border"
+        className="relative rounded-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-700 p-[2px]"
       >
         <div className="flex flex-col gap-3 rounded-xl bg-background p-1 sm:flex-row">
           <RippleButton
             size="lg"
-            className="h-12 flex-1 rounded-lg bg-amber-600 text-base text-white hover:bg-amber-700"
+            className="min-h-12 w-full shrink-0 rounded-lg bg-amber-600 text-base text-white hover:bg-amber-700 sm:flex-1"
             onClick={handleAddToCart}
             disabled={stock === 0}
           >
@@ -197,7 +197,7 @@ export function ProductActions({
           <RippleButton
             size="lg"
             variant="outline"
-            className="h-12 flex-1 rounded-lg border-amber-600 text-base text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950"
+            className="min-h-12 w-full shrink-0 rounded-lg border-amber-600 text-base text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950 sm:flex-1"
             onClick={handleBuyNow}
             disabled={stock === 0}
           >

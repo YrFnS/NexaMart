@@ -4,7 +4,9 @@ import { serializeExpiredSessionCookie } from '@/lib/session';
 
 export async function GET(request: Request) {
   try {
-    const user = await getAuthenticatedUser(request);
+    const user = await getAuthenticatedUser(request, {
+      includeSellerWorkspaceAccess: true,
+    });
     const response = NextResponse.json({ user });
 
     if (!user) {

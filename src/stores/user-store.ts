@@ -14,6 +14,7 @@ export interface User {
   walletBalance: number;
   aiCredits: number;
   isVerified: boolean;
+  canAccessSellerWorkspace?: boolean;
 }
 
 interface SetUserOptions {

@@ -169,6 +169,9 @@ test('permanent CI runs browsers and preserves failure diagnostics', () => {
   const packageJson = JSON.parse(source('package.json')) as {
     devDependencies?: Record<string, string>;
   };
+  const browserAuthLimit = Number(
+    workflow.match(/E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: "(\d+)"/)?.[1],
+  );
 
   assert.equal(packageJson.devDependencies?.['@playwright/test'], '1.61.1');
   assert.equal(packageJson.devDependencies?.['@axe-core/playwright'], '4.11.3');
@@ -177,7 +180,10 @@ test('permanent CI runs browsers and preserves failure diagnostics', () => {
   assert.match(workflow, /RATE_LIMIT_ALLOW_MEMORY_FALLBACK: "true"/);
   assert.match(workflow, /AUTH_COOKIE_INSECURE_FOR_TESTS: "true"/);
   assert.match(workflow, /E2E_BROWSER_TEST_HARNESS: "true"/);
-  assert.match(workflow, /E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: "30"/);
+  assert.ok(
+    Number.isInteger(browserAuthLimit) && browserAuthLimit >= 100,
+    'The isolated browser harness must allow the complete role matrix without weakening production limits.',
+  );
   assert.match(workflow, /E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: "100"/);
   assert.match(session, /process\.env\.CI === 'true'/);
   assert.match(session, /AUTH_COOKIE_INSECURE_FOR_TESTS === 'true'/);

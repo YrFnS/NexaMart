@@ -57,7 +57,7 @@ jobs:
       # deployments must not set this value. It raises only the browser suite's
       # per-IP ceilings because isolated test contexts share 127.0.0.1.
       E2E_BROWSER_TEST_HARNESS: "true"
-      E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: "30"
+      E2E_AUTH_RATE_LIMIT_MAX_REQUESTS: "120"
       E2E_WRITE_RATE_LIMIT_MAX_REQUESTS: "100"
       NEXT_TELEMETRY_DISABLED: "1"
 
@@ -83,16 +83,14 @@ jobs:
       - name: Deploy migrations to a clean database
         run: npm run db:deploy
 
-      - name: Verify the migration chain applies cleanly and report any schema drift
+      - name: Verify migration status and reject schema drift
         run: |
           npx prisma migrate status
-          # Reported, not enforced: three column defaults in the committed
-          # migrations still differ from prisma/schema.prisma. Re-enable
-          # --exit-code once a corrective migration lands.
           npx prisma migrate diff \
             --from-url "$DATABASE_URL" \
             --to-schema-datamodel prisma/schema.prisma \
-            --script
+            --script \
+            --exit-code
 
       - name: Seed authenticated demo data
         run: npm run db:seed

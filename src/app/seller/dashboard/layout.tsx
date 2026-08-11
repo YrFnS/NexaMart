@@ -170,6 +170,10 @@ export default function SellerDashboardLayout({
   const { user, isHydrated } = useUserStore();
   const pathname = usePathname();
   const isRTL = dir() === 'rtl';
+  const canAccessSellerWorkspace =
+    user?.role === 'seller' ||
+    user?.role === 'admin' ||
+    user?.canAccessSellerWorkspace === true;
 
   if (!isHydrated) {
     return (
@@ -179,7 +183,7 @@ export default function SellerDashboardLayout({
     );
   }
 
-  if (user?.role !== 'seller' && user?.role !== 'admin') {
+  if (!canAccessSellerWorkspace) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background p-4">
         <section className="w-full max-w-md rounded-2xl border border-emerald-200 bg-card p-6 text-center shadow-xl dark:border-emerald-800">
