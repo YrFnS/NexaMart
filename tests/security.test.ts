@@ -2,6 +2,7 @@
 // under `bun test` rather than the node:test suite in src/lib because
 // src/lib/security.ts imports next/server, which plain Node cannot resolve.
 import { describe, expect, test } from 'bun:test';
+import { GET as getSession } from '../src/app/api/auth/session/route';
 import { checkDistributedApiRateLimit } from '../src/lib/api-rate-limit';
 import type { DistributedRateLimitInput } from '../src/lib/distributed-rate-limit';
 import { createSessionToken, SESSION_COOKIE_NAME } from '../src/lib/session';
@@ -20,6 +21,22 @@ function requestWithSession(url: string, token: string): Request {
     headers: { cookie: `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}` },
   });
 }
+
+describe('session probe cookie safety', () => {
+  test('does not expire cookies from an anonymous or invalid read-only probe', async () => {
+    for (const cookie of [undefined, `${SESSION_COOKIE_NAME}=invalid`]) {
+      const response = await getSession(
+        new Request('https://nexamart.example/api/auth/session', {
+          headers: cookie ? { cookie } : undefined,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(await response.json()).toEqual({ user: null });
+    }
+  });
+});
 
 describe('distributed API rate limiting', () => {
   const url = 'https://nexamart.example/api/auth/login';

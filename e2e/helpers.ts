@@ -8,6 +8,7 @@ const SEEDED_PASSWORD =
   process.env.E2E_PASSWORD ||
   process.env.SEED_DEMO_PASSWORD ||
   'ci-demo-password-with-at-least-12-characters';
+const CART_OWNER_KEY = 'nexamart_cart_owner';
 
 type AxeBuilderOptions = ConstructorParameters<typeof AxeBuilder>[0];
 
@@ -131,6 +132,37 @@ export async function loginWithApi(
     }`,
   ).toBe(true);
   expect(result.payload.user?.email).toBe(email);
+
+  // Reload once after API login so the application session synchronizer, the
+  // HttpOnly cookie, and cart ownership all agree before the test interacts
+  // with authenticated pages. This also catches real cookie persistence bugs.
+  const sessionHydration = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/auth/session') &&
+      response.request().method() === 'GET',
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const sessionResponse = await sessionHydration;
+  expect(
+    sessionResponse.ok(),
+    `Session hydration failed after login with status ${sessionResponse.status()}.`,
+  ).toBe(true);
+
+  const sessionPayload = (await sessionResponse.json()) as {
+    user?: { id?: string; email?: string } | null;
+  };
+  expect(sessionPayload.user?.email).toBe(email);
+  const userId = sessionPayload.user?.id;
+  expect(userId, 'Authenticated session did not include a user id.').toBeTruthy();
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (storageKey) => window.localStorage.getItem(storageKey),
+        CART_OWNER_KEY,
+      ),
+    )
+    .toBe(userId);
 }
 
 export async function firstPublicStoreId(page: Page): Promise<string> {

@@ -29,29 +29,25 @@ async function isInViewport(locator: Locator): Promise<boolean> {
   }
 }
 
-async function scrollSelectorIntoView(page: Page, selector: string) {
-  const locator = page.locator(selector);
-  await expect(locator).toBeVisible();
-  await page.evaluate((value) => {
-    document.querySelector<HTMLElement>(value)?.scrollIntoView({
-      behavior: 'auto',
-      block: 'center',
-      inline: 'nearest',
-    });
-  }, selector);
-  await expect(locator).toBeInViewport();
-}
-
 async function scrollLocatorIntoView(locator: Locator) {
   await expect(locator).toBeVisible();
-  await locator.evaluate((element) => {
-    (element as HTMLElement).scrollIntoView({
-      behavior: 'auto',
-      block: 'center',
-      inline: 'nearest',
-    });
-  });
-  await expect(locator).toBeInViewport();
+  await expect
+    .poll(
+      async () => {
+        try {
+          await locator.scrollIntoViewIfNeeded();
+          return await isInViewport(locator);
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+}
+
+async function scrollSelectorIntoView(page: Page, selector: string) {
+  await scrollLocatorIntoView(page.locator(selector));
 }
 
 test.describe('P3 Arabic and mobile verification', () => {
@@ -125,8 +121,7 @@ test.describe('P3 Arabic and mobile verification', () => {
       name: actionName,
     });
 
-    await expect(addToCart).toBeVisible();
-    await expect(addToCart).toBeInViewport();
+    await scrollLocatorIntoView(addToCart);
     await expect(assistant).toBeVisible();
 
     const actionLayout = await addToCart.evaluate((element) => {

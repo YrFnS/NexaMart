@@ -13,6 +13,7 @@ export function AuthSessionSync() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const startingUserId = useUserStore.getState().user?.id || null;
 
     async function hydrateSession() {
       try {
@@ -23,6 +24,18 @@ export function AuthSessionSync() {
         });
         const data = (await response.json()) as { user?: User | null };
         const nextUser = response.ok ? data.user || null : null;
+        const currentUserId = useUserStore.getState().user?.id || null;
+        const nextUserId = nextUser?.id || null;
+
+        // Login or logout may complete while the initial session probe is in
+        // flight. Do not let that stale response replace the newer client
+        // identity or clear the cart that belongs to it.
+        if (
+          currentUserId !== startingUserId &&
+          nextUserId !== currentUserId
+        ) {
+          return;
+        }
 
         try {
           const previousOwner = localStorage.getItem(CART_OWNER_KEY);
