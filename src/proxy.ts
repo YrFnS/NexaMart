@@ -4,6 +4,11 @@ import {
   checkDistributedRateLimit,
   type DistributedRateLimitResult,
 } from './lib/distributed-rate-limit';
+import {
+  proxyRateLimitIdentifier,
+  SESSION_READ_RATE_LIMIT,
+} from './lib/proxy-rate-limit';
+import { getSessionClaims } from './lib/session';
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -202,10 +207,10 @@ function rateLimitPolicy(pathname: string): {
   if (pathname.startsWith('/api/support/')) {
     return { maxRequests: 20, windowSeconds: 60 };
   }
-  if (
-    pathname.startsWith('/api/auth/') &&
-    pathname !== '/api/auth/session'
-  ) {
+  if (pathname === '/api/auth/session') {
+    return SESSION_READ_RATE_LIMIT;
+  }
+  if (pathname.startsWith('/api/auth/')) {
     return { maxRequests: browserHarnessAuthLimit(), windowSeconds: 60 };
   }
   if (pathname === '/api/products' || pathname === '/api/search') {
@@ -242,9 +247,17 @@ export async function proxy(request: NextRequest) {
   }
 
   const policy = rateLimitPolicy(pathname);
+  const verifiedSessionUserId =
+    pathname === '/api/auth/session'
+      ? getSessionClaims(request)?.sub
+      : undefined;
   const rateLimit = await checkDistributedRateLimit({
     namespace: `${request.method}:${pathname}`,
-    identifier: getClientIp(request),
+    identifier: proxyRateLimitIdentifier(
+      pathname,
+      getClientIp(request),
+      verifiedSessionUserId,
+    ),
     maxRequests: policy.maxRequests,
     windowSeconds: policy.windowSeconds,
   });
