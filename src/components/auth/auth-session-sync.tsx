@@ -50,7 +50,10 @@ export function AuthSessionSync() {
 
         setUser(nextUser, { syncLogout: false });
       } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
+        if (
+          (error as Error).name !== 'AbortError' &&
+          (useUserStore.getState().user?.id || null) === startingUserId
+        ) {
           setUser(null, { syncLogout: false });
         }
       } finally {
