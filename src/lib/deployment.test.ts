@@ -30,7 +30,7 @@ test('only the production deployment is indexable', () => {
   );
 });
 
-test('production rate limiting requires both Redis REST credentials', () => {
+test('production uses Redis first and Postgres otherwise', () => {
   assert.equal(
     getRateLimitMode({ NODE_ENV: 'production' }),
     'unavailable',
@@ -59,6 +59,14 @@ test('production rate limiting requires both Redis REST credentials', () => {
   assert.equal(
     getRateLimitMode({
       NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://database.example/nexamart',
+    }),
+    'postgres',
+  );
+  assert.equal(
+    getRateLimitMode({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://database.example/nexamart',
       UPSTASH_REDIS_REST_URL: 'https://redis.example',
       UPSTASH_REDIS_REST_TOKEN: 'token',
     }),
@@ -66,7 +74,7 @@ test('production rate limiting requires both Redis REST credentials', () => {
   );
 });
 
-test('production readiness requires distributed rate limiting', () => {
+test('production readiness requires a shared rate limiter', () => {
   assert.equal(
     isDeploymentReady({
       DEPLOYMENT_ENV: 'production',
@@ -74,6 +82,14 @@ test('production readiness requires distributed rate limiting', () => {
       RATE_LIMIT_ALLOW_MEMORY_FALLBACK: 'true',
     }),
     false,
+  );
+  assert.equal(
+    isDeploymentReady({
+      DEPLOYMENT_ENV: 'production',
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://database.example/nexamart',
+    }),
+    true,
   );
   assert.equal(
     isDeploymentReady({

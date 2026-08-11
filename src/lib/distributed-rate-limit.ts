@@ -11,7 +11,7 @@ export interface DistributedRateLimitResult {
   allowed: boolean;
   remaining: number;
   resetAt: number;
-  source: 'redis' | 'memory' | 'unavailable';
+  source: 'redis' | 'postgres' | 'memory' | 'unavailable';
   unavailable: boolean;
 }
 
@@ -93,6 +93,41 @@ export function parseRedisRateLimitResult(
   };
 }
 
+export function parsePostgresRateLimitResult(
+  value: unknown,
+  maxRequests: number,
+  now = Date.now(),
+  defaultWindowMs = 60_000,
+): DistributedRateLimitResult | null {
+  if (!Array.isArray(value) || value.length < 1) return null;
+
+  const row = value[0];
+  if (!row || typeof row !== 'object') return null;
+
+  const count = Number((row as { count?: unknown }).count);
+  const rawResetAt = (row as { resetAt?: unknown }).resetAt;
+  const parsedResetAt =
+    rawResetAt instanceof Date
+      ? rawResetAt.getTime()
+      : Date.parse(String(rawResetAt || ''));
+
+  if (!Number.isFinite(count) || count < 1) return null;
+
+  const safeMax = positiveInteger(maxRequests, 1);
+  const resetAt =
+    Number.isFinite(parsedResetAt) && parsedResetAt > now
+      ? parsedResetAt
+      : now + defaultWindowMs;
+
+  return {
+    allowed: count <= safeMax,
+    remaining: Math.max(0, safeMax - count),
+    resetAt,
+    source: 'postgres',
+    unavailable: false,
+  };
+}
+
 export function isMemoryRateLimitFallbackAllowed(
   environment: Environment = process.env,
 ): boolean {
@@ -139,6 +174,10 @@ function upstashConfiguration(): { url: string; token: string } | null {
   return { url, token };
 }
 
+function postgresConfigurationAvailable(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
+
 function unavailableResult(now: number, windowMs: number): DistributedRateLimitResult {
   return {
     allowed: false,
@@ -149,25 +188,13 @@ function unavailableResult(now: number, windowMs: number): DistributedRateLimitR
   };
 }
 
-export async function checkDistributedRateLimit(
-  input: DistributedRateLimitInput,
+async function checkRedisRateLimit(
+  configuration: { url: string; token: string },
+  key: string,
+  maxRequests: number,
+  windowMs: number,
+  now: number,
 ): Promise<DistributedRateLimitResult> {
-  const maxRequests = positiveInteger(input.maxRequests, 1);
-  const windowSeconds = positiveInteger(input.windowSeconds, 60);
-  const windowMs = windowSeconds * 1_000;
-  const now = Date.now();
-  const key = await buildDistributedRateLimitKey(
-    input.namespace,
-    input.identifier,
-  );
-  const configuration = upstashConfiguration();
-
-  if (!configuration) {
-    return isMemoryRateLimitFallbackAllowed()
-      ? checkLocalRateLimit(key, maxRequests, windowMs, now)
-      : unavailableResult(now, windowMs);
-  }
-
   const timeoutMs = positiveInteger(
     Number(process.env.RATE_LIMIT_REDIS_TIMEOUT_MS),
     2_000,
@@ -209,12 +236,93 @@ export async function checkDistributedRateLimit(
     if (!parsed) throw new Error('Redis rate limiter returned an invalid result.');
 
     return parsed;
-  } catch (error) {
-    console.error('Distributed rate limiter unavailable:', error);
-    return isMemoryRateLimitFallbackAllowed()
-      ? checkLocalRateLimit(key, maxRequests, windowMs, now)
-      : unavailableResult(now, windowMs);
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function checkPostgresRateLimit(
+  key: string,
+  maxRequests: number,
+  windowMs: number,
+  now: number,
+): Promise<DistributedRateLimitResult> {
+  const { db } = await import('./db.ts');
+  const currentAt = new Date(now);
+  const resetAt = new Date(now + windowMs);
+
+  const rows = await db.$queryRaw<Array<{ count: number; resetAt: Date }>>`
+    INSERT INTO "nexamart_internal"."RateLimitBucket" AS bucket
+      ("key", "count", "resetAt", "updatedAt")
+    VALUES (${key}, 1, ${resetAt}, ${currentAt})
+    ON CONFLICT ("key") DO UPDATE SET
+      "count" = CASE
+        WHEN bucket."resetAt" <= ${currentAt} THEN 1
+        ELSE bucket."count" + 1
+      END,
+      "resetAt" = CASE
+        WHEN bucket."resetAt" <= ${currentAt} THEN ${resetAt}
+        ELSE bucket."resetAt"
+      END,
+      "updatedAt" = ${currentAt}
+    RETURNING "count", "resetAt"
+  `;
+
+  const parsed = parsePostgresRateLimitResult(
+    rows,
+    maxRequests,
+    now,
+    windowMs,
+  );
+  if (!parsed) throw new Error('Postgres rate limiter returned an invalid result.');
+
+  if (Math.random() < 0.01) {
+    const staleBefore = new Date(now - 86_400_000);
+    await db.$executeRaw`
+      DELETE FROM "nexamart_internal"."RateLimitBucket"
+      WHERE "key" IN (
+        SELECT "key"
+        FROM "nexamart_internal"."RateLimitBucket"
+        WHERE "resetAt" < ${staleBefore}
+        ORDER BY "resetAt" ASC
+        LIMIT 100
+      )
+    `;
+  }
+
+  return parsed;
+}
+
+export async function checkDistributedRateLimit(
+  input: DistributedRateLimitInput,
+): Promise<DistributedRateLimitResult> {
+  const maxRequests = positiveInteger(input.maxRequests, 1);
+  const windowSeconds = positiveInteger(input.windowSeconds, 60);
+  const windowMs = windowSeconds * 1_000;
+  const now = Date.now();
+  const key = await buildDistributedRateLimitKey(
+    input.namespace,
+    input.identifier,
+  );
+  const redis = upstashConfiguration();
+
+  if (redis) {
+    try {
+      return await checkRedisRateLimit(redis, key, maxRequests, windowMs, now);
+    } catch (error) {
+      console.error('Redis rate limiter unavailable:', error);
+    }
+  }
+
+  if (postgresConfigurationAvailable()) {
+    try {
+      return await checkPostgresRateLimit(key, maxRequests, windowMs, now);
+    } catch (error) {
+      console.error('Postgres rate limiter unavailable:', error);
+    }
+  }
+
+  return isMemoryRateLimitFallbackAllowed()
+    ? checkLocalRateLimit(key, maxRequests, windowMs, now)
+    : unavailableResult(now, windowMs);
 }

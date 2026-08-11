@@ -2,6 +2,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 export type RateLimitMode =
   | 'redis'
+  | 'postgres'
   | 'memory-fallback'
   | 'unavailable';
 
@@ -47,6 +48,10 @@ export function getRateLimitMode(
   );
   if (redisConfigured) return 'redis';
 
+  // The existing Neon/Postgres database provides a shared atomic counter across
+  // serverless instances, so production does not require a second paid service.
+  if (value(environment.DATABASE_URL)) return 'postgres';
+
   // Preview and staging deployments may use a process-local limiter so they
   // remain testable. Only the actual production environment fails closed
   // unless an operator explicitly enables the degraded fallback.
@@ -63,11 +68,12 @@ export function isDeploymentReady(
   const rateLimit = getRateLimitMode(environment);
   if (rateLimit === 'unavailable') return false;
 
-  // A single-instance in-memory limiter is useful for previews, staging, and
-  // the explicit browser harness, but it is not production-grade protection.
+  // Redis and Postgres are shared across serverless instances. A single-process
+  // memory limiter remains acceptable only outside the production environment.
   return (
     getDeploymentEnvironment(environment) !== 'production' ||
-    rateLimit === 'redis'
+    rateLimit === 'redis' ||
+    rateLimit === 'postgres'
   );
 }
 
