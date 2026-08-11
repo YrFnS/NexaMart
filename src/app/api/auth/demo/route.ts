@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { toAuthenticatedUser } from '@/lib/auth';
+import { checkDistributedApiRateLimit } from '@/lib/api-rate-limit';
 import { isDemoLoginEnabled } from '@/lib/demo-login';
-import { checkApiRateLimit, RATE_LIMITS, validateCsrf } from '@/lib/security';
+import { RATE_LIMITS, validateCsrf } from '@/lib/security';
 import {
   createSessionToken,
   serializeSessionCookie,
@@ -19,7 +20,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Demo login is disabled.' }, { status: 404 });
   }
 
-  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.auth);
+  const rateLimit = await checkDistributedApiRateLimit(
+    request,
+    'auth:demo',
+    RATE_LIMITS.auth,
+  );
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
 
   const csrf = validateCsrf(request);

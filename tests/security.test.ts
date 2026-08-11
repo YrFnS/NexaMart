@@ -2,8 +2,14 @@
 // under `bun test` rather than the node:test suite in src/lib because
 // src/lib/security.ts imports next/server, which plain Node cannot resolve.
 import { describe, expect, test } from 'bun:test';
+import { checkDistributedApiRateLimit } from '../src/lib/api-rate-limit';
+import type { DistributedRateLimitInput } from '../src/lib/distributed-rate-limit';
 import { createSessionToken, SESSION_COOKIE_NAME } from '../src/lib/session';
-import { validateAdminAuth, validateCsrf } from '../src/lib/security';
+import {
+  RATE_LIMITS,
+  validateAdminAuth,
+  validateCsrf,
+} from '../src/lib/security';
 
 process.env.AUTH_SECRET = 'test-auth-secret-that-is-longer-than-thirty-two-characters';
 process.env.NEXT_PUBLIC_APP_URL = 'https://nexamart.example';
@@ -14,6 +20,71 @@ function requestWithSession(url: string, token: string): Request {
     headers: { cookie: `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}` },
   });
 }
+
+describe('distributed API rate limiting', () => {
+  const url = 'https://nexamart.example/api/auth/login';
+
+  test('uses a server-controlled namespace and the trusted client identifier', async () => {
+    let capturedInput: DistributedRateLimitInput | undefined;
+    const resetAt = Date.now() + 60_000;
+    const request = new Request(url, {
+      headers: {
+        'x-forwarded-for': '203.0.113.10, 10.0.0.5',
+      },
+    });
+
+    const result = await checkDistributedApiRateLimit(
+      request,
+      'auth:login',
+      RATE_LIMITS.auth,
+      async (input) => {
+        capturedInput = input;
+        return {
+          allowed: true,
+          remaining: 4,
+          resetAt,
+          source: 'postgres',
+          unavailable: false,
+        };
+      },
+    );
+
+    expect(capturedInput).toEqual({
+      namespace: 'auth:login',
+      identifier: '203.0.113.10',
+      maxRequests: RATE_LIMITS.auth.maxRequests,
+      windowSeconds: RATE_LIMITS.auth.windowSeconds,
+    });
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(4);
+    expect(result.source).toBe('postgres');
+    expect(result.response).toBeUndefined();
+  });
+
+  test('preserves the hardened 429 response contract when shared quota is exhausted', async () => {
+    const resetAt = Date.now() + 30_000;
+    const result = await checkDistributedApiRateLimit(
+      new Request(url),
+      'auth:login',
+      RATE_LIMITS.auth,
+      async () => ({
+        allowed: false,
+        remaining: 0,
+        resetAt,
+        source: 'postgres',
+        unavailable: false,
+      }),
+    );
+
+    expect(result.allowed).toBe(false);
+    expect(result.response?.status).toBe(429);
+    expect(result.response?.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(Number(result.response?.headers.get('X-RateLimit-Reset'))).toBe(
+      Math.ceil(resetAt / 1000),
+    );
+    expect(Number(result.response?.headers.get('Retry-After'))).toBeGreaterThan(0);
+  });
+});
 
 describe('admin authorization', () => {
   test('accepts a signed admin session and rejects buyer or anonymous requests', () => {

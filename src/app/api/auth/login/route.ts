@@ -5,12 +5,9 @@ import {
   hasSellerWorkspaceAccess,
   toAuthenticatedUser,
 } from '@/lib/auth';
+import { checkDistributedApiRateLimit } from '@/lib/api-rate-limit';
 import { verifyPassword } from '@/lib/password';
-import {
-  checkApiRateLimit,
-  RATE_LIMITS,
-  validateCsrf,
-} from '@/lib/security';
+import { RATE_LIMITS, validateCsrf } from '@/lib/security';
 import {
   createSessionToken,
   serializeSessionCookie,
@@ -23,7 +20,11 @@ const loginSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const rateLimit = checkApiRateLimit(request, RATE_LIMITS.auth);
+  const rateLimit = await checkDistributedApiRateLimit(
+    request,
+    'auth:login',
+    RATE_LIMITS.auth,
+  );
   if (!rateLimit.allowed && rateLimit.response) return rateLimit.response;
 
   const csrf = validateCsrf(request);
