@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { toAuthenticatedUser } from '@/lib/auth';
+import { isDemoLoginEnabled } from '@/lib/demo-login';
 import { checkApiRateLimit, RATE_LIMITS, validateCsrf } from '@/lib/security';
 import {
   createSessionToken,
@@ -14,12 +15,7 @@ const demoSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const enabled =
-    process.env.ENABLE_DEMO_LOGIN === 'true' ||
-    process.env.VERCEL_ENV === 'preview' ||
-    process.env.NODE_ENV !== 'production';
-
-  if (!enabled) {
+  if (!isDemoLoginEnabled()) {
     return NextResponse.json({ error: 'Demo login is disabled.' }, { status: 404 });
   }
 
