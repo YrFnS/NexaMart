@@ -4,6 +4,7 @@ import {
   buildDistributedRateLimitKey,
   isMemoryRateLimitFallbackAllowed,
   normalizeRateLimitNamespace,
+  parsePostgresRateLimitResult,
   parseRedisRateLimitResult,
 } from './distributed-rate-limit.ts';
 
@@ -55,6 +56,37 @@ test('Redis counter responses produce bounded remaining and reset values', () =>
     unavailable: false,
   });
   assert.equal(parseRedisRateLimitResult({ result: 1 }, 5, now), null);
+});
+
+test('Postgres counter responses produce bounded remaining and reset values', () => {
+  const now = 1_000_000;
+  const resetAt = new Date(now + 4500);
+  const allowed = parsePostgresRateLimitResult(
+    [{ count: 3, resetAt }],
+    5,
+    now,
+  );
+  const denied = parsePostgresRateLimitResult(
+    [{ count: '6', resetAt: resetAt.toISOString() }],
+    5,
+    now,
+  );
+
+  assert.deepEqual(allowed, {
+    allowed: true,
+    remaining: 2,
+    resetAt: now + 4500,
+    source: 'postgres',
+    unavailable: false,
+  });
+  assert.deepEqual(denied, {
+    allowed: false,
+    remaining: 0,
+    resetAt: now + 4500,
+    source: 'postgres',
+    unavailable: false,
+  });
+  assert.equal(parsePostgresRateLimitResult([], 5, now), null);
 });
 
 test('memory fallback is automatic outside production but explicit in production', () => {
